@@ -36,6 +36,7 @@
         <activity
             android:name=".DatabaseViewActivity"
             android:exported="false" />
+        <activity android:name=".AppConfigViewActivity"></activity>
         <service
             android:name=".WifiForegroundService"
             android:enabled="true"

@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Общие настройки -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Общие настройки"
+            android:textStyle="bold"/>
+
+        <EditText
+            android:id="@+id/api_key_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="API Key"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Протокол геолокации:"
+            android:layout_marginTop="8dp"/>
+
+        <Spinner
+            android:id="@+id/protocol_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+        <Button
+            android:id="@+id/save_general_btn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Сохранить общие настройки"
+            android:layout_marginTop="8dp"/>
+
+
+        <!-- Настройки сканера -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Настройки сканера"
+            android:textStyle="bold"
+            android:layout_marginTop="24dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Выберите сканер:"/>
+
+        <Spinner
+            android:id="@+id/scanner_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Интервал сканирования (сек):"
+            android:layout_marginTop="8dp"/>
+
+        <EditText
+            android:id="@+id/interval_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Сила сигнала обнаружения:"
+            android:layout_marginTop="8dp"/>
+
+        <EditText
+            android:id="@+id/signal_strength_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal"/>
+
+        <Switch
+            android:id="@+id/enabled_switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Включен"
+            android:layout_marginTop="8dp"/>
+
+        <Button
+            android:id="@+id/save_scanner_btn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Сохранить настройки сканера"
+            android:layout_marginTop="8dp"/>
+
+        <!-- Результат -->
+        <TextView
+            android:id="@+id/result_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:textSize="12sp"/>
+
+    </LinearLayout>
+</ScrollView>

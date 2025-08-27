@@ -24,6 +24,7 @@ public class MainActivity extends AppCompatActivity {
     private Button startScanButton;
     private Button stopScanButton;
     private Button viewDatabaseButton;
+    private Button viewAppConfigButton;
     private static final int PERMISSION_REQUEST_CODE = 100;
 
     // Современный способ запроса разрешений
@@ -57,6 +58,7 @@ public class MainActivity extends AppCompatActivity {
         startScanButton = findViewById(R.id.startScanButton);
         stopScanButton = findViewById(R.id.stopScanButton);
         viewDatabaseButton = findViewById(R.id.viewDatabaseButton);
+        viewAppConfigButton = findViewById(R.id.viewAppConfigButton);
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -84,6 +86,14 @@ public class MainActivity extends AppCompatActivity {
                 viewDatabase();
             }
         });
+
+        viewAppConfigButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                viewAppConfig();
+            }
+        });
+
     }
 
     private void checkPermissionsAndStartScanning() {
@@ -200,4 +210,10 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = new Intent(this, DatabaseViewActivity.class);
         startActivity(intent);
     }
+
+    private void viewAppConfig(){
+        Intent intent = new Intent(this, AppConfigViewActivity.class);
+        startActivity(intent);
+    }
+
 }
