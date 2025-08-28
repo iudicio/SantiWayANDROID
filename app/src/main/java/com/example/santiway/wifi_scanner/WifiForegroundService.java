@@ -1,4 +1,4 @@
-package com.example.santiway;
+package com.example.santiway.wifi_scanner;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -18,6 +18,7 @@ import android.os.Looper;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.ActivityCompat;
 import android.util.Log;
+
 import java.util.List;
 
 public class WifiForegroundService extends Service {

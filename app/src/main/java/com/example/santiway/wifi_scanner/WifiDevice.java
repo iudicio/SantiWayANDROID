@@ -1,4 +1,4 @@
-package com.example.santiway;
+package com.example.santiway.wifi_scanner;
 
 public class WifiDevice {
     private int id;

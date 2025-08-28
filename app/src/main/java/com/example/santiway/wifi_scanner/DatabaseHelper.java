@@ -1,4 +1,4 @@
-package com.example.santiway;
+package com.example.santiway.wifi_scanner;
 
 import android.content.ContentValues;
 import android.content.Context;
