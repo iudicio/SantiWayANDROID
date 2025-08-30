@@ -38,7 +38,7 @@
             android:exported="false" />
         <activity android:name=".AppConfigViewActivity"></activity>
         <service
-            android:name=".WifiForegroundService"
+            android:name=".wifi_scanner.WifiForegroundService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="location|dataSync"/>

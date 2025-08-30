@@ -10,20 +10,6 @@ public class WifiDevice {
     private String vendor;
     private long timestamp;
 
-    public WifiDevice() {
-    }
-
-    public WifiDevice(String ssid, String bssid, int signalStrength, int frequency,
-                      String capabilities, String vendor, long timestamp) {
-        this.ssid = ssid;
-        this.bssid = bssid;
-        this.signalStrength = signalStrength;
-        this.frequency = frequency;
-        this.capabilities = capabilities;
-        this.vendor = vendor;
-        this.timestamp = timestamp;
-    }
-
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
 
