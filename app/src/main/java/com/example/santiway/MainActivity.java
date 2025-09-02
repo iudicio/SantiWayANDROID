@@ -175,15 +175,22 @@ public class MainActivity extends AppCompatActivity {
         builder.setPositiveButton("Создать", (dialog, which) -> {
             String folderName = input.getText().toString().trim();
             if (!folderName.isEmpty()) {
+                if (folderName.equals("default_table")) {
+                    Toast.makeText(this, "Имя папки недоступно", Toast.LENGTH_SHORT).show();
+                    return;
+                }
                 databaseHelper.createTableIfNotExists(folderName);
                 currentScanFolder = folderName;
                 updateCurrentFolderDisplay();
                 Toast.makeText(this, "Создана папка: " + folderName, Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "Имя папки не может быть пустым", Toast.LENGTH_SHORT).show();
             }
         });
         builder.setNegativeButton("Отмена", null);
         builder.show();
     }
+
 
     private void openDatabaseView(String tableName) {
         Intent intent = new Intent(this, DatabaseViewActivity.class);
