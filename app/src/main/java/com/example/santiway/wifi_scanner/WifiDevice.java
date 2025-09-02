@@ -1,7 +1,6 @@
 package com.example.santiway.wifi_scanner;
 
 public class WifiDevice {
-    private int id;
     private String ssid;
     private String bssid;
     private int signalStrength;
@@ -10,27 +9,74 @@ public class WifiDevice {
     private String vendor;
     private long timestamp;
 
-    public int getId() { return id; }
-    public void setId(int id) { this.id = id; }
+    public WifiDevice() {
+    }
 
-    public String getSsid() { return ssid; }
-    public void setSsid(String ssid) { this.ssid = ssid; }
+    public WifiDevice(String ssid, String bssid, int signalStrength, int frequency,
+                      String capabilities, String vendor, long timestamp) {
+        this.ssid = ssid;
+        this.bssid = bssid;
+        this.signalStrength = signalStrength;
+        this.frequency = frequency;
+        this.capabilities = capabilities;
+        this.vendor = vendor;
+        this.timestamp = timestamp;
+    }
 
-    public String getBssid() { return bssid; }
-    public void setBssid(String bssid) { this.bssid = bssid; }
+    // Геттеры и сеттеры
+    public String getSsid() {
+        return ssid;
+    }
 
-    public int getSignalStrength() { return signalStrength; }
-    public void setSignalStrength(int signalStrength) { this.signalStrength = signalStrength; }
+    public void setSsid(String ssid) {
+        this.ssid = ssid;
+    }
 
-    public int getFrequency() { return frequency; }
-    public void setFrequency(int frequency) { this.frequency = frequency; }
+    public String getBssid() {
+        return bssid;
+    }
 
-    public String getCapabilities() { return capabilities; }
-    public void setCapabilities(String capabilities) { this.capabilities = capabilities; }
+    public void setBssid(String bssid) {
+        this.bssid = bssid;
+    }
 
-    public String getVendor() { return vendor; }
-    public void setVendor(String vendor) { this.vendor = vendor; }
+    public int getSignalStrength() {
+        return signalStrength;
+    }
 
-    public long getTimestamp() { return timestamp; }
-    public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+    public void setSignalStrength(int signalStrength) {
+        this.signalStrength = signalStrength;
+    }
+
+    public int getFrequency() {
+        return frequency;
+    }
+
+    public void setFrequency(int frequency) {
+        this.frequency = frequency;
+    }
+
+    public String getCapabilities() {
+        return capabilities;
+    }
+
+    public void setCapabilities(String capabilities) {
+        this.capabilities = capabilities;
+    }
+
+    public String getVendor() {
+        return vendor;
+    }
+
+    public void setVendor(String vendor) {
+        this.vendor = vendor;
+    }
+
+    public long getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(long timestamp) {
+        this.timestamp = timestamp;
+    }
 }

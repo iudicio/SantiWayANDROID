@@ -95,6 +95,8 @@ public class MainActivity extends AppCompatActivity {
             tables.add("default_table");
         }
         dialogItems.addAll(tables);
+        dialogItems.add("---");
+        dialogItems.add("Управление папками");
 
         final CharSequence[] items = dialogItems.toArray(new CharSequence[0]);
 
@@ -104,7 +106,9 @@ public class MainActivity extends AppCompatActivity {
             String selectedItem = items[which].toString();
             if (selectedItem.equals("+ Создать новую папку")) {
                 showCreateFolderDialog();
-            } else {
+            } else if (selectedItem.equals("Управление папками")) {
+                showFolderManagementDialog();
+            } else if (!selectedItem.equals("---")) {
                 currentScanFolder = selectedItem;
                 updateCurrentFolderDisplay();
                 Toast.makeText(this, "Выбрана папка: " + currentScanFolder, Toast.LENGTH_SHORT).show();
@@ -112,6 +116,53 @@ public class MainActivity extends AppCompatActivity {
         });
         builder.setNegativeButton("Отмена", null);
         builder.show();
+    }
+
+    private void showFolderManagementDialog() {
+        List<String> tables = databaseHelper.getAllTables();
+        final List<String> deletableTables = new ArrayList<>();
+
+        for (String table : tables) {
+            if (!table.equals("default_table")) {
+                deletableTables.add(table);
+            }
+        }
+
+        if (deletableTables.isEmpty()) {
+            Toast.makeText(this, "Нет папок для удаления", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        final CharSequence[] items = deletableTables.toArray(new CharSequence[0]);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Удаление папок");
+        builder.setItems(items, (dialog, which) -> {
+            String tableToDelete = items[which].toString();
+            showDeleteConfirmationDialog(tableToDelete);
+        });
+        builder.setNegativeButton("Отмена", null);
+        builder.show();
+    }
+
+    private void showDeleteConfirmationDialog(String tableName) {
+        new AlertDialog.Builder(this)
+                .setTitle("Удаление папки")
+                .setMessage("Вы уверены, что хотите удалить папку '" + tableName + "'? Все данные будут потеряны!")
+                .setPositiveButton("Удалить", (dialog, which) -> {
+                    boolean success = databaseHelper.deleteTable(tableName);
+                    if (success) {
+                        Toast.makeText(this, "Папка удалена: " + tableName, Toast.LENGTH_SHORT).show();
+                        if (currentScanFolder.equals(tableName)) {
+                            currentScanFolder = "default_table";
+                            updateCurrentFolderDisplay();
+                        }
+                    } else {
+                        Toast.makeText(this, "Ошибка при удалении папки", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
     }
 
     private void showCreateFolderDialog() {

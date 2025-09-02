@@ -232,7 +232,7 @@ public class WifiForegroundService extends Service {
             device.setVendor(getVendorFromBSSID(result.BSSID));
             device.setTimestamp(System.currentTimeMillis());
 
-            long resultId = databaseHelper.addOrUpdateDevice(currentTableName, device);
+            long resultId = databaseHelper.addWifiDevice(currentTableName, device);
 
             if (resultId != -1) {
                 Log.d(TAG, "✓ Saved: " + device.getSsid() + " (" + device.getBssid() + ")");

@@ -1,6 +1,7 @@
 package com.example.santiway;
 
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -79,6 +80,13 @@ public class DatabaseViewActivity extends AppCompatActivity {
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_database_view, menu);
+
+        // Скрываем кнопку удаления для папки по умолчанию
+        MenuItem deleteItem = menu.findItem(R.id.action_delete);
+        if (currentTableName != null && currentTableName.equals("default_table")) {
+            deleteItem.setVisible(false);
+        }
+
         return true;
     }
 
@@ -93,6 +101,9 @@ public class DatabaseViewActivity extends AppCompatActivity {
             return true;
         } else if (id == R.id.action_clear) {
             clearCurrentTable();
+            return true;
+        } else if (id == R.id.action_delete) {
+            deleteCurrentTable();
             return true;
         } else if (id == R.id.action_info) {
             showTableInfo();
@@ -117,6 +128,30 @@ public class DatabaseViewActivity extends AppCompatActivity {
                         databaseHelper.clearTable(currentTableName);
                         refreshData();
                         Toast.makeText(this, "Папка очищена", Toast.LENGTH_SHORT).show();
+                    })
+                    .setNegativeButton("Отмена", null)
+                    .show();
+        }
+    }
+
+    private void deleteCurrentTable() {
+        if (currentTableName != null) {
+            if (currentTableName.equals("default_table")) {
+                Toast.makeText(this, "Нельзя удалить папку по умолчанию", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            new AlertDialog.Builder(this)
+                    .setTitle("Удаление папки")
+                    .setMessage("Вы уверены, что хотите удалить папку '" + currentTableName + "'? Это действие нельзя отменить!")
+                    .setPositiveButton("Удалить", (dialog, which) -> {
+                        boolean success = databaseHelper.deleteTable(currentTableName);
+                        if (success) {
+                            Toast.makeText(this, "Папка удалена", Toast.LENGTH_SHORT).show();
+                            finish(); // Закрываем активность после удаления
+                        } else {
+                            Toast.makeText(this, "Ошибка при удалении папки", Toast.LENGTH_SHORT).show();
+                        }
                     })
                     .setNegativeButton("Отмена", null)
                     .show();
