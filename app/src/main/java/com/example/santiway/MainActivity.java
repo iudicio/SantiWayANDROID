@@ -1,23 +1,30 @@
 package com.example.santiway;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
-
 import androidx.activity.EdgeToEdge;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
-
 import android.util.Log;
+import android.content.DialogInterface;
+import com.example.santiway.wifi_scanner.DatabaseHelper;
+import com.example.santiway.wifi_scanner.WifiForegroundService;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -25,9 +32,11 @@ public class MainActivity extends AppCompatActivity {
     private Button stopScanButton;
     private Button viewDatabaseButton;
     private Button viewAppConfigButton;
-    private static final int PERMISSION_REQUEST_CODE = 100;
+    private Button selectFolderButton;
+    private TextView currentFolderTextView;
+    private DatabaseHelper databaseHelper;
+    private String currentScanFolder = "default_table";
 
-    // Современный способ запроса разрешений
     private final ActivityResultLauncher<String[]> requestPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(),
                     permissions -> {
@@ -38,14 +47,10 @@ public class MainActivity extends AppCompatActivity {
                                 break;
                             }
                         }
-
                         if (allGranted) {
-                            Log.d("MainActivity", "All permissions granted, starting scan");
                             startWifiScanning();
                         } else {
-                            Log.w("MainActivity", "Some permissions were denied");
-                            Toast.makeText(this, "Permissions denied. Cannot start scanning.",
-                                    Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MainActivity.this, "Permissions denied", Toast.LENGTH_SHORT).show();
                         }
                     });
 
@@ -59,6 +64,11 @@ public class MainActivity extends AppCompatActivity {
         stopScanButton = findViewById(R.id.stopScanButton);
         viewDatabaseButton = findViewById(R.id.viewDatabaseButton);
         viewAppConfigButton = findViewById(R.id.viewAppConfigButton);
+        selectFolderButton = findViewById(R.id.selectFolderButton);
+        currentFolderTextView = findViewById(R.id.currentFolderTextView);
+
+        databaseHelper = new DatabaseHelper(this);
+        updateCurrentFolderDisplay();
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -66,66 +76,149 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
 
-        startScanButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                checkPermissionsAndStartScanning();
+        startScanButton.setOnClickListener(v -> checkPermissionsAndStartScanning());
+        stopScanButton.setOnClickListener(v -> stopWifiScanning());
+        viewDatabaseButton.setOnClickListener(v -> openDatabaseView(currentScanFolder));
+        viewAppConfigButton.setOnClickListener(v -> viewAppConfig());
+        selectFolderButton.setOnClickListener(v -> showFolderSelectionDialog());
+    }
+
+    private void updateCurrentFolderDisplay() {
+        currentFolderTextView.setText("Текущая папка: " + currentScanFolder);
+    }
+
+    private void showFolderSelectionDialog() {
+        List<String> tables = databaseHelper.getAllTables();
+        final List<String> dialogItems = new ArrayList<>();
+        dialogItems.add("+ Создать новую папку");
+        if (!tables.contains("default_table")) {
+            tables.add("default_table");
+        }
+        dialogItems.addAll(tables);
+        dialogItems.add("---");
+        dialogItems.add("Управление папками");
+
+        final CharSequence[] items = dialogItems.toArray(new CharSequence[0]);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Выберите папку для сканирования");
+        builder.setItems(items, (dialog, which) -> {
+            String selectedItem = items[which].toString();
+            if (selectedItem.equals("+ Создать новую папку")) {
+                showCreateFolderDialog();
+            } else if (selectedItem.equals("Управление папками")) {
+                showFolderManagementDialog();
+            } else if (!selectedItem.equals("---")) {
+                currentScanFolder = selectedItem;
+                updateCurrentFolderDisplay();
+                Toast.makeText(this, "Выбрана папка: " + currentScanFolder, Toast.LENGTH_SHORT).show();
             }
         });
+        builder.setNegativeButton("Отмена", null);
+        builder.show();
+    }
 
-        stopScanButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                stopWifiScanning();
+    private void showFolderManagementDialog() {
+        List<String> tables = databaseHelper.getAllTables();
+        final List<String> deletableTables = new ArrayList<>();
+
+        for (String table : tables) {
+            if (!table.equals("default_table")) {
+                deletableTables.add(table);
+            }
+        }
+
+        if (deletableTables.isEmpty()) {
+            Toast.makeText(this, "Нет папок для удаления", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        final CharSequence[] items = deletableTables.toArray(new CharSequence[0]);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Удаление папок");
+        builder.setItems(items, (dialog, which) -> {
+            String tableToDelete = items[which].toString();
+            showDeleteConfirmationDialog(tableToDelete);
+        });
+        builder.setNegativeButton("Отмена", null);
+        builder.show();
+    }
+
+    private void showDeleteConfirmationDialog(String tableName) {
+        new AlertDialog.Builder(this)
+                .setTitle("Удаление папки")
+                .setMessage("Вы уверены, что хотите удалить папку '" + tableName + "'? Все данные будут потеряны!")
+                .setPositiveButton("Удалить", (dialog, which) -> {
+                    boolean success = databaseHelper.deleteTable(tableName);
+                    if (success) {
+                        Toast.makeText(this, "Папка удалена: " + tableName, Toast.LENGTH_SHORT).show();
+                        if (currentScanFolder.equals(tableName)) {
+                            currentScanFolder = "default_table";
+                            updateCurrentFolderDisplay();
+                        }
+                    } else {
+                        Toast.makeText(this, "Ошибка при удалении папки", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void showCreateFolderDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Создать новую папку");
+        final android.widget.EditText input = new android.widget.EditText(this);
+        input.setHint("Введите название папки");
+        builder.setView(input);
+
+        builder.setPositiveButton("Создать", (dialog, which) -> {
+            String folderName = input.getText().toString().trim();
+            if (!folderName.isEmpty()) {
+                if (folderName.equals("default_table")) {
+                    Toast.makeText(this, "Имя папки недоступно", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                databaseHelper.createTableIfNotExists(folderName);
+                currentScanFolder = folderName;
+                updateCurrentFolderDisplay();
+                Toast.makeText(this, "Создана папка: " + folderName, Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "Имя папки не может быть пустым", Toast.LENGTH_SHORT).show();
             }
         });
+        builder.setNegativeButton("Отмена", null);
+        builder.show();
+    }
 
-        viewDatabaseButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                viewDatabase();
-            }
-        });
 
-        viewAppConfigButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                viewAppConfig();
-            }
-        });
-
+    private void openDatabaseView(String tableName) {
+        Intent intent = new Intent(this, DatabaseViewActivity.class);
+        intent.putExtra("TABLE_NAME", tableName);
+        startActivity(intent);
     }
 
     private void checkPermissionsAndStartScanning() {
-        Log.d("MainActivity", "Checking permissions");
-
         if (checkAllPermissions()) {
-            Log.d("MainActivity", "All permissions already granted");
             startWifiScanning();
         } else {
-            Log.d("MainActivity", "Requesting permissions");
             requestNecessaryPermissions();
         }
     }
 
     private boolean checkAllPermissions() {
-        // Проверяем все необходимые разрешения
         boolean hasLocationPermission = ContextCompat.checkSelfPermission(this,
                 android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-
         boolean hasNotificationPermission = true;
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             hasNotificationPermission = ContextCompat.checkSelfPermission(this,
                     android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
         }
-
         return hasLocationPermission && hasNotificationPermission;
     }
 
     private void requestNecessaryPermissions() {
-        // Создаем список разрешений для запроса
         String[] permissionsToRequest;
-
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             permissionsToRequest = new String[]{
                     android.Manifest.permission.ACCESS_FINE_LOCATION,
@@ -136,84 +229,30 @@ public class MainActivity extends AppCompatActivity {
                     android.Manifest.permission.ACCESS_FINE_LOCATION
             };
         }
-
-        // Проверяем, нужно ли показывать объяснение
-        boolean shouldShowRationale = false;
-        for (String permission : permissionsToRequest) {
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this, permission)) {
-                shouldShowRationale = true;
-                break;
-            }
-        }
-
-        if (shouldShowRationale) {
-            // Показываем объяснение пользователю
-            Toast.makeText(this,
-                    "This app needs location permission to scan for Wi-Fi networks and notification permission to show background scanning status",
-                    Toast.LENGTH_LONG).show();
-
-            // Даем время прочитать сообщение, затем запрашиваем разрешения
-            new android.os.Handler().postDelayed(() -> {
-                requestPermissionLauncher.launch(permissionsToRequest);
-            }, 2000);
-        } else {
-            // Сразу запрашиваем разрешения
-            requestPermissionLauncher.launch(permissionsToRequest);
-        }
+        requestPermissionLauncher.launch(permissionsToRequest);
     }
 
     private void startWifiScanning() {
-        Log.d("MainActivity", "Start button clicked - starting service");
         Intent serviceIntent = new Intent(this, WifiForegroundService.class);
         serviceIntent.setAction("START_SCAN");
-
+        serviceIntent.putExtra("tableName", currentScanFolder);
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent);
         } else {
             startService(serviceIntent);
         }
-
-        Toast.makeText(this, "Wi-Fi scanning started", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Сканирование запущено: " + currentScanFolder, Toast.LENGTH_SHORT).show();
     }
 
     private void stopWifiScanning() {
-        Log.d("MainActivity", "Stop button clicked");
         Intent serviceIntent = new Intent(this, WifiForegroundService.class);
         serviceIntent.setAction("STOP_SCAN");
         startService(serviceIntent);
-        Toast.makeText(this, "Wi-Fi scanning stopped", Toast.LENGTH_SHORT).show();
-    }
-
-    // Обработка результата запроса разрешений (для обратной совместимости)
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-
-        if (requestCode == PERMISSION_REQUEST_CODE) {
-            boolean allGranted = true;
-            for (int result : grantResults) {
-                if (result != PackageManager.PERMISSION_GRANTED) {
-                    allGranted = false;
-                    break;
-                }
-            }
-
-            if (allGranted) {
-                startWifiScanning();
-            } else {
-                Toast.makeText(this, "Permissions denied. Cannot start scanning.", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
-    private void viewDatabase() {
-        Intent intent = new Intent(this, DatabaseViewActivity.class);
-        startActivity(intent);
+        Toast.makeText(this, "Сканирование остановлено", Toast.LENGTH_SHORT).show();
     }
 
     private void viewAppConfig(){
         Intent intent = new Intent(this, AppConfigViewActivity.class);
         startActivity(intent);
     }
-
 }

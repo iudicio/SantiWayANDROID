@@ -5,30 +5,13 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
-import android.util.Log;
-
 import java.util.ArrayList;
 import java.util.List;
 
 public class DatabaseHelper extends SQLiteOpenHelper {
-    private static final String TAG = "DatabaseHelper";
 
-    // Database Info
-    private static final String DATABASE_NAME = "wifi_scanner.db";
+    private static final String DATABASE_NAME = "WifiScanner.db";
     private static final int DATABASE_VERSION = 1;
-
-    // Table Names
-    private static final String TABLE_WIFI_DEVICES = "wifi_devices";
-
-    // Wifi Devices Table Columns
-    private static final String KEY_ID = "id";
-    private static final String KEY_SSID = "ssid";
-    private static final String KEY_BSSID = "bssid";
-    private static final String KEY_SIGNAL_STRENGTH = "signal_strength";
-    private static final String KEY_FREQUENCY = "frequency";
-    private static final String KEY_CAPABILITIES = "capabilities";
-    private static final String KEY_VENDOR = "vendor";
-    private static final String KEY_TIMESTAMP = "timestamp";
 
     public DatabaseHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -36,181 +19,183 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onCreate(SQLiteDatabase db) {
-        String CREATE_WIFI_DEVICES_TABLE = "CREATE TABLE " + TABLE_WIFI_DEVICES +
-                "(" +
-                KEY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
-                KEY_SSID + " TEXT," +
-                KEY_BSSID + " TEXT UNIQUE," + // BSSID should be unique
-                KEY_SIGNAL_STRENGTH + " INTEGER," +
-                KEY_FREQUENCY + " INTEGER," +
-                KEY_CAPABILITIES + " TEXT," +
-                KEY_VENDOR + " TEXT," +
-                KEY_TIMESTAMP + " INTEGER" +
-                ")";
-
-        db.execSQL(CREATE_WIFI_DEVICES_TABLE);
-        Log.d(TAG, "Database created successfully");
+        // Таблица по умолчанию создается при первом обращении
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        if (oldVersion != newVersion) {
-            db.execSQL("DROP TABLE IF EXISTS " + TABLE_WIFI_DEVICES);
-            onCreate(db);
+        // Миграция данных при обновлении базы
+    }
+
+    // Создание таблицы (оборачиваем имя таблицы в двойные кавычки)
+    public void createTableIfNotExists(String tableName) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        String safeName = "\"" + tableName + "\"";
+        String createTableQuery = "CREATE TABLE IF NOT EXISTS " + safeName + " (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "ssid TEXT," +
+                "bssid TEXT UNIQUE," +
+                "signal_strength INTEGER," +
+                "frequency INTEGER," +
+                "capabilities TEXT," +
+                "vendor TEXT," +
+                "timestamp LONG)";
+        db.execSQL(createTableQuery);
+        db.close();
+    }
+
+    // Удаление таблицы, default_table нельзя удалить
+    public boolean deleteTable(String tableName) {
+        if (tableName.equals("default_table")) return false;
+
+        SQLiteDatabase db = this.getWritableDatabase();
+        try {
+            String safeName = "\"" + tableName + "\"";
+            db.execSQL("DROP TABLE IF EXISTS " + safeName);
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        } finally {
+            db.close();
         }
     }
 
-    // Insert or update a wifi device
-    public long addOrUpdateWifiDevice(WifiDevice device) {
-        SQLiteDatabase db = getWritableDatabase();
-        long result = -1;
+    // Добавление Wi-Fi устройства
+    public long addWifiDevice(String tableName, WifiDevice device) {
+        createTableIfNotExists(tableName);
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put("ssid", device.getSsid());
+        values.put("bssid", device.getBssid());
+        values.put("signal_strength", device.getSignalStrength());
+        values.put("frequency", device.getFrequency());
+        values.put("capabilities", device.getCapabilities());
+        values.put("vendor", device.getVendor());
+        values.put("timestamp", device.getTimestamp());
 
-        db.beginTransaction();
-        try {
-            ContentValues values = new ContentValues();
-            values.put(KEY_SSID, device.getSsid());
-            values.put(KEY_BSSID, device.getBssid());
-            values.put(KEY_SIGNAL_STRENGTH, device.getSignalStrength());
-            values.put(KEY_FREQUENCY, device.getFrequency());
-            values.put(KEY_CAPABILITIES, device.getCapabilities());
-            values.put(KEY_VENDOR, device.getVendor());
-            values.put(KEY_TIMESTAMP, device.getTimestamp());
-
-            // First try to update if device exists
-            int rowsAffected = db.update(TABLE_WIFI_DEVICES, values,
-                    KEY_BSSID + " = ?", new String[]{device.getBssid()});
-
-            // If no rows were updated, insert new device
-            if (rowsAffected == 0) {
-                result = db.insertOrThrow(TABLE_WIFI_DEVICES, null, values);
-                Log.d(TAG, "Inserted new device: " + device.getBssid());
-            } else {
-                result = rowsAffected;
-                Log.d(TAG, "Updated existing device: " + device.getBssid());
-            }
-
-            db.setTransactionSuccessful();
-        } catch (Exception e) {
-            Log.e(TAG, "Error while adding/updating device: " + e.getMessage());
-        } finally {
-            db.endTransaction();
-        }
-
+        long result = db.insert("\"" + tableName + "\"", null, values);
+        db.close();
         return result;
     }
 
-    // Get all wifi devices
-    public List<WifiDevice> getAllWifiDevices() {
-        List<WifiDevice> devices = new ArrayList<>();
+    // Добавление или обновление устройства по BSSID
+    public long addOrUpdateDevice(String tableName, WifiDevice device) {
+        createTableIfNotExists(tableName);
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put("ssid", device.getSsid());
+        values.put("bssid", device.getBssid());
+        values.put("signal_strength", device.getSignalStrength());
+        values.put("frequency", device.getFrequency());
+        values.put("capabilities", device.getCapabilities());
+        values.put("vendor", device.getVendor());
+        values.put("timestamp", device.getTimestamp());
 
-        String SELECT_QUERY = "SELECT * FROM " + TABLE_WIFI_DEVICES +
-                " ORDER BY " + KEY_TIMESTAMP + " DESC";
-
-        SQLiteDatabase db = getReadableDatabase();
-        Cursor cursor = db.rawQuery(SELECT_QUERY, null);
-
+        long result = -1;
         try {
-            if (cursor.moveToFirst()) {
-                do {
-                    WifiDevice device = new WifiDevice();
-                    device.setId(cursor.getInt(cursor.getColumnIndexOrThrow(KEY_ID)));
-                    device.setSsid(cursor.getString(cursor.getColumnIndexOrThrow(KEY_SSID)));
-                    device.setBssid(cursor.getString(cursor.getColumnIndexOrThrow(KEY_BSSID)));
-                    device.setSignalStrength(cursor.getInt(cursor.getColumnIndexOrThrow(KEY_SIGNAL_STRENGTH)));
-                    device.setFrequency(cursor.getInt(cursor.getColumnIndexOrThrow(KEY_FREQUENCY)));
-                    device.setCapabilities(cursor.getString(cursor.getColumnIndexOrThrow(KEY_CAPABILITIES)));
-                    device.setVendor(cursor.getString(cursor.getColumnIndexOrThrow(KEY_VENDOR)));
-                    device.setTimestamp(cursor.getLong(cursor.getColumnIndexOrThrow(KEY_TIMESTAMP)));
-
-                    devices.add(device);
-                } while (cursor.moveToNext());
+            int rowsAffected = db.update("\"" + tableName + "\"", values, "bssid = ?", new String[]{device.getBssid()});
+            if (rowsAffected == 0) {
+                result = db.insert("\"" + tableName + "\"", null, values);
+            } else {
+                result = rowsAffected;
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error while getting devices: " + e.getMessage());
+            e.printStackTrace();
+            result = db.insert("\"" + tableName + "\"", null, values);
         } finally {
-            if (cursor != null && !cursor.isClosed()) {
-                cursor.close();
-            }
+            db.close();
         }
-
-        return devices;
+        return result;
     }
 
-    public List<WifiDevice> getDevicesBySignalStrength(int minStrength, int maxStrength) {
+    // Получение всех устройств из таблицы
+    public List<WifiDevice> getAllDevices(String tableName) {
         List<WifiDevice> devices = new ArrayList<>();
-
-        String SELECT_QUERY = "SELECT * FROM " + TABLE_WIFI_DEVICES +
-                " WHERE " + KEY_SIGNAL_STRENGTH + " BETWEEN ? AND ?" +
-                " ORDER BY " + KEY_SIGNAL_STRENGTH + " DESC";
-
-        SQLiteDatabase db = getReadableDatabase();
-        Cursor cursor = db.rawQuery(SELECT_QUERY,
-                new String[]{String.valueOf(minStrength), String.valueOf(maxStrength)});
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
 
         try {
+            cursor = db.query("\"" + tableName + "\"", null, null, null, null, null, "timestamp DESC");
             if (cursor != null && cursor.moveToFirst()) {
                 do {
                     WifiDevice device = new WifiDevice();
-
-                    // Безопасное получение значений из cursor
-                    int idIndex = cursor.getColumnIndex(KEY_ID);
-                    int ssidIndex = cursor.getColumnIndex(KEY_SSID);
-                    int bssidIndex = cursor.getColumnIndex(KEY_BSSID);
-                    int signalIndex = cursor.getColumnIndex(KEY_SIGNAL_STRENGTH);
-                    int freqIndex = cursor.getColumnIndex(KEY_FREQUENCY);
-                    int capsIndex = cursor.getColumnIndex(KEY_CAPABILITIES);
-                    int vendorIndex = cursor.getColumnIndex(KEY_VENDOR);
-                    int timeIndex = cursor.getColumnIndex(KEY_TIMESTAMP);
-
-                    if (idIndex != -1) device.setId(cursor.getInt(idIndex));
-                    if (ssidIndex != -1) device.setSsid(cursor.getString(ssidIndex));
-                    if (bssidIndex != -1) device.setBssid(cursor.getString(bssidIndex));
-                    if (signalIndex != -1) device.setSignalStrength(cursor.getInt(signalIndex));
-                    if (freqIndex != -1) device.setFrequency(cursor.getInt(freqIndex));
-                    if (capsIndex != -1) device.setCapabilities(cursor.getString(capsIndex));
-                    if (vendorIndex != -1) device.setVendor(cursor.getString(vendorIndex));
-                    if (timeIndex != -1) device.setTimestamp(cursor.getLong(timeIndex));
-
+                    device.setSsid(cursor.getString(cursor.getColumnIndexOrThrow("ssid")));
+                    device.setBssid(cursor.getString(cursor.getColumnIndexOrThrow("bssid")));
+                    device.setSignalStrength(cursor.getInt(cursor.getColumnIndexOrThrow("signal_strength")));
+                    device.setFrequency(cursor.getInt(cursor.getColumnIndexOrThrow("frequency")));
+                    device.setCapabilities(cursor.getString(cursor.getColumnIndexOrThrow("capabilities")));
+                    device.setVendor(cursor.getString(cursor.getColumnIndexOrThrow("vendor")));
+                    device.setTimestamp(cursor.getLong(cursor.getColumnIndexOrThrow("timestamp")));
                     devices.add(device);
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error while getting devices: " + e.getMessage());
+            e.printStackTrace();
         } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
+            if (cursor != null) cursor.close();
+            db.close();
         }
 
         return devices;
     }
 
-    // Delete old records (older than 7 days)
-    public int deleteOldRecords(long cutoffTime) {
-        SQLiteDatabase db = getWritableDatabase();
-        return db.delete(TABLE_WIFI_DEVICES,
-                KEY_TIMESTAMP + " < ?",
-                new String[]{String.valueOf(cutoffTime)});
+    // Очистка таблицы
+    public void clearTable(String tableName) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        try {
+            db.delete("\"" + tableName + "\"", null, null);
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            db.close();
+        }
     }
 
-    // Get total count of devices
-    public int getDevicesCount() {
-        String countQuery = "SELECT COUNT(*) FROM " + TABLE_WIFI_DEVICES;
-        SQLiteDatabase db = getReadableDatabase();
-        Cursor cursor = db.rawQuery(countQuery, null);
-
+    // Подсчет записей
+    public int getDevicesCount(String tableName) {
+        SQLiteDatabase db = this.getReadableDatabase();
         int count = 0;
-        if (cursor != null) {
-            cursor.moveToFirst();
-            count = cursor.getInt(0);
-            cursor.close();
+        Cursor cursor = null;
+
+        try {
+            cursor = db.rawQuery("SELECT COUNT(*) FROM \"" + tableName + "\"", null);
+            if (cursor != null && cursor.moveToFirst()) {
+                count = cursor.getInt(0);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (cursor != null) cursor.close();
+            db.close();
         }
 
         return count;
     }
 
-    public void clearAllData() {
-        SQLiteDatabase db = getWritableDatabase();
-        db.delete(TABLE_WIFI_DEVICES, null, null);
+    // Получение всех таблиц (кроме системных)
+    public List<String> getAllTables() {
+        List<String> tables = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+
+        try {
+            cursor = db.rawQuery(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%'",
+                    null
+            );
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    tables.add(cursor.getString(0));
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (cursor != null) cursor.close();
+            db.close();
+        }
+
+        return tables;
     }
 }
