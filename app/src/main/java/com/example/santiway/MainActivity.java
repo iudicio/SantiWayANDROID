@@ -3,6 +3,7 @@ package com.example.santiway;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.location.Location;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -22,6 +23,7 @@ import android.util.Log;
 import android.content.DialogInterface;
 import com.example.santiway.wifi_scanner.DatabaseHelper;
 import com.example.santiway.wifi_scanner.WifiForegroundService;
+import com.example.santiway.gsm_protocol.LocationManager;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +37,7 @@ public class MainActivity extends AppCompatActivity {
     private Button selectFolderButton;
     private TextView currentFolderTextView;
     private DatabaseHelper databaseHelper;
+    private LocationManager locationManager;
     private String currentScanFolder = "default_table";
 
     private final ActivityResultLauncher<String[]> requestPermissionLauncher =
@@ -48,6 +51,7 @@ public class MainActivity extends AppCompatActivity {
                             }
                         }
                         if (allGranted) {
+                            initializeLocationManager();
                             startWifiScanning();
                         } else {
                             Toast.makeText(MainActivity.this, "Permissions denied", Toast.LENGTH_SHORT).show();
@@ -81,6 +85,77 @@ public class MainActivity extends AppCompatActivity {
         viewDatabaseButton.setOnClickListener(v -> openDatabaseView(currentScanFolder));
         viewAppConfigButton.setOnClickListener(v -> viewAppConfig());
         selectFolderButton.setOnClickListener(v -> showFolderSelectionDialog());
+
+        // Проверяем разрешения при запуске
+        checkAndRequestLocationPermissions();
+    }
+
+    private void checkAndRequestLocationPermissions() {
+        if (!checkAllPermissions()) {
+            requestNecessaryPermissions();
+        } else {
+            // Если разрешения уже есть, инициализируем LocationManager
+            initializeLocationManager();
+        }
+    }
+
+    private void initializeLocationManager() {
+        locationManager = new LocationManager(this);
+        locationManager.setOnLocationUpdateListener(new LocationManager.OnLocationUpdateListener() {
+            @Override
+            public void onLocationUpdate(Location location) {
+                Log.d("MainActivity", "Location updated: " +
+                        location.getLatitude() + ", " + location.getLongitude());
+            }
+
+            @Override
+            public void onPermissionDenied() {
+                runOnUiThread(() -> {
+                    Toast.makeText(MainActivity.this,
+                            "Location permission denied", Toast.LENGTH_SHORT).show();
+                });
+            }
+
+            @Override
+            public void onLocationError(String error) {
+                Log.e("MainActivity", "Location error: " + error);
+            }
+        });
+
+        // Запускаем обновления местоположения
+        locationManager.startLocationUpdates();
+
+        // Получаем последнюю известную локацию
+        locationManager.getLastKnownLocation();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // При возобновлении активности продолжаем обновления местоположения
+        if (locationManager != null && checkAllPermissions()) {
+            locationManager.startLocationUpdates();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // При сворачивании приложения НЕ останавливаем LocationManager
+        // Он продолжит работать в фоновом режиме
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // При полном уничтожении активности очищаем ресурсы
+        if (locationManager != null) {
+            locationManager.cleanup();
+            locationManager = null;
+        }
+
+        // Также останавливаем сервис сканирования
+        stopWifiScanning();
     }
 
     private void updateCurrentFolderDisplay() {
@@ -233,9 +308,24 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startWifiScanning() {
+        // Получаем текущее местоположение и передаем в сервис
+        Location currentLocation = null;
+        if (locationManager != null) {
+            currentLocation = locationManager.getCurrentLocation();
+        }
         Intent serviceIntent = new Intent(this, WifiForegroundService.class);
         serviceIntent.setAction("START_SCAN");
         serviceIntent.putExtra("tableName", currentScanFolder);
+
+        // Передаем координаты в сервис
+        if (currentLocation != null) {
+            serviceIntent.putExtra("latitude", currentLocation.getLatitude());
+            serviceIntent.putExtra("longitude", currentLocation.getLongitude());
+            serviceIntent.putExtra("accuracy", currentLocation.getAccuracy());
+            if (currentLocation.hasAltitude()) {
+                serviceIntent.putExtra("altitude", currentLocation.getAltitude());
+            }
+        }
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent);
         } else {

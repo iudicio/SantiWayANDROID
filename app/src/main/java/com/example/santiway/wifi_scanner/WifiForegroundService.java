@@ -34,6 +34,10 @@ public class WifiForegroundService extends Service {
     private boolean isScanning = false;
     private long scanInterval = 15000;
     private String currentTableName = "default_table";
+    private double currentLatitude = 0.0;
+    private double currentLongitude = 0.0;
+    private double currentAltitude = 0.0;
+    private float currentAccuracy = 0.0f;
 
     @Override
     public void onCreate() {
@@ -53,7 +57,18 @@ public class WifiForegroundService extends Service {
         Log.d(TAG, "Service onStartCommand");
 
         if (intent != null) {
-            // Get table name from intent
+            // Получаем координаты из intent
+            if (intent.hasExtra("latitude")) {
+                currentLatitude = intent.getDoubleExtra("latitude", 0.0);
+                currentLongitude = intent.getDoubleExtra("longitude", 0.0);
+                currentAccuracy = intent.getFloatExtra("accuracy", 0.0f);
+                if (intent.hasExtra("altitude")) {
+                    currentAltitude = intent.getDoubleExtra("altitude", 0.0);
+                }
+                Log.d(TAG, "Location received: " + currentLatitude + ", " + currentLongitude);
+            }
+
+            // Получить имя таблицы из intent
             if (intent.hasExtra("tableName")) {
                 currentTableName = intent.getStringExtra("tableName");
                 Log.d(TAG, "Table name set to: " + currentTableName);
@@ -230,6 +245,10 @@ public class WifiForegroundService extends Service {
             device.setFrequency(result.frequency);
             device.setCapabilities(result.capabilities != null ? result.capabilities : "Unknown");
             device.setVendor(getVendorFromBSSID(result.BSSID));
+            device.setLatitude(currentLatitude);
+            device.setLongitude(currentLongitude);
+            device.setAltitude(currentAltitude);
+            device.setLocationAccuracy(currentAccuracy);
             device.setTimestamp(System.currentTimeMillis());
 
             long resultId = databaseHelper.addWifiDevice(currentTableName, device);

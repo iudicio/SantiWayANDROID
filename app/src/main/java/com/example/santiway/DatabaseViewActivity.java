@@ -61,6 +61,8 @@ public class DatabaseViewActivity extends AppCompatActivity {
                         .append("Частота: ").append(device.getFrequency()).append(" MHz\n")
                         .append("Защита: ").append(device.getCapabilities()).append("\n")
                         .append("Производитель: ").append(device.getVendor()).append("\n")
+                        .append("Координаты: ").append(String.format("%.6f, %.6f, %.6f", device.getLatitude(), device.getLongitude(), device.getAltitude())).append("\n")
+                        .append("Точность: ").append(device.getLocationAccuracy()).append("m\n")
                         .append("Время: ").append(timeString).append("\n")
                         .append("----------------------------\n");
             }
