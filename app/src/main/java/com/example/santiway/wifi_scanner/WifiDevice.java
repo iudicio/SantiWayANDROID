@@ -7,20 +7,13 @@ public class WifiDevice {
     private int frequency;
     private String capabilities;
     private String vendor;
+    private double latitude;
+    private double longitude;
+    private double altitude;
+    private float locationAccuracy;
     private long timestamp;
 
     public WifiDevice() {
-    }
-
-    public WifiDevice(String ssid, String bssid, int signalStrength, int frequency,
-                      String capabilities, String vendor, long timestamp) {
-        this.ssid = ssid;
-        this.bssid = bssid;
-        this.signalStrength = signalStrength;
-        this.frequency = frequency;
-        this.capabilities = capabilities;
-        this.vendor = vendor;
-        this.timestamp = timestamp;
     }
 
     // Геттеры и сеттеры
@@ -79,4 +72,15 @@ public class WifiDevice {
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
     }
+    public double getLatitude() { return latitude; }
+    public void setLatitude(double latitude) { this.latitude = latitude; }
+
+    public double getLongitude() { return longitude; }
+    public void setLongitude(double longitude) { this.longitude = longitude; }
+
+    public double getAltitude() { return altitude; }
+    public void setAltitude(double altitude) { this.altitude = altitude; }
+
+    public float getLocationAccuracy() { return locationAccuracy; }
+    public void setLocationAccuracy(float locationAccuracy) { this.locationAccuracy = locationAccuracy; }
 }
