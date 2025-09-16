@@ -24,6 +24,8 @@ import android.content.DialogInterface;
 import com.example.santiway.wifi_scanner.DatabaseHelper;
 import com.example.santiway.wifi_scanner.WifiForegroundService;
 import com.example.santiway.gsm_protocol.LocationManager;
+import com.example.santiway.cell_scanner.CellScannerManager;
+import com.example.santiway.cell_scanner.CellTower;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -35,10 +37,16 @@ public class MainActivity extends AppCompatActivity {
     private Button viewDatabaseButton;
     private Button viewAppConfigButton;
     private Button selectFolderButton;
+    private Button startCellScanButton;
+    private Button stopCellScanButton;
+    private Button viewCellDatabaseButton;
     private TextView currentFolderTextView;
+    private TextView cellScanStatusTextView;
     private DatabaseHelper databaseHelper;
     private LocationManager locationManager;
+    private CellScannerManager cellScannerManager;
     private String currentScanFolder = "default_table";
+    private String currentCellScanFolder = "default_cell_table";
 
     private final ActivityResultLauncher<String[]> requestPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(),
@@ -69,10 +77,16 @@ public class MainActivity extends AppCompatActivity {
         viewDatabaseButton = findViewById(R.id.viewDatabaseButton);
         viewAppConfigButton = findViewById(R.id.viewAppConfigButton);
         selectFolderButton = findViewById(R.id.selectFolderButton);
+        startCellScanButton = findViewById(R.id.startCellScanButton);
+        stopCellScanButton = findViewById(R.id.stopCellScanButton);
+        viewCellDatabaseButton = findViewById(R.id.viewCellDatabaseButton);
         currentFolderTextView = findViewById(R.id.currentFolderTextView);
+        cellScanStatusTextView = findViewById(R.id.cellScanStatusTextView);
 
         databaseHelper = new DatabaseHelper(this);
+        cellScannerManager = new CellScannerManager(this);
         updateCurrentFolderDisplay();
+        updateCellScanStatus();
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -85,6 +99,16 @@ public class MainActivity extends AppCompatActivity {
         viewDatabaseButton.setOnClickListener(v -> openDatabaseView(currentScanFolder));
         viewAppConfigButton.setOnClickListener(v -> viewAppConfig());
         selectFolderButton.setOnClickListener(v -> showFolderSelectionDialog());
+        
+        if (startCellScanButton != null) {
+            startCellScanButton.setOnClickListener(v -> checkPermissionsAndStartCellScanning());
+        }
+        if (stopCellScanButton != null) {
+            stopCellScanButton.setOnClickListener(v -> stopCellScanning());
+        }
+        if (viewCellDatabaseButton != null) {
+            viewCellDatabaseButton.setOnClickListener(v -> showCellDatabaseInfo());
+        }
 
         // Проверяем разрешения при запуске
         checkAndRequestLocationPermissions();
@@ -154,12 +178,24 @@ public class MainActivity extends AppCompatActivity {
             locationManager = null;
         }
 
-        // Также останавливаем сервис сканирования
         stopWifiScanning();
+        stopCellScanning();
+        
+        if (cellScannerManager != null) {
+            cellScannerManager.cleanup();
+            cellScannerManager = null;
+        }
     }
 
     private void updateCurrentFolderDisplay() {
         currentFolderTextView.setText("Текущая папка: " + currentScanFolder);
+    }
+    
+    private void updateCellScanStatus() {
+        if (cellScanStatusTextView != null && cellScannerManager != null) {
+            String status = cellScannerManager.getScanningStatus();
+            cellScanStatusTextView.setText("Статус сканирования базовых станций:\n" + status);
+        }
     }
 
     private void showFolderSelectionDialog() {
@@ -284,12 +320,14 @@ public class MainActivity extends AppCompatActivity {
     private boolean checkAllPermissions() {
         boolean hasLocationPermission = ContextCompat.checkSelfPermission(this,
                 android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        boolean hasPhoneStatePermission = ContextCompat.checkSelfPermission(this,
+                android.Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED;
         boolean hasNotificationPermission = true;
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             hasNotificationPermission = ContextCompat.checkSelfPermission(this,
                     android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
         }
-        return hasLocationPermission && hasNotificationPermission;
+        return hasLocationPermission && hasPhoneStatePermission && hasNotificationPermission;
     }
 
     private void requestNecessaryPermissions() {
@@ -297,11 +335,13 @@ public class MainActivity extends AppCompatActivity {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             permissionsToRequest = new String[]{
                     android.Manifest.permission.ACCESS_FINE_LOCATION,
+                    android.Manifest.permission.READ_PHONE_STATE,
                     android.Manifest.permission.POST_NOTIFICATIONS
             };
         } else {
             permissionsToRequest = new String[]{
-                    android.Manifest.permission.ACCESS_FINE_LOCATION
+                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                    android.Manifest.permission.READ_PHONE_STATE
             };
         }
         requestPermissionLauncher.launch(permissionsToRequest);
@@ -344,5 +384,64 @@ public class MainActivity extends AppCompatActivity {
     private void viewAppConfig(){
         Intent intent = new Intent(this, AppConfigViewActivity.class);
         startActivity(intent);
+    }
+    
+    private void checkPermissionsAndStartCellScanning() {
+        if (checkAllPermissions()) {
+            startCellScanning();
+        } else {
+            requestNecessaryPermissions();
+        }
+    }
+    
+    private void startCellScanning() {
+        if (cellScannerManager != null) {
+            cellScannerManager.startScanning(currentCellScanFolder);
+            Toast.makeText(this, "Сканирование базовых станций запущено: " + currentCellScanFolder, Toast.LENGTH_SHORT).show();
+            updateCellScanStatus();
+        }
+    }
+    
+    private void stopCellScanning() {
+        if (cellScannerManager != null) {
+            cellScannerManager.stopScanning();
+            Toast.makeText(this, "Сканирование базовых станций остановлено", Toast.LENGTH_SHORT).show();
+            updateCellScanStatus();
+        }
+    }
+    
+    private void showCellDatabaseInfo() {
+        if (cellScannerManager == null) {
+            Toast.makeText(this, "CellScannerManager не инициализирован", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        StringBuilder info = new StringBuilder();
+        info.append("=== ИНФОРМАЦИЯ О БАЗОВЫХ СТАНЦИЯХ ===\n\n");
+        
+        info.append("Статус сканирования:\n");
+        info.append(cellScannerManager.getScanningStatus()).append("\n");
+        
+        info.append("Информация о покрытии:\n");
+        info.append(cellScannerManager.getCoverageInfo()).append("\n");
+        
+        info.append("Информация о сети:\n");
+        info.append(cellScannerManager.getNetworkInfo()).append("\n");
+        
+        info.append("Статистика по типам сетей:\n");
+        info.append(cellScannerManager.getTowerStatistics()).append("\n");
+        
+        int towersCount = cellScannerManager.getTowersCount(currentCellScanFolder);
+        info.append("Записей в базе данных: ").append(towersCount).append("\n\n");
+        
+        info.append("=== ТЕКУЩИЕ БАЗОВЫЕ СТАНЦИИ ===\n");
+        info.append(cellScannerManager.getDetailedTowerInfo());
+        
+        new AlertDialog.Builder(this)
+                .setTitle("Информация о базовых станциях")
+                .setMessage(info.toString())
+                .setPositiveButton("OK", null)
+                .setNeutralButton("Обновить", (dialog, which) -> updateCellScanStatus())
+                .show();
     }
 }
