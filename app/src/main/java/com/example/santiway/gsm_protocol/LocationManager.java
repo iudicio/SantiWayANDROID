@@ -140,7 +140,20 @@ public class LocationManager {
         return currentLocation != null;
     }
 
-    // Интерфейс для колбэков
+    public boolean isGpsAvailable() {
+        return hasFineLocationPermission();
+    }
+
+    public boolean isNetworkLocationAvailable() {
+        return hasFineLocationPermission();
+    }
+
+    public boolean isLocationFresh() {
+        if (currentLocation == null) return false;
+        long timeDiff = System.currentTimeMillis() - currentLocation.getTime();
+        return timeDiff < 300000;
+    }
+
     public interface OnLocationUpdateListener {
         void onLocationUpdate(Location location);
         void onPermissionDenied();
