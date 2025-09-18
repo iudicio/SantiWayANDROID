@@ -29,6 +29,7 @@ import com.example.santiway.cell_scanner.CellTower;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import com.example.santiway.bluetooth_scanner.BluetoothForegroundService;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -61,6 +62,7 @@ public class MainActivity extends AppCompatActivity {
                         if (allGranted) {
                             initializeLocationManager();
                             startWifiScanning();
+                            startBluetoothScanning();
                         } else {
                             Toast.makeText(MainActivity.this, "Permissions denied", Toast.LENGTH_SHORT).show();
                         }
@@ -95,11 +97,11 @@ public class MainActivity extends AppCompatActivity {
         });
 
         startScanButton.setOnClickListener(v -> checkPermissionsAndStartScanning());
-        stopScanButton.setOnClickListener(v -> stopWifiScanning());
+        stopScanButton.setOnClickListener(v -> {stopWifiScanning(); stopBluetoothScanning();});
         viewDatabaseButton.setOnClickListener(v -> openDatabaseView(currentScanFolder));
         viewAppConfigButton.setOnClickListener(v -> viewAppConfig());
         selectFolderButton.setOnClickListener(v -> showFolderSelectionDialog());
-        
+
         if (startCellScanButton != null) {
             startCellScanButton.setOnClickListener(v -> checkPermissionsAndStartCellScanning());
         }
@@ -179,8 +181,9 @@ public class MainActivity extends AppCompatActivity {
         }
 
         stopWifiScanning();
+        stopBluetoothScanning();
         stopCellScanning();
-        
+
         if (cellScannerManager != null) {
             cellScannerManager.cleanup();
             cellScannerManager = null;
@@ -190,7 +193,7 @@ public class MainActivity extends AppCompatActivity {
     private void updateCurrentFolderDisplay() {
         currentFolderTextView.setText("Текущая папка: " + currentScanFolder);
     }
-    
+
     private void updateCellScanStatus() {
         if (cellScanStatusTextView != null && cellScannerManager != null) {
             String status = cellScannerManager.getScanningStatus();
@@ -312,6 +315,7 @@ public class MainActivity extends AppCompatActivity {
     private void checkPermissionsAndStartScanning() {
         if (checkAllPermissions()) {
             startWifiScanning();
+            startBluetoothScanning();
         } else {
             requestNecessaryPermissions();
         }
@@ -327,7 +331,17 @@ public class MainActivity extends AppCompatActivity {
             hasNotificationPermission = ContextCompat.checkSelfPermission(this,
                     android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
         }
-        return hasLocationPermission && hasPhoneStatePermission && hasNotificationPermission;
+        boolean hasBluetoothScanPermission = true;
+        boolean hasBluetoothConnectPermission = true;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            hasBluetoothScanPermission = ContextCompat.checkSelfPermission(this,
+                    android.Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
+            hasBluetoothConnectPermission = ContextCompat.checkSelfPermission(this,
+                    android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
+        }
+
+        return hasLocationPermission && hasPhoneStatePermission && hasNotificationPermission
+                && hasBluetoothScanPermission && hasBluetoothConnectPermission;
     }
 
     private void requestNecessaryPermissions() {
@@ -336,7 +350,16 @@ public class MainActivity extends AppCompatActivity {
             permissionsToRequest = new String[]{
                     android.Manifest.permission.ACCESS_FINE_LOCATION,
                     android.Manifest.permission.READ_PHONE_STATE,
-                    android.Manifest.permission.POST_NOTIFICATIONS
+                    android.Manifest.permission.POST_NOTIFICATIONS,
+                    android.Manifest.permission.BLUETOOTH_SCAN,
+                    android.Manifest.permission.BLUETOOTH_CONNECT
+            };
+        } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            permissionsToRequest = new String[]{
+                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                    android.Manifest.permission.READ_PHONE_STATE,
+                    android.Manifest.permission.BLUETOOTH_SCAN,
+                    android.Manifest.permission.BLUETOOTH_CONNECT
             };
         } else {
             permissionsToRequest = new String[]{
@@ -381,11 +404,44 @@ public class MainActivity extends AppCompatActivity {
         Toast.makeText(this, "Сканирование остановлено", Toast.LENGTH_SHORT).show();
     }
 
+    private void startBluetoothScanning() {
+        Location currentLocation = null;
+        if (locationManager != null) {
+            currentLocation = locationManager.getCurrentLocation();
+        }
+
+        Intent btServiceIntent = new Intent(this, BluetoothForegroundService.class);
+        btServiceIntent.setAction("START_SCAN");
+        btServiceIntent.putExtra("tableName", currentScanFolder);
+
+        if (currentLocation != null) {
+            btServiceIntent.putExtra("latitude", currentLocation.getLatitude());
+            btServiceIntent.putExtra("longitude", currentLocation.getLongitude());
+            btServiceIntent.putExtra("accuracy", currentLocation.getAccuracy());
+            if (currentLocation.hasAltitude()) {
+                btServiceIntent.putExtra("altitude", currentLocation.getAltitude());
+            }
+        }
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            startForegroundService(btServiceIntent);
+        } else {
+            startService(btServiceIntent);
+        }
+    }
+
+    private void stopBluetoothScanning() {
+        Intent btServiceIntent = new Intent(this, BluetoothForegroundService.class);
+        btServiceIntent.setAction("STOP_SCAN");
+        startService(btServiceIntent);
+    }
+
+
     private void viewAppConfig(){
         Intent intent = new Intent(this, AppConfigViewActivity.class);
         startActivity(intent);
     }
-    
+
     private void checkPermissionsAndStartCellScanning() {
         if (checkAllPermissions()) {
             startCellScanning();
@@ -393,7 +449,7 @@ public class MainActivity extends AppCompatActivity {
             requestNecessaryPermissions();
         }
     }
-    
+
     private void startCellScanning() {
         if (cellScannerManager != null) {
             cellScannerManager.startScanning(currentCellScanFolder);
@@ -401,7 +457,7 @@ public class MainActivity extends AppCompatActivity {
             updateCellScanStatus();
         }
     }
-    
+
     private void stopCellScanning() {
         if (cellScannerManager != null) {
             cellScannerManager.stopScanning();
@@ -409,34 +465,34 @@ public class MainActivity extends AppCompatActivity {
             updateCellScanStatus();
         }
     }
-    
+
     private void showCellDatabaseInfo() {
         if (cellScannerManager == null) {
             Toast.makeText(this, "CellScannerManager не инициализирован", Toast.LENGTH_SHORT).show();
             return;
         }
-        
+
         StringBuilder info = new StringBuilder();
         info.append("=== ИНФОРМАЦИЯ О БАЗОВЫХ СТАНЦИЯХ ===\n\n");
-        
+
         info.append("Статус сканирования:\n");
         info.append(cellScannerManager.getScanningStatus()).append("\n");
-        
+
         info.append("Информация о покрытии:\n");
         info.append(cellScannerManager.getCoverageInfo()).append("\n");
-        
+
         info.append("Информация о сети:\n");
         info.append(cellScannerManager.getNetworkInfo()).append("\n");
-        
+
         info.append("Статистика по типам сетей:\n");
         info.append(cellScannerManager.getTowerStatistics()).append("\n");
-        
+
         int towersCount = cellScannerManager.getTowersCount(currentCellScanFolder);
         info.append("Записей в базе данных: ").append(towersCount).append("\n\n");
-        
+
         info.append("=== ТЕКУЩИЕ БАЗОВЫЕ СТАНЦИИ ===\n");
         info.append(cellScannerManager.getDetailedTowerInfo());
-        
+
         new AlertDialog.Builder(this)
                 .setTitle("Информация о базовых станциях")
                 .setMessage(info.toString())

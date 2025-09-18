@@ -12,12 +12,15 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import com.example.santiway.wifi_scanner.DatabaseHelper;
 import com.example.santiway.wifi_scanner.WifiDevice;
+import com.example.santiway.bluetooth_scanner.BluetoothDatabaseHelper;
+import com.example.santiway.bluetooth_scanner.BluetoothDevice;
 import java.util.List;
 
 public class DatabaseViewActivity extends AppCompatActivity {
 
     private TextView dbInfoTextView;
     private DatabaseHelper databaseHelper;
+    private BluetoothDatabaseHelper btDatabaseHelper;
     private String currentTableName;
 
     @Override
@@ -32,6 +35,7 @@ public class DatabaseViewActivity extends AppCompatActivity {
 
         dbInfoTextView = findViewById(R.id.dbInfoTextView);
         databaseHelper = new DatabaseHelper(this);
+        btDatabaseHelper = new BluetoothDatabaseHelper(this);
 
         currentTableName = getIntent().getStringExtra("TABLE_NAME");
         if (currentTableName != null) {
@@ -67,6 +71,29 @@ public class DatabaseViewActivity extends AppCompatActivity {
                         .append("----------------------------\n");
             }
         }
+        // --- Bluetooth устройства ---
+        List<BluetoothDevice> btDevices = btDatabaseHelper.getAllDevices(tableName);
+        sb.append("Bluetooth устройства:\n");
+        if (btDevices.isEmpty()) {
+            sb.append("Нет Bluetooth устройств\n\n");
+        } else {
+            sb.append("Найдено Bluetooth устройств: ").append(btDevices.size()).append("\n\n");
+            for (int i = 0; i < btDevices.size(); i++) {
+                com.example.santiway.bluetooth_scanner.BluetoothDevice device = btDevices.get(i);
+                String timeString = formatTimestamp(device.getTimestamp());
+                sb.append("Устройство ").append(i + 1).append(":\n")
+                        .append("Имя: ").append(device.getDeviceName()).append("\n")
+                        .append("MAC: ").append(device.getMacAddress()).append("\n")
+                        .append("Сила сигнала: ").append(device.getSignalStrength()).append(" dBm\n")
+                        .append("Производитель: ").append(device.getVendor()).append("\n")
+                        .append("Координаты: ").append(String.format("%.6f, %.6f, %.6f",
+                                device.getLatitude(), device.getLongitude(), device.getAltitude())).append("\n")
+                        .append("Точность: ").append(device.getLocationAccuracy()).append("m\n")
+                        .append("Время: ").append(timeString).append("\n")
+                        .append("----------------------------\n");
+            }
+        }
+
         dbInfoTextView.setText(sb.toString());
     }
 
@@ -127,6 +154,7 @@ public class DatabaseViewActivity extends AppCompatActivity {
                     .setTitle("Очистка папки")
                     .setMessage("Очистить папку '" + currentTableName + "'?")
                     .setPositiveButton("Очистить", (dialog, which) -> {
+                        btDatabaseHelper.clearTable(currentTableName);
                         databaseHelper.clearTable(currentTableName);
                         refreshData();
                         Toast.makeText(this, "Папка очищена", Toast.LENGTH_SHORT).show();
@@ -147,7 +175,7 @@ public class DatabaseViewActivity extends AppCompatActivity {
                     .setTitle("Удаление папки")
                     .setMessage("Вы уверены, что хотите удалить папку '" + currentTableName + "'? Это действие нельзя отменить!")
                     .setPositiveButton("Удалить", (dialog, which) -> {
-                        boolean success = databaseHelper.deleteTable(currentTableName);
+                        boolean success = databaseHelper.deleteTable(currentTableName) && btDatabaseHelper.deleteTable(currentTableName);
                         if (success) {
                             Toast.makeText(this, "Папка удалена", Toast.LENGTH_SHORT).show();
                             finish(); // Закрываем активность после удаления
@@ -162,7 +190,7 @@ public class DatabaseViewActivity extends AppCompatActivity {
 
     private void showTableInfo() {
         if (currentTableName != null) {
-            int count = databaseHelper.getDevicesCount(currentTableName);
+            int count = databaseHelper.getDevicesCount(currentTableName) + btDatabaseHelper.getDevicesCount(currentTableName);
             String message = "Папка: " + currentTableName + "\nЗаписей: " + count;
             new AlertDialog.Builder(this)
                     .setTitle("Информация о папке")
