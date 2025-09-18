@@ -11,8 +11,8 @@ import android.util.Log;
 
 public class CellDatabaseHelper extends SQLiteOpenHelper {
 
-    private static final String DATABASE_NAME = "CellScanner.db";
-    private static final int DATABASE_VERSION = 1;
+    private static final String DATABASE_NAME = "WifiScanner.db";
+    private static final int DATABASE_VERSION = 2;
 
     public CellDatabaseHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -26,7 +26,7 @@ public class CellDatabaseHelper extends SQLiteOpenHelper {
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         // TODO: Добавить миграцию данных
-        if (oldVersion < 1) {
+        if (oldVersion < 2) {
         }
     }
 
@@ -132,16 +132,16 @@ public class CellDatabaseHelper extends SQLiteOpenHelper {
             values.put("location_accuracy", tower.getLocationAccuracy());
             values.put("timestamp", tower.getTimestamp());
 
-            String uniqueKey = tower.getMcc() + "-" + tower.getMnc() + "-" + 
-                             tower.getLac() + "-" + tower.getCellId();
+            String uniqueKey = tower.getMcc() + "-" + tower.getMnc() + "-" +
+                    tower.getLac() + "-" + tower.getCellId();
 
             try (Cursor cursor = db.query("\"" + tableName + "\"",
                     new String[]{"id", "timestamp"},
                     "mcc = ? AND mnc = ? AND lac = ? AND cell_id = ?",
-                    new String[]{String.valueOf(tower.getMcc()), 
-                               String.valueOf(tower.getMnc()),
-                               String.valueOf(tower.getLac()),
-                               String.valueOf(tower.getCellId())},
+                    new String[]{String.valueOf(tower.getMcc()),
+                            String.valueOf(tower.getMnc()),
+                            String.valueOf(tower.getLac()),
+                            String.valueOf(tower.getCellId())},
                     null, null, null)) {
                 if (cursor.moveToFirst()) {
                     long existingId = cursor.getLong(cursor.getColumnIndexOrThrow("id"));
@@ -334,3 +334,5 @@ public class CellDatabaseHelper extends SQLiteOpenHelper {
         return stats.toString();
     }
 }
+
+

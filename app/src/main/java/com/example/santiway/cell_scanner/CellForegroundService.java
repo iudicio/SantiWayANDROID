@@ -137,7 +137,7 @@ public class CellForegroundService extends Service {
             handler.removeCallbacks(scanRunnable);
         }
 
-        stopForeground(true);
+        stopForeground(Service.STOP_FOREGROUND_REMOVE);
         stopSelf();
 
         Log.d(TAG, "Foreground cell scanning stopped");
