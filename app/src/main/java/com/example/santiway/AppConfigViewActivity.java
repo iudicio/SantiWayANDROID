@@ -26,7 +26,7 @@ public class AppConfigViewActivity extends ComponentActivity {
     private EditText signalStrengthInput;
 
     // Допустимые значения для протокола
-    private String[] allowedProtocols = {"GSM", "GPS"};
+    private final String[] allowedProtocols = {"GSM", "GPS"};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -133,8 +133,8 @@ public class AppConfigViewActivity extends ComponentActivity {
 
             // ПРОВЕРКА: корректность силы сигнала
             Float strength = parseFloat(signalStrength);
-            if (strength == null || strength < 0) {
-                showToast("Ошибка: введите корректную силу сигнала");
+            if (strength == null || strength > 0 || strength < -120) {
+                showToast("Ошибка: сила сигнала должна быть в диапазоне от -120 до 0 дБм");
                 return;
             }
 
