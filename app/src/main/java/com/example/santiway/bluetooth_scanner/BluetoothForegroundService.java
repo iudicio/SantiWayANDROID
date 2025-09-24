@@ -35,8 +35,6 @@ import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
 
-
-
 public class BluetoothForegroundService extends Service {
     private static final String TAG = "BluetoothForegroundService";
     private static final String CHANNEL_ID = "bluetooth_scanner_channel";
@@ -59,15 +57,16 @@ public class BluetoothForegroundService extends Service {
     private Runnable scanRunnable;
     private boolean isScanning = false;
 
-    private long scanInterval = 15000; // интервал между циклами сканирования
-    private long scanDuration = 8000;  // длительность одного активного сканирования
-    private float minRssi = -100;        // минимальный RSSI для сохранения устройства
+    private long scanInterval = 15000;
+    private long scanDuration = 8000;
+    private float minRssi = -100;
 
-    // Параметры геопозиции — получаем извне через Intent
+    // Параметры геопозиции
     private double currentLatitude = 0.0;
     private double currentLongitude = 0.0;
     private double currentAltitude = 0.0;
     private float currentAccuracy = 0.0f;
+
     private static final Map<String, String> OUI_MAP = new HashMap<>();
     static {
         OUI_MAP.put("30:7B:07", "Apple");
@@ -79,7 +78,8 @@ public class BluetoothForegroundService extends Service {
         OUI_MAP.put("98:5F:41", "Dell");
         OUI_MAP.put("66:AB:65", "HP");
     }
-    private String currentTableName = "default_table"; // имя таблицы для сохранения
+
+    private String currentTableName = "default_table";
 
     @Override
     public void onCreate() {
@@ -101,14 +101,12 @@ public class BluetoothForegroundService extends Service {
 
         if (btAdapter == null) {
             Log.e(TAG, "Bluetooth не поддерживается на данном устройстве");
-            stopSelf();
+            // Не останавливаем сервис сразу, позволим onStartCommand обработать
             return;
         }
 
-        if (!btAdapter.isEnabled()) {
-            Log.w(TAG, "Bluetooth адаптер существует, но отключен");
-        } else {
-            // Подключение BLE сканера для
+        // Подключение BLE сканера
+        if (btAdapter.isEnabled()) {
             bleScanner = btAdapter.getBluetoothLeScanner();
         }
 
@@ -131,7 +129,6 @@ public class BluetoothForegroundService extends Service {
             Log.d(TAG, "Настройки обновлены: интервал=" + scanInterval + "мс, minRssi=" + minRssi);
         }
     }
-
 
     // Подготовка BLE ScanCallback
     private void prepareBleScanCallback() {
@@ -189,7 +186,6 @@ public class BluetoothForegroundService extends Service {
         if (seenAddresses.contains(address)) return;
         seenAddresses.add(address);
 
-
         // Создание модели устройства
         com.example.santiway.bluetooth_scanner.BluetoothDevice myDev = new com.example.santiway.bluetooth_scanner.BluetoothDevice();
         myDev.setDeviceName(name != null ? name : "Unknown");
@@ -198,7 +194,7 @@ public class BluetoothForegroundService extends Service {
         myDev.setVendor(getVendor(address));
         myDev.setTimestamp(System.currentTimeMillis());
 
-        // Добавление геопозиции (пока из intent)
+        // Добавление геопозиции
         myDev.setLatitude(currentLatitude);
         myDev.setLongitude(currentLongitude);
         myDev.setAltitude(currentAltitude);
@@ -216,7 +212,7 @@ public class BluetoothForegroundService extends Service {
 
     public static String getVendor(String macAddress) {
         if (macAddress == null || macAddress.length() < 8) return "Unknown";
-        String prefix = macAddress.substring(0, 8).toUpperCase(); // первые 3 байта
+        String prefix = macAddress.substring(0, 8).toUpperCase();
         return OUI_MAP.getOrDefault(prefix, "Unknown");
     }
 
@@ -254,23 +250,34 @@ public class BluetoothForegroundService extends Service {
     }
 
     private void startForegroundScanning() {
-        if (isScanning) return;
-
-        if (!checkPermissions()) {
-            Log.w(TAG, "Нет нужных разрешений, остановка сервиса");
-            stopSelf();
+        if (isScanning) {
+            Log.d(TAG, "Сканирование уже запущено");
             return;
         }
 
-        if (btAdapter == null || !btAdapter.isEnabled()) {
-            Log.w(TAG, "Bluetooth адаптер недоступен или отключен");
-            stopSelf();
-            return;
-        }
-
-        // Создание уведомления и запуск foreground
+        // ВАЖНО: Сначала создаем уведомление и запускаем foreground
         Notification notification = createNotification();
         startForeground(NOTIFICATION_ID, notification);
+        Log.d(TAG, "Foreground service started");
+
+        if (!checkPermissions()) {
+            Log.w(TAG, "Нет нужных разрешений, останавливаем сканирование");
+            stopForegroundScanning();
+            return;
+        }
+
+        if (btAdapter == null) {
+            Log.w(TAG, "Bluetooth не поддерживается");
+            // Показываем уведомление, но не останавливаем сервис полностью
+            updateNotificationWithError("Bluetooth не поддерживается");
+            return;
+        }
+
+        if (!btAdapter.isEnabled()) {
+            Log.w(TAG, "Bluetooth отключен");
+            updateNotificationWithError("Bluetooth отключен");
+            // Не останавливаем сервис - пользователь может включить Bluetooth позже
+        }
 
         isScanning = true;
         seenAddresses.clear();
@@ -280,16 +287,19 @@ public class BluetoothForegroundService extends Service {
     }
 
     private void stopForegroundScanning() {
+        Log.d(TAG, "Останавливаем сканирование");
+
         isScanning = false;
 
         if (handler != null && scanRunnable != null) {
             handler.removeCallbacks(scanRunnable);
         }
 
+        stopAllScanning();
         stopForeground(true);
         stopSelf();
 
-        Log.d(TAG, "Фоновое Bluetooth сканирование остановлен");
+        Log.d(TAG, "Фоновое Bluetooth сканирование остановлено");
     }
 
     private boolean checkPermissions() {
@@ -302,7 +312,7 @@ public class BluetoothForegroundService extends Service {
         } else {
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
                     && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                Log.w(TAG, "Location permission not granted (needed for BT discovery on older Android)");
+                Log.w(TAG, "Location permission not granted");
                 return false;
             }
         }
@@ -323,12 +333,25 @@ public class BluetoothForegroundService extends Service {
             public void run() {
                 if (!isScanning) return;
 
+                // Проверяем состояние Bluetooth перед каждым сканированием
+                if (btAdapter == null || !btAdapter.isEnabled()) {
+                    Log.w(TAG, "Bluetooth недоступен, пропускаем сканирование");
+                    updateNotificationWithError("Bluetooth недоступен");
+                    // Планируем следующую проверку
+                    if (isScanning && handler != null) {
+                        handler.postDelayed(this, scanInterval);
+                    }
+                    return;
+                }
+
                 updateScannerSettings();
                 startAllScanning();
 
                 handler.postDelayed(() -> {
                     stopAllScanning();
-                    if (isScanning) handler.postDelayed(scanRunnable, scanInterval);
+                    if (isScanning && handler != null) {
+                        handler.postDelayed(this, scanInterval);
+                    }
                 }, scanDuration);
             }
         };
@@ -372,9 +395,13 @@ public class BluetoothForegroundService extends Service {
 
                 try {
                     registerReceiver(classicReceiver, filter);
-                } catch (IllegalArgumentException ignored) {}
+                } catch (IllegalArgumentException e) {
+                    Log.w(TAG, "Receiver уже зарегистрирован: " + e.getMessage());
+                }
 
-                if (btAdapter.isDiscovering()) btAdapter.cancelDiscovery();
+                if (btAdapter.isDiscovering()) {
+                    btAdapter.cancelDiscovery();
+                }
 
                 boolean started = btAdapter.startDiscovery();
                 Log.d(TAG, "Классическое сканирование запущено: " + started);
@@ -401,10 +428,16 @@ public class BluetoothForegroundService extends Service {
         // Classic
         if (btAdapter != null) {
             try {
-                if (btAdapter.isDiscovering()) btAdapter.cancelDiscovery();
+                if (btAdapter.isDiscovering()) {
+                    btAdapter.cancelDiscovery();
+                }
+
                 try {
                     unregisterReceiver(classicReceiver);
-                } catch (IllegalArgumentException ignored) {}
+                } catch (IllegalArgumentException e) {
+                    Log.w(TAG, "Receiver не был зарегистрирован: " + e.getMessage());
+                }
+
                 Log.d(TAG, "Классическое сканирование остановлено");
             } catch (Exception e) {
                 Log.e(TAG, "Ошибка остановки классического сканирования: " + e.getMessage());
@@ -438,6 +471,21 @@ public class BluetoothForegroundService extends Service {
         }
     }
 
+    private void updateNotificationWithError(String error) {
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager != null) {
+            Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setContentTitle("Bluetooth Scanner")
+                    .setContentText("Ошибка: " + error)
+                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setOngoing(true)
+                    .setOnlyAlertOnce(true)
+                    .build();
+            manager.notify(NOTIFICATION_ID, notification);
+        }
+    }
+
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
@@ -459,6 +507,8 @@ public class BluetoothForegroundService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        Log.d(TAG, "Service onDestroy");
+
         isScanning = false;
 
         try {
@@ -471,8 +521,8 @@ public class BluetoothForegroundService extends Service {
             try {
                 unregisterReceiver(classicReceiver);
                 Log.d(TAG, "Ресивер сканирования Bluetooth отключен");
-            } catch (Exception e) {
-                Log.e(TAG, "Ошибка при отключении ресивера: " + e.getMessage());
+            } catch (IllegalArgumentException e) {
+                Log.w(TAG, "Receiver не был зарегистрирован при отключении: " + e.getMessage());
             }
         }
 
