@@ -61,7 +61,7 @@ public class AppSettingsDbHelper extends SQLiteOpenHelper {
                 COLUMN_SCANNER_NAME + " TEXT UNIQUE NOT NULL," +
                 COLUMN_SCANNER_ENABLED + " INTEGER NOT NULL DEFAULT 0," +
                 COLUMN_SCAN_INTERVAL + " REAL NOT NULL DEFAULT 15.0," +
-                COLUMN_SIGNAL_STRENGTH + " REAL NOT NULL DEFAULT 0.0" +
+                COLUMN_SIGNAL_STRENGTH + " REAL NOT NULL DEFAULT -120.0" +
                 ")";
         db.execSQL(createTableQuery);
     }

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_open_folder"
+            android:icon="@drawable/ic_cloud"
+            android:title="Open Folder" />
+        <item
+            android:id="@+id/nav_create_folder"
+            android:icon="@drawable/ic_cloud"
+            android:title="Create Folder" />
+        <item
+            android:id="@+id/nav_make_safe"
+            android:icon="@drawable/ic_cloud"
+            android:title="Make Safe" />
+        <item
+            android:id="@+id/nav_delete_folder"
+            android:icon="@drawable/ic_cloud"
+            android:title="Delete Folder" />
+        <item
+            android:id="@+id/nav_clear_status"
+            android:icon="@drawable/ic_cloud"
+            android:title="Settings" />
+        <item
+            android:id="@+id/nav_clear_triggers"
+            android:icon="@drawable/ic_cloud"
+            android:title="Clear triggers" />
+        <item
+            android:id="@+id/nav_view_database"
+            android:icon="@drawable/ic_cloud"
+            android:title="View Database" />
+    </group>
+</menu>

@@ -1,6 +1,67 @@
 <resources>
-    <string name="app_name">SantiWay</string>
     <string name="startScan">Начать сканирование</string>
     <string name="stopScan">Остановить сканирование</string>
     <string name="database">Перейти в базу данных</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="app_name">Network Scanner</string>
+
+    <string name="bluetooth_text">Bluetooth</string>
+    <string name="wifi_text">Wi-Fi</string>
+    <string name="cellular_text">Cellular</string>
+    <string name="scanning_status">Scanning…</string>
+    <string name="stopped_status">Stopped</string>
+    <string name="coordinates_text">Current coordinates: 51.5074, -0.1278</string>
+    <string name="button_start">START</string>
+    <string name="button_stop">STOP</string>
+
+    <string name="nav_create_folder">Create folder</string>
+    <string name="nav_delete">Delete</string>
+    <string name="nav_make_safe">Make safe</string>
+    <string name="nav_clear_status">Clear status</string>
+    <string name="nav_clear_triggers">Clear triggers</string>
+
+
+    <string name="logo_description">Application logo</string>
+    <string name="toolbar_title">Network Scanner</string>
+    <string name="nav_open">Open navigation drawer</string>
+    <string name="nav_close">Close navigation drawer</string>
+    <string name="status_standby">Standby</string>
+    <string name="status_scanning">Scanning</string>
+    <string name="status_connected">Connected</string>
+    <string name="wifi_status_label">Wi-Fi Status:</string>
+    <string name="cellular_status_label">Cellular Status:</string>
+    <string name="coordinates_label">Coordinates:</string>
+    <string name="user_name_placeholder">User Name</string>
+    <string name="device_list_title">Device List</string>
+
+    <string name="title_wifi_status">WiFi Status</string>
+    <string name="title_cellular_status">Cellular Status</string>
+    <string name="title_bluetooth_status">Bluetooth Status</string>
+    <string name="title_coordinates">Coordinates</string>
+    <string name="status_off">Offline</string>
+
+
+    <string name="folder_name_hint">Enter Folder Name</string>
+
+    <string name="nav_open_folder">Open Folder</string>
+    <string name="nav_delete_folder">Delete Folder</string>
+
+    <string name="create_folder_dialog_title">Create New Folder</string>
+    <string name="delete_folder_dialog_title">Delete Folder</string>
+    <string name="folder_name_empty_toast">Folder name cannot be empty.</string>
+    <string name="folder_created_toast">Folder \'%1$s\' created.</string>
+    <string name="folder_exists_toast">Folder with this name already exists.</string>
+    <string name="no_folders_to_delete_toast">No folders to delete.</string>
+    <string name="folder_deleted_toast">Folder \'%1$s\' deleted.</string>
+    <string name="dialog_create">Create</string>
+    <string name="dialog_cancel">Cancel</string>
+    <string name="dialog_delete">Delete</string>
+
+    <string name="device_unknown">Unknown</string>
+    <string name="device_list_screen_name">Device List</string>
+
+    <string name="permission_not_granted_message">Not all permissions were granted.</string>
+    <string name="all_permissions_granted_message">All permissions granted.</string>
+
 </resources>
