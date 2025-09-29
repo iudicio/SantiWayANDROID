@@ -90,7 +90,7 @@ public class MainTest extends AppCompatActivity implements NavigationView.OnNavi
         registerFolderSwitchedReceiver();
         databaseHelper = new MainDatabaseHelper(this);
         checkAndRequestLocationPermissions();
-        databaseHelper.deleteOldRecordsFromAllTables(60 * 1000);
+        databaseHelper.deleteOldRecordsFromAllTables(2 * 24 * 60 * 60 * 1000);
 
         scanButton.setOnClickListener(v -> {
             if (checkAllPermissions()) {
