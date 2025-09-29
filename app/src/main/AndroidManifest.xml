@@ -36,7 +36,7 @@
         android:theme="@style/Theme.SantiWay"
         tools:targetApi="31">
         <activity
-            android:name=".MainActivity"
+            android:name=".MainTest"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -45,19 +45,23 @@
             </intent-filter>
         </activity>
         <activity
+            android:name=".DeviceListActivity"
+            android:exported="false" />
+        <activity
             android:name=".DatabaseViewActivity"
             android:exported="false" />
         <activity android:name=".AppConfigViewActivity"></activity>
+
         <service
             android:name=".wifi_scanner.WifiForegroundService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="location|dataSync"/>
+            android:foregroundServiceType="connectedDevice|location|dataSync"/>
         <service
             android:name=".cell_scanner.CellForegroundService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="location|dataSync"/>
+            android:foregroundServiceType="connectedDevice|location|dataSync"/>
         <service
             android:name=".bluetooth_scanner.BluetoothForegroundService"
             android:enabled="true"

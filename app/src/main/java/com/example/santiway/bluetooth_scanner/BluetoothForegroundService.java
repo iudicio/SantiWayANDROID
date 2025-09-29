@@ -5,6 +5,12 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothManager;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanResult;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -19,21 +25,15 @@ import android.util.Log;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
+import com.example.santiway.MainDatabaseHelper;
+import com.example.santiway.host_database.AppSettingsRepository;
+import com.example.santiway.host_database.ScannerSettings;
+
+
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-
-import com.example.santiway.host_database.ScannerSettings;
-import com.example.santiway.host_database.AppSettingsRepository;
-
-// Bluetooth
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothManager;
-import android.bluetooth.BluetoothDevice;
-import android.bluetooth.le.BluetoothLeScanner;
-import android.bluetooth.le.ScanCallback;
-import android.bluetooth.le.ScanResult;
 
 
 
@@ -46,7 +46,7 @@ public class BluetoothForegroundService extends Service {
     private ScannerSettings scannerSettings;
 
     // Сканеры и адаптеры Bluetooth
-    private BluetoothDatabaseHelper databaseHelper;
+    private MainDatabaseHelper databaseHelper;
     private BluetoothAdapter btAdapter;
     private BluetoothLeScanner bleScanner;
     private BroadcastReceiver classicReceiver;
@@ -87,7 +87,7 @@ public class BluetoothForegroundService extends Service {
         Log.d(TAG, "Service onCreate");
 
         handler = new Handler(Looper.getMainLooper());
-        databaseHelper = new BluetoothDatabaseHelper(this);
+        databaseHelper = new MainDatabaseHelper(this);
         appSettingsRepository = new AppSettingsRepository(this);
         updateScannerSettings();
 
@@ -205,11 +205,8 @@ public class BluetoothForegroundService extends Service {
         myDev.setLocationAccuracy(currentAccuracy);
 
         // Сохранение в базу
-        long rowId = databaseHelper.insertBluetoothDevice(myDev, currentTableName);
-        int savedCount = databaseHelper.getDevicesCount(currentTableName);
+        long rowId = databaseHelper.addBluetoothDevice(myDev, currentTableName);
 
-        // Обновление уведомления
-        updateNotification(savedCount, seenAddresses.size());
 
         Log.d(TAG, (isBle ? "BLE" : "Classic") + " устройство сохранено: " + name + " [" + address + "] RSSI=" + rssi + " rowId=" + rowId);
     }
@@ -222,6 +219,7 @@ public class BluetoothForegroundService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+
         Log.d(TAG, "Сервис запущен onStartCommand");
 
         if (intent != null) {

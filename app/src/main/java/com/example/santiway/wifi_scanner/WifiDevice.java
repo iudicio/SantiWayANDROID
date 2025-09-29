@@ -1,5 +1,8 @@
 package com.example.santiway.wifi_scanner;
 
+import android.net.wifi.ScanResult;
+import java.util.Date;
+
 public class WifiDevice {
     private String ssid;
     private String bssid;
@@ -14,6 +17,21 @@ public class WifiDevice {
     private long timestamp;
 
     public WifiDevice() {
+    }
+
+    // ИСПРАВЛЕНО: Добавлен конструктор, который принимает все необходимые данные
+    public WifiDevice(ScanResult result, double latitude, double longitude, double altitude, float locationAccuracy) {
+        this.ssid = result.SSID;
+        this.bssid = result.BSSID;
+        this.signalStrength = result.level;
+        this.frequency = result.frequency;
+        this.capabilities = result.capabilities;
+        this.vendor = "Unknown"; // Установите значение по умолчанию
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.altitude = altitude;
+        this.locationAccuracy = locationAccuracy;
+        this.timestamp = new Date().getTime();
     }
 
     // Геттеры и сеттеры
@@ -72,15 +90,36 @@ public class WifiDevice {
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
     }
-    public double getLatitude() { return latitude; }
-    public void setLatitude(double latitude) { this.latitude = latitude; }
 
-    public double getLongitude() { return longitude; }
-    public void setLongitude(double longitude) { this.longitude = longitude; }
+    public double getLatitude() {
+        return latitude;
+    }
 
-    public double getAltitude() { return altitude; }
-    public void setAltitude(double altitude) { this.altitude = altitude; }
+    public void setLatitude(double latitude) {
+        this.latitude = latitude;
+    }
 
-    public float getLocationAccuracy() { return locationAccuracy; }
-    public void setLocationAccuracy(float locationAccuracy) { this.locationAccuracy = locationAccuracy; }
+    public double getLongitude() {
+        return longitude;
+    }
+
+    public void setLongitude(double longitude) {
+        this.longitude = longitude;
+    }
+
+    public double getAltitude() {
+        return altitude;
+    }
+
+    public void setAltitude(double altitude) {
+        this.altitude = altitude;
+    }
+
+    public float getLocationAccuracy() {
+        return locationAccuracy;
+    }
+
+    public void setLocationAccuracy(float locationAccuracy) {
+        this.locationAccuracy = locationAccuracy;
+    }
 }

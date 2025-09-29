@@ -18,6 +18,9 @@ import android.os.Looper;
 import android.util.Log;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
+
+import com.example.santiway.MainDatabaseHelper;
+
 import java.util.List;
 
 
@@ -26,14 +29,14 @@ public class WifiForegroundService extends Service {
     private static final String CHANNEL_ID = "wifi_scanner_channel";
     private static final int NOTIFICATION_ID = 1001;
 
-    private DatabaseHelper databaseHelper;
+    private MainDatabaseHelper databaseHelper;
     private WifiManager wifiManager;
     private BroadcastReceiver wifiScanReceiver;
     private Handler handler;
     private Runnable scanRunnable;
     private boolean isScanning = false;
     private long scanInterval = 15000;
-    private String currentTableName = "default_table";
+    private String currentTableName = "unified_data";
     private double currentLatitude = 0.0;
     private double currentLongitude = 0.0;
     private double currentAltitude = 0.0;
@@ -46,7 +49,7 @@ public class WifiForegroundService extends Service {
 
         wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         handler = new Handler(Looper.getMainLooper());
-        databaseHelper = new DatabaseHelper(this);
+        databaseHelper = new MainDatabaseHelper(this);
 
         createNotificationChannel();
         setupWifiScanReceiver();
@@ -251,7 +254,7 @@ public class WifiForegroundService extends Service {
             device.setLocationAccuracy(currentAccuracy);
             device.setTimestamp(System.currentTimeMillis());
 
-            long resultId = databaseHelper.addWifiDevice(currentTableName, device);
+            long resultId = databaseHelper.addWifiDevice(device, currentTableName);
 
             if (resultId != -1) {
                 Log.d(TAG, "✓ Saved: " + device.getSsid() + " (" + device.getBssid() + ")");
