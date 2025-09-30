@@ -16,12 +16,15 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
+import android.widget.Toast;
+
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
 import com.example.santiway.MainDatabaseHelper;
 
 import java.util.List;
+import java.lang.IllegalArgumentException;
 
 
 public class WifiForegroundService extends Service {
@@ -58,6 +61,17 @@ public class WifiForegroundService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "Service onStartCommand");
+
+        // Сразу создаем уведомление и запускаем foreground
+        try {
+            Notification notification = createNotification();
+            startForeground(NOTIFICATION_ID, notification);
+            Log.d(TAG, "Foreground service started successfully");
+        } catch (Exception e) {
+            Log.e(TAG, "Ошибка при создании уведомления: " + e.getMessage());
+            stopSelf();
+            return START_NOT_STICKY;
+        }
 
         if (intent != null) {
             // Получаем координаты из intent
@@ -108,18 +122,18 @@ public class WifiForegroundService extends Service {
         // Check if WiFi is enabled
         if (wifiManager == null || !wifiManager.isWifiEnabled()) {
             Log.w(TAG, "WiFi is not enabled");
+            Toast.makeText(this, "Включите WiFi для сканирования", Toast.LENGTH_SHORT).show();
             stopSelf();
             return;
         }
-
-        // Create and start foreground notification
-        Notification notification = createNotification();
-        startForeground(NOTIFICATION_ID, notification);
 
         isScanning = true;
         startPeriodicScanning();
 
         Log.d(TAG, "Foreground Wi-Fi scanning started successfully");
+
+        // Обновляем уведомление
+        updateNotification(0, 0);
     }
 
     private boolean checkPermissions() {
@@ -151,7 +165,6 @@ public class WifiForegroundService extends Service {
         }
 
         // Stop foreground service
-        stopForeground(true);
         stopSelf();
 
         Log.d(TAG, "Foreground Wi-Fi scanning stopped");
@@ -352,6 +365,9 @@ public class WifiForegroundService extends Service {
             try {
                 unregisterReceiver(wifiScanReceiver);
                 Log.d(TAG, "WiFi scan receiver unregistered");
+            } catch (IllegalArgumentException e) {
+                // Ресивер не был зарегистрирован - это нормально
+                Log.d(TAG, "WiFi scan receiver already unregistered");
             } catch (Exception e) {
                 Log.e(TAG, "Error unregistering receiver: " + e.getMessage());
             }

@@ -6,10 +6,9 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.MenuItem;
-import android.widget.Button;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
@@ -32,20 +31,16 @@ import com.google.android.material.navigation.NavigationView;
 import java.util.ArrayList;
 import java.util.List;
 
-
-
-
-
-public class MainTest extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
+public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
 
     private BroadcastReceiver folderSwitchedReceiver;
     private DrawerLayout drawerLayout;
     private Toolbar toolbar;
-    private Button scanButton;
-    private TextView wifiStatusTextView;
-    private TextView bluetoothStatusTextView;
-    private TextView cellularStatusTextView;
-    private TextView coordinatesTextView;
+    private android.widget.Button scanButton;
+    private android.widget.TextView wifiStatusTextView;
+    private android.widget.TextView bluetoothStatusTextView;
+    private android.widget.TextView cellularStatusTextView;
+    private android.widget.TextView coordinatesTextView;
     private MainDatabaseHelper databaseHelper;
     private LocationManager locationManager;
     private boolean isScanning = false;
@@ -55,8 +50,8 @@ public class MainTest extends AppCompatActivity implements NavigationView.OnNavi
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(),
                     permissions -> {
                         boolean allGranted = true;
-                        for (Boolean isGranted : permissions.values()) {
-                            if (!isGranted) {
+                        for (Boolean granted : permissions.values()) {
+                            if (!granted) {
                                 allGranted = false;
                                 break;
                             }
@@ -64,7 +59,7 @@ public class MainTest extends AppCompatActivity implements NavigationView.OnNavi
                         if (allGranted) {
                             initializeLocationManager();
                         } else {
-                            Toast.makeText(MainTest.this, "Permissions denied", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MainActivity.this, "Permissions denied", Toast.LENGTH_SHORT).show();
                         }
                     });
 
@@ -87,10 +82,13 @@ public class MainTest extends AppCompatActivity implements NavigationView.OnNavi
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setHomeAsUpIndicator(R.drawable.ic_cloud);
         navigationView.setNavigationItemSelectedListener(this);
+
         registerFolderSwitchedReceiver();
+
         databaseHelper = new MainDatabaseHelper(this);
-        checkAndRequestLocationPermissions();
         databaseHelper.deleteOldRecordsFromAllTables(2 * 24 * 60 * 60 * 1000);
+
+        checkAndRequestPermissions();
 
         scanButton.setOnClickListener(v -> {
             if (checkAllPermissions()) {
@@ -99,6 +97,24 @@ public class MainTest extends AppCompatActivity implements NavigationView.OnNavi
                 requestNecessaryPermissions();
             }
         });
+    }
+
+    private void registerFolderSwitchedReceiver() {
+        folderSwitchedReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if ("com.example.santiway.FOLDER_SWITCHED".equals(intent.getAction())) {
+                    String newTableName = intent.getStringExtra("newTableName");
+                    if (newTableName != null && !newTableName.isEmpty()) {
+                        currentScanFolder = newTableName;
+                        runOnUiThread(() -> Toast.makeText(MainActivity.this,
+                                "Папка сканирования переключена на: " + newTableName, Toast.LENGTH_LONG).show());
+                    }
+                }
+            }
+        };
+        IntentFilter filter = new IntentFilter("com.example.santiway.FOLDER_SWITCHED");
+        registerReceiver(folderSwitchedReceiver, filter);
     }
 
     private void initializeLocationManager() {
@@ -112,12 +128,12 @@ public class MainTest extends AppCompatActivity implements NavigationView.OnNavi
 
                 @Override
                 public void onPermissionDenied() {
-                    runOnUiThread(() -> Toast.makeText(MainTest.this, "Location permission denied", Toast.LENGTH_SHORT).show());
+                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "Location permission denied", Toast.LENGTH_SHORT).show());
                 }
 
                 @Override
                 public void onLocationError(String error) {
-                    runOnUiThread(() -> Toast.makeText(MainTest.this, "Location error: " + error, Toast.LENGTH_SHORT).show());
+                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "Location error: " + error, Toast.LENGTH_SHORT).show());
                 }
             });
             locationManager.startLocationUpdates();
@@ -141,82 +157,62 @@ public class MainTest extends AppCompatActivity implements NavigationView.OnNavi
         }
     }
 
-
     private void startScanning() {
         isScanning = true;
-        scanButton.setText(R.string.button_stop);
-        wifiStatusTextView.setText(R.string.scanning_status);
-        bluetoothStatusTextView.setText(R.string.scanning_status);
-        cellularStatusTextView.setText(R.string.scanning_status);
+        updateScanStatusUI(true);
 
-        Location currentLocation = null;
-        if (locationManager != null) {
-            currentLocation = locationManager.getCurrentLocation();
-        }
+        Location currentLocation = (locationManager != null) ? locationManager.getCurrentLocation() : null;
 
         double latitude = (currentLocation != null) ? currentLocation.getLatitude() : 0.0;
         double longitude = (currentLocation != null) ? currentLocation.getLongitude() : 0.0;
         double altitude = (currentLocation != null) ? currentLocation.getAltitude() : 0.0;
         float accuracy = (currentLocation != null) ? currentLocation.getAccuracy() : 0.0f;
 
-        // Запуск Wi-Fi сканера
-        Intent wifiServiceIntent = new Intent(this, WifiForegroundService.class);
-        wifiServiceIntent.setAction("START_SCAN");
-        wifiServiceIntent.putExtra("tableName", currentScanFolder);
-        wifiServiceIntent.putExtra("latitude", latitude);
-        wifiServiceIntent.putExtra("longitude", longitude);
-        wifiServiceIntent.putExtra("altitude", altitude);
-        wifiServiceIntent.putExtra("accuracy", accuracy);
+        startScannerService(WifiForegroundService.class, latitude, longitude, altitude, accuracy);
+        startScannerService(CellForegroundService.class, latitude, longitude, altitude, accuracy);
+        startScannerService(BluetoothForegroundService.class, latitude, longitude, altitude, accuracy);
 
-        // Запуск Cell сканера
-        Intent cellServiceIntent = new Intent(this, CellForegroundService.class);
-        cellServiceIntent.setAction("START_SCAN");
-        cellServiceIntent.putExtra("tableName", currentScanFolder);
-        cellServiceIntent.putExtra("latitude", latitude);
-        cellServiceIntent.putExtra("longitude", longitude);
-        cellServiceIntent.putExtra("altitude", altitude);
-        cellServiceIntent.putExtra("accuracy", accuracy);
-
-        Intent bluetoothServiceIntent = new Intent(this, BluetoothForegroundService.class);
-        bluetoothServiceIntent.setAction("START_SCAN");
-        bluetoothServiceIntent.putExtra("tableName", currentScanFolder);
-        bluetoothServiceIntent.putExtra("latitude", latitude);
-        bluetoothServiceIntent.putExtra("longitude", longitude);
-        bluetoothServiceIntent.putExtra("altitude", altitude);
-        bluetoothServiceIntent.putExtra("accuracy", accuracy);
-
-
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            startForegroundService(wifiServiceIntent);
-            startForegroundService(cellServiceIntent);
-            startForegroundService(bluetoothServiceIntent);
-        } else {
-            startService(wifiServiceIntent);
-            startService(cellServiceIntent);
-            startService(bluetoothServiceIntent);
-        }
         Toast.makeText(this, "Сканирование запущено: " + currentScanFolder, Toast.LENGTH_SHORT).show();
     }
 
     private void stopScanning() {
         isScanning = false;
-        scanButton.setText(R.string.button_start);
-        wifiStatusTextView.setText(R.string.stopped_status);
-        bluetoothStatusTextView.setText(R.string.stopped_status);
-        cellularStatusTextView.setText(R.string.stopped_status);
+        updateScanStatusUI(false);
 
-        // Остановка Wi-Fi сканера
-        Intent wifiServiceIntent = new Intent(this, WifiForegroundService.class);
-        stopService(wifiServiceIntent);
-
-        // Остановка Cell сканера
-        Intent cellServiceIntent = new Intent(this, CellForegroundService.class);
-        stopService(cellServiceIntent);
-
-        Intent blueServiceIntent = new Intent(this, BluetoothForegroundService.class);
-        stopService(blueServiceIntent);
+        stopScannerService(WifiForegroundService.class);
+        stopScannerService(CellForegroundService.class);
+        stopScannerService(BluetoothForegroundService.class);
 
         Toast.makeText(this, "Сканирование остановлено", Toast.LENGTH_SHORT).show();
+    }
+
+    private void updateScanStatusUI(boolean scanning) {
+        int textRes = scanning ? R.string.scanning_status : R.string.stopped_status;
+        scanButton.setText(scanning ? R.string.button_stop : R.string.button_start);
+        wifiStatusTextView.setText(textRes);
+        bluetoothStatusTextView.setText(textRes);
+        cellularStatusTextView.setText(textRes);
+    }
+
+    private void startScannerService(Class<?> serviceClass, double latitude, double longitude, double altitude, float accuracy) {
+        Intent intent = new Intent(this, serviceClass);
+        intent.setAction("START_SCAN");
+        intent.putExtra("tableName", currentScanFolder);
+        intent.putExtra("latitude", latitude);
+        intent.putExtra("longitude", longitude);
+        intent.putExtra("altitude", altitude);
+        intent.putExtra("accuracy", accuracy);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent);
+        } else {
+            startService(intent);
+        }
+    }
+
+    private void stopScannerService(Class<?> serviceClass) {
+        Intent intent = new Intent(this, serviceClass);
+        stopService(intent);
     }
 
     @Override
@@ -228,11 +224,6 @@ public class MainTest extends AppCompatActivity implements NavigationView.OnNavi
     }
 
     @Override
-    protected void onPause() {
-        super.onPause();
-    }
-
-    @Override
     protected void onDestroy() {
         super.onDestroy();
         if (locationManager != null) {
@@ -241,34 +232,22 @@ public class MainTest extends AppCompatActivity implements NavigationView.OnNavi
         stopScanning();
         unregisterReceiver(folderSwitchedReceiver);
     }
-    private void registerFolderSwitchedReceiver() {
-        folderSwitchedReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                if ("com.example.santiway.FOLDER_SWITCHED".equals(intent.getAction())) {
-                    String newTableName = intent.getStringExtra("newTableName");
-                    currentScanFolder = newTableName;
-                    runOnUiThread(() -> {
-                        Toast.makeText(MainTest.this, "Папка сканирования удалена. Переключено на: " + newTableName, Toast.LENGTH_LONG).show();
-                    });
-                }
-            }
-        };
-        IntentFilter filter = new IntentFilter("com.example.santiway.FOLDER_SWITCHED");
-    }
+
     private boolean checkAllPermissions() {
         boolean hasLocationPermission = ContextCompat.checkSelfPermission(this,
                 android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
         boolean hasPhoneStatePermission = ContextCompat.checkSelfPermission(this,
                 android.Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED;
+
         boolean hasNotificationPermission = true;
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             hasNotificationPermission = ContextCompat.checkSelfPermission(this,
                     android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
         }
+
         boolean hasBluetoothScanPermission = true;
         boolean hasBluetoothConnectPermission = true;
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             hasBluetoothScanPermission = ContextCompat.checkSelfPermission(this,
                     android.Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
             hasBluetoothConnectPermission = ContextCompat.checkSelfPermission(this,
@@ -279,7 +258,7 @@ public class MainTest extends AppCompatActivity implements NavigationView.OnNavi
                 && hasBluetoothScanPermission && hasBluetoothConnectPermission;
     }
 
-    private void checkAndRequestLocationPermissions() {
+    private void checkAndRequestPermissions() {
         if (!checkAllPermissions()) {
             requestNecessaryPermissions();
         } else {
@@ -288,29 +267,19 @@ public class MainTest extends AppCompatActivity implements NavigationView.OnNavi
     }
 
     private void requestNecessaryPermissions() {
-        String[] permissionsToRequest;
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-            permissionsToRequest = new String[]{
-                    android.Manifest.permission.ACCESS_FINE_LOCATION,
-                    android.Manifest.permission.READ_PHONE_STATE,
-                    android.Manifest.permission.POST_NOTIFICATIONS,
-                    android.Manifest.permission.BLUETOOTH_SCAN,
-                    android.Manifest.permission.BLUETOOTH_CONNECT
-            };
-        } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            permissionsToRequest = new String[]{
-                    android.Manifest.permission.ACCESS_FINE_LOCATION,
-                    android.Manifest.permission.READ_PHONE_STATE,
-                    android.Manifest.permission.BLUETOOTH_SCAN,
-                    android.Manifest.permission.BLUETOOTH_CONNECT
-            };
-        } else {
-            permissionsToRequest = new String[]{
-                    android.Manifest.permission.ACCESS_FINE_LOCATION,
-                    android.Manifest.permission.READ_PHONE_STATE
-            };
+        List<String> permissionsToRequest = new ArrayList<>();
+        permissionsToRequest.add(android.Manifest.permission.ACCESS_FINE_LOCATION);
+        permissionsToRequest.add(android.Manifest.permission.READ_PHONE_STATE);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissionsToRequest.add(android.Manifest.permission.POST_NOTIFICATIONS);
         }
-        requestPermissionLauncher.launch(permissionsToRequest);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            permissionsToRequest.add(android.Manifest.permission.BLUETOOTH_SCAN);
+            permissionsToRequest.add(android.Manifest.permission.BLUETOOTH_CONNECT);
+        }
+
+        requestPermissionLauncher.launch(permissionsToRequest.toArray(new String[0]));
     }
 
     @Override
@@ -343,72 +312,70 @@ public class MainTest extends AppCompatActivity implements NavigationView.OnNavi
     }
 
     private void openDeviceListActivity() {
-        Intent intent = new Intent(this, DeviceListActivity.class);
-        startActivity(intent);
+        startActivity(new Intent(this, DeviceListActivity.class));
     }
 
-    private void viewAppConfig(){
-        Intent intent = new Intent(this, AppConfigViewActivity.class);
-        startActivity(intent);
+    private void viewAppConfig() {
+        startActivity(new Intent(this, AppConfigViewActivity.class));
     }
 
-    private void showFolderSelectionDialog() {
+    private List<String> getAllFolders() {
         List<String> tables = databaseHelper.getAllTables();
-        final List<String> dialogItems = new ArrayList<>();
         if (!tables.contains("unified_data")) {
             tables.add("unified_data");
         }
-        dialogItems.addAll(tables);
+        return tables;
+    }
 
-        final CharSequence[] items = dialogItems.toArray(new CharSequence[0]);
+    private void showFolderSelectionDialog() {
+        List<String> folders = getAllFolders();
+        final CharSequence[] items = folders.toArray(new CharSequence[0]);
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Выберите папку для сканирования");
-        builder.setItems(items, (dialog, which) -> {
-            String selectedItem = items[which].toString();
-            stopScanning();
-            currentScanFolder = selectedItem;
-            startScanning();
-            Toast.makeText(this, "Выбрана папка: " + currentScanFolder, Toast.LENGTH_SHORT).show();
-        });
-        builder.setNegativeButton("Отмена", null);
-        builder.show();
+        new AlertDialog.Builder(this)
+                .setTitle("Выберите папку для сканирования")
+                .setItems(items, (dialog, which) -> {
+                    String selectedFolder = items[which].toString();
+                    stopScanning();
+                    currentScanFolder = selectedFolder;
+                    startScanning();
+                    Toast.makeText(this, "Выбрана папка: " + currentScanFolder, Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
     }
 
     private void showFolderManagementDialog() {
-        List<String> tables = databaseHelper.getAllTables();
-        final List<String> deletableTables = new ArrayList<>();
-        for (String table : tables) {
-            if (!table.equals("")) {
-                deletableTables.add(table);
+        List<String> folders = databaseHelper.getAllTables();
+        List<String> deletableFolders = new ArrayList<>();
+        for (String folder : folders) {
+            if (!folder.isEmpty()) {
+                deletableFolders.add(folder);
             }
         }
 
-        if (deletableTables.isEmpty()) {
+        if (deletableFolders.isEmpty()) {
             Toast.makeText(this, "Нет папок для удаления", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        final CharSequence[] items = deletableTables.toArray(new CharSequence[0]);
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Удаление папок");
-        builder.setItems(items, (dialog, which) -> {
-            String tableToDelete = items[which].toString();
-            showDeleteConfirmationDialog(tableToDelete);
-        });
-        builder.setNegativeButton("Отмена", null);
-        builder.show();
+        final CharSequence[] items = deletableFolders.toArray(new CharSequence[0]);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Удаление папок")
+                .setItems(items, (dialog, which) -> showDeleteConfirmationDialog(items[which].toString()))
+                .setNegativeButton("Отмена", null)
+                .show();
     }
 
-    private void showDeleteConfirmationDialog(String tableName) {
+    private void showDeleteConfirmationDialog(String folderName) {
         new AlertDialog.Builder(this)
                 .setTitle("Удаление папки")
-                .setMessage("Вы уверены, что хотите удалить папку '" + tableName + "'? Все данные будут потеряны!")
+                .setMessage("Вы уверены, что хотите удалить папку '" + folderName + "'? Все данные будут потеряны!")
                 .setPositiveButton("Удалить", (dialog, which) -> {
-                    boolean success = databaseHelper.deleteTable(tableName);
+                    boolean success = databaseHelper.deleteTable(folderName);
                     if (success) {
-                        Toast.makeText(this, "Папка удалена: " + tableName, Toast.LENGTH_SHORT).show();
-                        if (currentScanFolder.equals(tableName)) {
+                        Toast.makeText(this, "Папка удалена: " + folderName, Toast.LENGTH_SHORT).show();
+                        if (currentScanFolder.equals(folderName)) {
                             stopScanning();
                             currentScanFolder = "unified_data";
                             startScanning();
@@ -430,17 +397,17 @@ public class MainTest extends AppCompatActivity implements NavigationView.OnNavi
 
         builder.setPositiveButton("Создать", (dialog, which) -> {
             String folderName = input.getText().toString().trim();
-            if (!folderName.isEmpty()) {
-                if (folderName.equals("unified_data")) {
-                    Toast.makeText(this, "Имя папки недоступно", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                databaseHelper.createTableIfNotExists(folderName);
-                currentScanFolder = folderName;
-                Toast.makeText(this, "Создана папка: " + folderName, Toast.LENGTH_SHORT).show();
-            } else {
+            if (folderName.isEmpty()) {
                 Toast.makeText(this, "Имя папки не может быть пустым", Toast.LENGTH_SHORT).show();
+                return;
             }
+            if (folderName.equals("unified_data")) {
+                Toast.makeText(this, "Имя папки недоступно", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            databaseHelper.createTableIfNotExists(folderName);
+            currentScanFolder = folderName;
+            Toast.makeText(this, "Создана папка: " + folderName, Toast.LENGTH_SHORT).show();
         });
         builder.setNegativeButton("Отмена", null);
         builder.show();
