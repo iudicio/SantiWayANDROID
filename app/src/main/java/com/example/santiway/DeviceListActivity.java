@@ -7,7 +7,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import com.example.santiway.MainDatabaseHelper;
+import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.google.android.material.tabs.TabLayout;
 import java.util.ArrayList;
 import java.util.List;

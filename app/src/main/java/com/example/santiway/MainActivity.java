@@ -24,6 +24,7 @@ import androidx.drawerlayout.widget.DrawerLayout;
 
 import com.example.santiway.bluetooth_scanner.BluetoothForegroundService;
 import com.example.santiway.cell_scanner.CellForegroundService;
+import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.example.santiway.wifi_scanner.WifiForegroundService;
 import com.example.santiway.gsm_protocol.LocationManager;
 import com.google.android.material.navigation.NavigationView;
@@ -45,6 +46,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private LocationManager locationManager;
     private boolean isScanning = false;
     private String currentScanFolder = "unified_data";
+    private DeviceUploadManager uploadManager;
 
     private final ActivityResultLauncher<String[]> requestPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(),
@@ -97,6 +99,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 requestNecessaryPermissions();
             }
         });
+
+        uploadManager = new DeviceUploadManager(this);
+        startUploadService();
     }
 
     private void registerFolderSwitchedReceiver() {
@@ -411,5 +416,14 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         });
         builder.setNegativeButton("Отмена", null);
         builder.show();
+    }
+
+    private void startUploadService() {
+        Intent serviceIntent = new Intent(this, DeviceUploadService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
     }
 }
