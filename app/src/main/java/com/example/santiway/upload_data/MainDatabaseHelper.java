@@ -1,4 +1,4 @@
-package com.example.santiway;
+package com.example.santiway.upload_data;
 
 import android.content.ContentValues;
 import android.content.Context;
@@ -16,7 +16,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
     private static final String TAG = "MainDatabaseHelper";
     private static final String DATABASE_NAME = "UnifiedScanner.db";
-    private static final int DATABASE_VERSION = 5; // УВЕЛИЧЕНО
+    private static final int DATABASE_VERSION = 6; // УВЕЛИЧЕНО
 
     public MainDatabaseHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -52,7 +52,9 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 "altitude REAL," +
                 "location_accuracy REAL," +
                 "timestamp LONG," +
-                "status TEXT DEFAULT 'ignore')";
+                "status TEXT DEFAULT 'ignore'," +
+                "is_uploaded INTEGER DEFAULT 0)" +
+                ")";
         db.execSQL(createUnifiedTable);
     }
     public void deleteOldRecordsFromAllTables(long maxAgeMillis) {
@@ -72,6 +74,17 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        if (oldVersion < 6) { // Увеличить версию до 6
+            // Добавляем поле is_uploaded в существующие таблицы
+            List<String> tables = getAllTables();
+            for (String table : tables) {
+                try {
+                    db.execSQL("ALTER TABLE \"" + table + "\" ADD COLUMN is_uploaded INTEGER DEFAULT 0");
+                } catch (Exception e) {
+                    Log.e(TAG, "Error adding is_uploaded column to table " + table + ": " + e.getMessage());
+                }
+            }
+        }
         if (oldVersion < 5) {
             // Удаляем старые таблицы, если они существуют, и создаем новую
             db.execSQL("DROP TABLE IF EXISTS \"wifi_data\"");
