@@ -10,6 +10,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.MenuItem;
 import android.widget.Toast;
+import android.os.Build;
+
 
 import androidx.activity.EdgeToEdge;
 import androidx.activity.result.ActivityResultLauncher;
@@ -21,15 +23,27 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.work.Constraints;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.NetworkType;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkManager;
 
 import com.example.santiway.bluetooth_scanner.BluetoothForegroundService;
 import com.example.santiway.cell_scanner.CellForegroundService;
+import com.example.santiway.upload_data.ApiConfig;
+import com.example.santiway.upload_data.ApiDevice;
+import com.example.santiway.upload_data.DeviceUploadManager;
+import com.example.santiway.upload_data.DeviceUploadService;
+import com.example.santiway.upload_data.DeviceUploadWorker;
+import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.example.santiway.wifi_scanner.WifiForegroundService;
 import com.example.santiway.gsm_protocol.LocationManager;
 import com.google.android.material.navigation.NavigationView;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
 
@@ -45,6 +59,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private LocationManager locationManager;
     private boolean isScanning = false;
     private String currentScanFolder = "unified_data";
+    private DeviceUploadManager uploadManager;
 
     private final ActivityResultLauncher<String[]> requestPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(),
@@ -86,7 +101,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         registerFolderSwitchedReceiver();
 
         databaseHelper = new MainDatabaseHelper(this);
-        databaseHelper.deleteOldRecordsFromAllTables(2 * 24 * 60 * 60 * 1000);
+        //databaseHelper.deleteOldRecordsFromAllTables(2 * 24 * 60 * 60 * 1000);
 
         checkAndRequestPermissions();
 
@@ -97,6 +112,11 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 requestNecessaryPermissions();
             }
         });
+
+        // Инициализация конфигурации API
+        ApiConfig.initialize(this);
+        uploadManager = new DeviceUploadManager(this);
+        startUploadService();
     }
 
     private void registerFolderSwitchedReceiver() {
@@ -114,7 +134,15 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             }
         };
         IntentFilter filter = new IntentFilter("com.example.santiway.FOLDER_SWITCHED");
-        registerReceiver(folderSwitchedReceiver, filter);
+
+        // Добавить проверку версии Android
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Для Android 13+ нужно указать флаг экспорта
+            registerReceiver(folderSwitchedReceiver, filter, RECEIVER_NOT_EXPORTED);
+        } else {
+            // Для старых версий Android
+            registerReceiver(folderSwitchedReceiver, filter);
+        }
     }
 
     private void initializeLocationManager() {
@@ -172,6 +200,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         startScannerService(CellForegroundService.class, latitude, longitude, altitude, accuracy);
         startScannerService(BluetoothForegroundService.class, latitude, longitude, altitude, accuracy);
 
+        // Запускаем периодическую отправку данных
+        schedulePeriodicUpload();
+
         Toast.makeText(this, "Сканирование запущено: " + currentScanFolder, Toast.LENGTH_SHORT).show();
     }
 
@@ -183,7 +214,43 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         stopScannerService(CellForegroundService.class);
         stopScannerService(BluetoothForegroundService.class);
 
+        // Отправляем оставшиеся данные перед остановкой
+        uploadRemainingData();
+
         Toast.makeText(this, "Сканирование остановлено", Toast.LENGTH_SHORT).show();
+    }
+
+    private void schedulePeriodicUpload() {
+        // Запускаем WorkManager для периодической отправки
+        Constraints constraints = new Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build();
+
+        PeriodicWorkRequest uploadWork = new PeriodicWorkRequest.Builder(
+                DeviceUploadWorker.class, 15, TimeUnit.MINUTES)
+                .setConstraints(constraints)
+                .build();
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                "PeriodicUpload",
+                ExistingPeriodicWorkPolicy.KEEP,
+                uploadWork);
+    }
+
+    private void uploadRemainingData() {
+        new Thread(() -> {
+            DeviceUploadManager uploadManager = new DeviceUploadManager(this);
+            List<ApiDevice> remainingDevices = uploadManager.getPendingDevicesBatch();
+            if (!remainingDevices.isEmpty()) {
+                boolean success = uploadManager.uploadBatch(remainingDevices);
+                runOnUiThread(() -> {
+                    if (success) {
+                        Toast.makeText(this, "Отправлено " + remainingDevices.size() + " устройств", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+            uploadManager.cleanup();
+        }).start();
     }
 
     private void updateScanStatusUI(boolean scanning) {
@@ -411,5 +478,14 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         });
         builder.setNegativeButton("Отмена", null);
         builder.show();
+    }
+
+    private void startUploadService() {
+        Intent serviceIntent = new Intent(this, DeviceUploadService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
     }
 }

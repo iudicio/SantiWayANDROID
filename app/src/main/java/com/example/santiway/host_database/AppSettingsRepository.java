@@ -1,145 +1,99 @@
 package com.example.santiway.host_database;
 
-import android.content.ContentValues;
 import android.content.Context;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
-
-import java.util.ArrayList;
+import android.content.SharedPreferences;
+import java.util.Arrays;
 import java.util.List;
 
 public class AppSettingsRepository {
-    private AppSettingsDbHelper dbHelper;
+    private ScannerSettings settings;
+    private SharedPreferences sharedPreferences;
+    private static final String PREFS_NAME = "AppSettings";
+
+    // Ключи для SharedPreferences
+    private static final String KEY_API_KEY = "api_key";
+    private static final String KEY_GEO_PROTOCOL = "geo_protocol";
+    private static final String KEY_IS_SCANNING = "is_scanning";
+    private static final String KEY_SERVER_IP = "server_ip";
 
     public AppSettingsRepository(Context context) {
-        dbHelper = new AppSettingsDbHelper(context);
+        this.sharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
     }
 
-    private String getAppConfigValue(String columnName) {
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        Cursor cursor = db.query(
-                AppSettingsDbHelper.TABLE_APP_CONFIG,
-        new String[]{columnName},
-        AppSettingsDbHelper.COLUMN_ID + " = ?",
-        new String[]{"1"},
-        null, null, null
-        );
-
-        try {
-            if (cursor.moveToFirst()) {
-                return cursor.getString(0);
-            } else {
-                return null;
-            }
-        } finally {
-            cursor.close();
-        }
+    // Метод для сохранения IPv4 адреса сервера
+    public void setServerIp(String serverIp) {
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString(KEY_SERVER_IP, serverIp);
+        editor.apply();
     }
 
-    private void setAppConfigValue(String columnName, Object value) {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        ContentValues values = new ContentValues();
-
-        if (value instanceof String) {
-            values.put(columnName, (String) value);
-        } else if (value instanceof Boolean) {
-            values.put(columnName, (Boolean) value ? 1 : 0);
-        } else {
-            throw new IllegalArgumentException("Unsupported type");
-        }
-
-        db.update(
-            AppSettingsDbHelper.TABLE_APP_CONFIG,
-            values,
-            AppSettingsDbHelper.COLUMN_ID + " = ?",
-            new String[]{"1"}
-        );
+    // Метод для получения IPv4 адреса сервера
+    public String getServerIp() {
+        return sharedPreferences.getString(KEY_SERVER_IP, null);
     }
 
+    // Метод для сохранения API Key
+    public void setApiKey(String apiKey) {
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString(KEY_API_KEY, apiKey);
+        editor.apply();
+    }
+
+    // Метод для получения API Key
     public String getApiKey() {
-        return getAppConfigValue(AppSettingsDbHelper.COLUMN_API_KEY);
+        return sharedPreferences.getString(KEY_API_KEY, null);
     }
 
+    // Метод для сохранения протокола геолокации
+    public void setGeoProtocol(String protocol) {
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString(KEY_GEO_PROTOCOL, protocol);
+        editor.apply();
+    }
+
+    // Метод для получения протокола геолокации
     public String getGeoProtocol() {
-        return getAppConfigValue(AppSettingsDbHelper.COLUMN_GEO_PROTOCOL);
+        return sharedPreferences.getString(KEY_GEO_PROTOCOL, "GSM"); // значение по умолчанию
     }
 
+    // Метод для установки статуса сканирования
+    public void setScanning(boolean isScanning) {
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putBoolean(KEY_IS_SCANNING, isScanning);
+        editor.apply();
+    }
+
+    // Метод для получения статуса сканирования
     public boolean isScanning() {
-        String value = getAppConfigValue(AppSettingsDbHelper.COLUMN_IS_SCANNING);
-        return value != null && Integer.parseInt(value) == 1;
+        return sharedPreferences.getBoolean(KEY_IS_SCANNING, false);
     }
 
-    public ScannerSettings getScannerSettings(String scannerName) {
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        Cursor cursor = db.query(
-                AppSettingsDbHelper.TABLE_SCANNERS_CONFIG,
-        null,
-        AppSettingsDbHelper.COLUMN_SCANNER_NAME + " = ?",
-        new String[]{scannerName},
-        null, null, null
-        );
-
-        try {
-            if (cursor.moveToFirst()) {
-                return new ScannerSettings(
-                        cursor.getString(cursor.getColumnIndexOrThrow(AppSettingsDbHelper.COLUMN_SCANNER_NAME)),
-                cursor.getInt(cursor.getColumnIndexOrThrow(AppSettingsDbHelper.COLUMN_SCANNER_ENABLED)) == 1,
-                cursor.getFloat(cursor.getColumnIndexOrThrow(AppSettingsDbHelper.COLUMN_SCAN_INTERVAL)),
-                cursor.getFloat(cursor.getColumnIndexOrThrow(AppSettingsDbHelper.COLUMN_SIGNAL_STRENGTH))
-                );
-            } else {
-                return null;
-            }
-        } finally {
-            cursor.close();
-        }
-    }
-
+    // Метод для получения всех сканеров
     public List<String> getAllScanners() {
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        Cursor cursor = db.query(
-                AppSettingsDbHelper.TABLE_SCANNERS_CONFIG,
-        new String[]{AppSettingsDbHelper.COLUMN_SCANNER_NAME},
-        null, null, null, null, null
-        );
-
-        List<String> scanners = new ArrayList<>();
-        try {
-            while (cursor.moveToNext()) {
-                scanners.add(cursor.getString(0));
-            }
-        } finally {
-            cursor.close();
-        }
-        return scanners;
+        return Arrays.asList("WiFi", "Bluetooth", "Cell");
     }
 
-    public void setApiKey(String newApiKey) {
-        setAppConfigValue(AppSettingsDbHelper.COLUMN_API_KEY, newApiKey);
+    // Метод для получения настроек сканера
+    public ScannerSettings getScannerSettings(String scannerName) {
+        boolean enabled = sharedPreferences.getBoolean(scannerName + "_enabled", true);
+        float interval = sharedPreferences.getFloat(scannerName + "_interval", 5.0f);
+        float signalStrength = sharedPreferences.getFloat(scannerName + "_signal_strength", -80.0f);
+
+        return new ScannerSettings(scannerName, enabled, interval, signalStrength);
     }
 
-    public void setGeoProtocol(String newGeoProtocol) {
-        setAppConfigValue(AppSettingsDbHelper.COLUMN_GEO_PROTOCOL, newGeoProtocol);
-    }
-
-    public void setScanning(boolean enabled) {
-        setAppConfigValue(AppSettingsDbHelper.COLUMN_IS_SCANNING, enabled);
-    }
-
+    // Метод для обновления настроек сканера
     public boolean updateScannerSettings(ScannerSettings settings) {
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        ContentValues values = new ContentValues();
-        values.put(AppSettingsDbHelper.COLUMN_SCANNER_ENABLED, settings.isEnabled() ? 1 : 0);
-        values.put(AppSettingsDbHelper.COLUMN_SCAN_INTERVAL, settings.getScanInterval());
-        values.put(AppSettingsDbHelper.COLUMN_SIGNAL_STRENGTH, settings.getSignalStrength());
-
-        int rowsAffected = db.update(
-                AppSettingsDbHelper.TABLE_SCANNERS_CONFIG,
-        values,
-        AppSettingsDbHelper.COLUMN_SCANNER_NAME + " = ?",
-        new String[]{settings.getName()}
-        );
-
-        return rowsAffected > 0;
+        try {
+            SharedPreferences.Editor editor = sharedPreferences.edit();
+            // ИСПРАВЛЕНИЕ: используем getName() вместо getScannerName()
+            editor.putBoolean(settings.getName() + "_enabled", settings.isEnabled());
+            editor.putFloat(settings.getName() + "_interval", settings.getScanInterval());
+            editor.putFloat(settings.getName() + "_signal_strength", settings.getSignalStrength());
+            editor.apply();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

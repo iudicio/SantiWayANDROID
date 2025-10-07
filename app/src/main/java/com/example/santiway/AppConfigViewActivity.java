@@ -15,6 +15,7 @@ import android.widget.Toast;
 import androidx.activity.ComponentActivity;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 public class AppConfigViewActivity extends ComponentActivity {
     private AppSettingsRepository repository;
@@ -24,9 +25,17 @@ public class AppConfigViewActivity extends ComponentActivity {
     private EditText intervalInput;
     private Switch enabledSwitch;
     private EditText signalStrengthInput;
+    private EditText serverIpInput;
+    private static String GLOBAL_API_KEY;
 
     // Допустимые значения для протокола
     private final String[] allowedProtocols = {"GSM", "GPS"};
+
+    // Регулярное выражение для проверки IPv4
+    private static final String IPV4_PATTERN =
+            "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$";
+    private static final Pattern pattern = Pattern.compile(IPV4_PATTERN);
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -40,6 +49,8 @@ public class AppConfigViewActivity extends ComponentActivity {
         intervalInput = findViewById(R.id.interval_input);
         enabledSwitch = findViewById(R.id.enabled_switch);
         signalStrengthInput = findViewById(R.id.signal_strength_input);
+        serverIpInput = findViewById(R.id.server_ip_input);
+        GLOBAL_API_KEY = getString(R.string.api_key);
 
         setupSpinners();
         setupAppSettingsUI();
@@ -99,9 +110,17 @@ public class AppConfigViewActivity extends ComponentActivity {
         Button saveGeneralBtn = findViewById(R.id.save_general_btn);
 
         // Загрузить текущие значения
+        serverIpInput.setText(repository.getServerIp() != null ? repository.getServerIp() : "");
         apiKeyInput.setText(repository.getApiKey() != null ? repository.getApiKey() : "");
 
         saveGeneralBtn.setOnClickListener(v -> {
+            // ПРОВЕРКА: Корректный ли IPv4 адрес (переместить сюда)
+            String serverIp = serverIpInput.getText().toString().trim();
+            if (!isValidIPv4(serverIp)) {
+                showToast("Ошибка: введите корректный IPv4 адрес сервера");
+                return;
+            }
+
             // ПРОВЕРКА: Выбран ли допустимый протокол
             String selectedProtocol = (String) protocolSpinner.getSelectedItem();
             if (!isAllowedProtocol(selectedProtocol)) {
@@ -109,8 +128,11 @@ public class AppConfigViewActivity extends ComponentActivity {
                 return;
             }
 
+            // Сохраняем все настройки
+            repository.setServerIp(serverIp);
             repository.setApiKey(apiKeyInput.getText().toString());
-            repository.setGeoProtocol(selectedProtocol); // Сохраняем выбранное значение из Spinner
+            repository.setGeoProtocol(selectedProtocol);
+
             showToast("Общие настройки сохранены!");
             showCurrentValues();
         });
@@ -180,6 +202,7 @@ public class AppConfigViewActivity extends ComponentActivity {
 
         // Общие настройки
         stringBuilder.append("=== ОБЩИЕ НАСТРОЙКИ ===\n");
+        stringBuilder.append("IPv4 сервера: ").append(repository.getServerIp() != null ? repository.getServerIp() : "не установлен").append("\n");
         stringBuilder.append("API Key: ").append(repository.getApiKey() != null ? repository.getApiKey() : "не установлен").append("\n");
         stringBuilder.append("Протокол: ").append(repository.getGeoProtocol()).append("\n");
         stringBuilder.append("Сканирование активно: ").append(repository.isScanning()).append("\n");
@@ -227,5 +250,13 @@ public class AppConfigViewActivity extends ComponentActivity {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    // Метод для проверки корректности IPv4 адреса
+    private boolean isValidIPv4(String ip) {
+        if (ip == null || ip.isEmpty()) {
+            return false;
+        }
+        return pattern.matcher(ip).matches();
     }
 }

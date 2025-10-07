@@ -1,4 +1,4 @@
-package com.example.santiway;
+package com.example.santiway.upload_data;
 
 import android.content.ContentValues;
 import android.content.Context;
@@ -11,12 +11,13 @@ import com.example.santiway.wifi_scanner.WifiDevice;
 import java.util.ArrayList;
 import java.util.List;
 import com.example.santiway.bluetooth_scanner.BluetoothDevice;
+import com.example.santiway.DeviceListActivity;
 
 public class MainDatabaseHelper extends SQLiteOpenHelper {
 
     private static final String TAG = "MainDatabaseHelper";
     private static final String DATABASE_NAME = "UnifiedScanner.db";
-    private static final int DATABASE_VERSION = 5; // УВЕЛИЧЕНО
+    private static final int DATABASE_VERSION = 7; // УВЕЛИЧЕНО
 
     public MainDatabaseHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -52,26 +53,73 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 "altitude REAL," +
                 "location_accuracy REAL," +
                 "timestamp LONG," +
-                "status TEXT DEFAULT 'ignore')";
+                "status TEXT DEFAULT 'ignore'," +
+                "is_uploaded INTEGER DEFAULT 0" +
+                ");";
         db.execSQL(createUnifiedTable);
     }
     public void deleteOldRecordsFromAllTables(long maxAgeMillis) {
-        List<String> tables = getAllTables();
-        for (String table : tables) {
-            long cutoffTime = System.currentTimeMillis() - maxAgeMillis;
-            SQLiteDatabase db = this.getWritableDatabase();
-            try {
-                db.delete("\"" + table + "\"", "timestamp < ?", new String[]{String.valueOf(cutoffTime)});
-            } catch (Exception e) {
-                Log.e(TAG, "Error deleting old records from table " + table + ": " + e.getMessage());
-            } finally {
-                db.close();
+        SQLiteDatabase db = this.getWritableDatabase();
+        try {
+            // Получаем список таблиц напрямую через один запрос к базе
+            Cursor cursor = db.rawQuery(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%'",
+                    null
+            );
+
+            if (cursor != null) {
+                try {
+                    long cutoffTime = System.currentTimeMillis() - maxAgeMillis;
+
+                    while (cursor.moveToNext()) {
+                        String table = cursor.getString(0);
+                        try {
+                            db.delete("\"" + table + "\"", "timestamp < ?", new String[]{String.valueOf(cutoffTime)});
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error deleting old records from table " + table + ": " + e.getMessage());
+                        }
+                    }
+                } finally {
+                    cursor.close();
+                }
             }
+        } catch (Exception e) {
+            Log.e(TAG, "Error deleting old records: " + e.getMessage());
+        } finally {
+            db.close();
         }
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        if (oldVersion < 6) {
+            // Добавляем поле is_uploaded в существующие таблицы
+            // Вместо вызова getAllTables() работаем напрямую с переданной db
+            try {
+                // Получаем список таблиц напрямую через SQL запрос
+                Cursor cursor = db.rawQuery(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%'",
+                        null
+                );
+
+                if (cursor != null) {
+                    try {
+                        while (cursor.moveToNext()) {
+                            String tableName = cursor.getString(0);
+                            try {
+                                db.execSQL("ALTER TABLE \"" + tableName + "\" ADD COLUMN is_uploaded INTEGER DEFAULT 0");
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error adding is_uploaded column to table " + tableName + ": " + e.getMessage());
+                            }
+                        }
+                    } finally {
+                        cursor.close();
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error during database upgrade: " + e.getMessage());
+            }
+        }
         if (oldVersion < 5) {
             // Удаляем старые таблицы, если они существуют, и создаем новую
             db.execSQL("DROP TABLE IF EXISTS \"wifi_data\"");
@@ -268,36 +316,42 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     }
     public void createTableIfNotExists(String tableName) {
         SQLiteDatabase db = this.getWritableDatabase();
-        String safeName = "\"" + tableName + "\"";
-        String createTableQuery = "CREATE TABLE IF NOT EXISTS " + safeName + " (" +
-                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                "type TEXT NOT NULL," + // Важно: добавляем колонки type и name
-                "name TEXT," +
-                "bssid TEXT," +
-                "signal_strength INTEGER," +
-                "frequency INTEGER," +
-                "capabilities TEXT," +
-                "vendor TEXT," +
-                "cell_id INTEGER," +
-                "lac INTEGER," +
-                "mcc INTEGER," +
-                "mnc INTEGER," +
-                "psc INTEGER," +
-                "pci INTEGER," +
-                "tac INTEGER," +
-                "earfcn INTEGER," +
-                "arfcn INTEGER," +
-                "signal_quality INTEGER," +
-                "network_type TEXT," +
-                "is_registered INTEGER," +
-                "is_neighbor INTEGER," +
-                "latitude REAL," +
-                "longitude REAL," +
-                "altitude REAL," +
-                "location_accuracy REAL," +
-                "timestamp LONG," +
-                "status TEXT DEFAULT 'ignore')";
-        db.execSQL(createTableQuery);
-        db.close();
+        try {
+            String safeName = "\"" + tableName + "\"";
+            String createTableQuery = "CREATE TABLE IF NOT EXISTS " + safeName + " (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "type TEXT NOT NULL," +
+                    "name TEXT," +
+                    "bssid TEXT," +
+                    "signal_strength INTEGER," +
+                    "frequency INTEGER," +
+                    "capabilities TEXT," +
+                    "vendor TEXT," +
+                    "cell_id INTEGER," +
+                    "lac INTEGER," +
+                    "mcc INTEGER," +
+                    "mnc INTEGER," +
+                    "psc INTEGER," +
+                    "pci INTEGER," +
+                    "tac INTEGER," +
+                    "earfcn INTEGER," +
+                    "arfcn INTEGER," +
+                    "signal_quality INTEGER," +
+                    "network_type TEXT," +
+                    "is_registered INTEGER," +
+                    "is_neighbor INTEGER," +
+                    "latitude REAL," +
+                    "longitude REAL," +
+                    "altitude REAL," +
+                    "location_accuracy REAL," +
+                    "timestamp INTEGER," +
+                    "status TEXT DEFAULT 'ignore'," +
+                    "is_uploaded INTEGER DEFAULT 0)"; // Добавляем поле is_uploaded
+            db.execSQL(createTableQuery);
+        } catch (Exception e) {
+            Log.e(TAG, "Error creating table " + tableName + ": " + e.getMessage());
+        } finally {
+            db.close();
+        }
     }
 }
