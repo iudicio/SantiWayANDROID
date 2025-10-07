@@ -30,7 +30,7 @@ public class DeviceUploadWorker extends Worker {
                 return Result.retry();
             }
 
-            List<RabbitMQDevice> batch = uploadManager.getPendingDevicesBatch();
+            List<ApiDevice> batch = uploadManager.getPendingDevicesBatch();
 
             if (batch.isEmpty()) {
                 Log.d(TAG, "No pending devices to upload");

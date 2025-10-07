@@ -64,4 +64,6 @@
     <string name="permission_not_granted_message">Not all permissions were granted.</string>
     <string name="all_permissions_granted_message">All permissions granted.</string>
 
+    <string name="api_key"></string>
+
 </resources>

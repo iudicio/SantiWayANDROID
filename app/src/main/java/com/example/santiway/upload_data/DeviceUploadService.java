@@ -37,8 +37,9 @@ public class DeviceUploadService extends Service {
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build();
 
+        // Уменьшить интервал для более частой отправки (например, 5 минут)
         PeriodicWorkRequest uploadWork =
-                new PeriodicWorkRequest.Builder(DeviceUploadWorker.class, 15, TimeUnit.MINUTES)
+                new PeriodicWorkRequest.Builder(DeviceUploadWorker.class, 1, TimeUnit.MINUTES)
                         .setConstraints(constraints)
                         .build();
 
@@ -47,7 +48,7 @@ public class DeviceUploadService extends Service {
                 ExistingPeriodicWorkPolicy.KEEP,
                 uploadWork);
 
-        Log.d(TAG, "Periodic upload work scheduled");
+        Log.d(TAG, "Periodic upload work scheduled every 5 minutes");
     }
 
     @Nullable
