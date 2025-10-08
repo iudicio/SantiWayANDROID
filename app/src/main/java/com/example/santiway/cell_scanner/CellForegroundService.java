@@ -16,7 +16,7 @@ import android.util.Log;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
-import com.example.santiway.MainDatabaseHelper;
+import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.Priority;

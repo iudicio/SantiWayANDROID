@@ -16,11 +16,27 @@
             android:text="Общие настройки"
             android:textStyle="bold"/>
 
+        <!-- Новое поле для IPv4 адреса -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="IPv4 адрес сервера:"
+            android:layout_marginTop="8dp"/>
+
+        <EditText
+            android:id="@+id/server_ip_input"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="192.168.1.100"
+            android:inputType="numberDecimal"
+            android:digits="0123456789." />
+
         <EditText
             android:id="@+id/api_key_input"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="API Key"/>
+            android:hint="API Key"
+            android:layout_marginTop="8dp"/>
 
         <TextView
             android:layout_width="match_parent"
@@ -39,7 +55,6 @@
             android:layout_height="wrap_content"
             android:text="Сохранить общие настройки"
             android:layout_marginTop="8dp"/>
-
 
         <!-- Настройки сканера -->
         <TextView
