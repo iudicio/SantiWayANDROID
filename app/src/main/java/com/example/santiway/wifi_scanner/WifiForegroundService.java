@@ -21,7 +21,7 @@ import android.widget.Toast;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
-import com.example.santiway.MainDatabaseHelper;
+import com.example.santiway.upload_data.MainDatabaseHelper;
 
 import java.util.List;
 import java.lang.IllegalArgumentException;

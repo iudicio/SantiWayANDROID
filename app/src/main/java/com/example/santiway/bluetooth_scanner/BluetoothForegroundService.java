@@ -26,7 +26,7 @@ import android.widget.Toast;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
-import com.example.santiway.MainDatabaseHelper;
+import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.example.santiway.host_database.AppSettingsRepository;
 import com.example.santiway.host_database.ScannerSettings;
 
