@@ -1,33 +1,15 @@
 # Gradle
 .gradle/
 gradle/caches/
-build/
-*/build/
 !gradle/wrapper/gradle-wrapper.jar
 
-# Android Studio / IntelliJ IDEA
-.idea/
-*.iml
-*.ipr
-*.iws
+# Build folders
+app/build/
+*/app/build/
+build-output/
 
-# Local configuration
-local.properties
-
-# Keystore files
-*.jks
-*.keystore
-
-# Logs
-*.log
-
-# Generated files
-captures/
-.externalNativeBuild/
-.cxx/
-*.apk
-*.ap_
-
-# OS files
-.DS_Store
-Thumbs.db
+# Но оставляем корневой build.gradle и другие важные файлы
+!build.gradle
+!app/build.gradle
+!gradle.properties
+!settings.gradle
