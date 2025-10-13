@@ -16,20 +16,26 @@
             android:text="Общие настройки"
             android:textStyle="bold"/>
 
-        <!-- Новое поле для IPv4 адреса -->
+        <!-- Новое поле для IPv4 адреса (только для отображения) -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="IPv4 адрес сервера:"
+            android:text="IPv4 адрес сервера (из настроек приложения):"
             android:layout_marginTop="8dp"/>
 
-        <EditText
+        <TextView
             android:id="@+id/server_ip_input"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="192.168.1.100"
-            android:inputType="numberDecimal"
-            android:digits="0123456789." />
+            android:padding="12dp"
+            android:background="@android:color/transparent"
+            android:textColor="@android:color/white"
+            android:text="Загрузка..."
+            android:textStyle="italic"
+            android:textSize="14dp"
+            android:focusable="false"
+            android:clickable="false"
+            android:longClickable="false"/>
 
         <!-- API Key (только для отображения) -->
         <TextView
