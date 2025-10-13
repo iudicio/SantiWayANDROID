@@ -31,12 +31,26 @@
             android:inputType="numberDecimal"
             android:digits="0123456789." />
 
-        <EditText
-            android:id="@+id/api_key_input"
+        <!-- API Key (только для отображения) -->
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="API Key"
+            android:text="API Key (из настроек приложения):"
             android:layout_marginTop="8dp"/>
+
+        <TextView
+            android:id="@+id/api_key_display"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="12dp"
+            android:background="@android:color/transparent"
+            android:textColor="@android:color/white"
+            android:text="Загрузка..."
+            android:textStyle="italic"
+            android:textSize="14dp"
+            android:focusable="false"
+            android:clickable="false"
+            android:longClickable="false"/>
 
         <TextView
             android:layout_width="match_parent"
