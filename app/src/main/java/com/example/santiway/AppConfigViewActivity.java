@@ -26,7 +26,7 @@ public class AppConfigViewActivity extends ComponentActivity {
     private Switch enabledSwitch;
     private EditText signalStrengthInput;
     private EditText serverIpInput;
-    private static String GLOBAL_API_KEY;
+    private TextView apiKeyDisplay; // Изменено с EditText на TextView
 
     // Допустимые значения для протокола
     private final String[] allowedProtocols = {"GSM", "GPS"};
@@ -35,7 +35,6 @@ public class AppConfigViewActivity extends ComponentActivity {
     private static final String IPV4_PATTERN =
             "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$";
     private static final Pattern pattern = Pattern.compile(IPV4_PATTERN);
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,7 +49,7 @@ public class AppConfigViewActivity extends ComponentActivity {
         enabledSwitch = findViewById(R.id.enabled_switch);
         signalStrengthInput = findViewById(R.id.signal_strength_input);
         serverIpInput = findViewById(R.id.server_ip_input);
-        GLOBAL_API_KEY = getString(R.string.api_key);
+        apiKeyDisplay = findViewById(R.id.api_key_display); // Новый ID
 
         setupSpinners();
         setupAppSettingsUI();
@@ -106,15 +105,25 @@ public class AppConfigViewActivity extends ComponentActivity {
     }
 
     private void setupAppSettingsUI() {
-        EditText apiKeyInput = findViewById(R.id.api_key_input);
         Button saveGeneralBtn = findViewById(R.id.save_general_btn);
 
-        // Загрузить текущие значения
+        // Загружаем API ключ из strings.xml
+        String defaultApiKey = getString(R.string.default_api_key);
+
+        // Отображаем API ключ (только для чтения)
+        if (defaultApiKey != null && !defaultApiKey.isEmpty()) {
+            // Показываем только первые 8 и последние 4 символа для безопасности
+            String maskedApiKey = maskApiKey(defaultApiKey);
+            apiKeyDisplay.setText(maskedApiKey);
+        } else {
+            apiKeyDisplay.setText("API ключ не настроен в приложении");
+        }
+
+        // Загрузить текущие значения сервера
         serverIpInput.setText(repository.getServerIp() != null ? repository.getServerIp() : "");
-        apiKeyInput.setText(repository.getApiKey() != null ? repository.getApiKey() : "");
 
         saveGeneralBtn.setOnClickListener(v -> {
-            // ПРОВЕРКА: Корректный ли IPv4 адрес (переместить сюда)
+            // ПРОВЕРКА: Корректный ли IPv4 адрес
             String serverIp = serverIpInput.getText().toString().trim();
             if (!isValidIPv4(serverIp)) {
                 showToast("Ошибка: введите корректный IPv4 адрес сервера");
@@ -128,9 +137,8 @@ public class AppConfigViewActivity extends ComponentActivity {
                 return;
             }
 
-            // Сохраняем все настройки
+            // Сохраняем настройки (API ключ не сохраняем, он берется из strings.xml)
             repository.setServerIp(serverIp);
-            repository.setApiKey(apiKeyInput.getText().toString());
             repository.setGeoProtocol(selectedProtocol);
 
             showToast("Общие настройки сохранены!");
@@ -203,7 +211,7 @@ public class AppConfigViewActivity extends ComponentActivity {
         // Общие настройки
         stringBuilder.append("=== ОБЩИЕ НАСТРОЙКИ ===\n");
         stringBuilder.append("IPv4 сервера: ").append(repository.getServerIp() != null ? repository.getServerIp() : "не установлен").append("\n");
-        stringBuilder.append("API Key: ").append(repository.getApiKey() != null ? repository.getApiKey() : "не установлен").append("\n");
+        stringBuilder.append("API Key: ").append(getString(R.string.default_api_key) != null ? "настроен в приложении" : "не настроен").append("\n");
         stringBuilder.append("Протокол: ").append(repository.getGeoProtocol()).append("\n");
         stringBuilder.append("Сканирование активно: ").append(repository.isScanning()).append("\n");
 
@@ -258,5 +266,13 @@ public class AppConfigViewActivity extends ComponentActivity {
             return false;
         }
         return pattern.matcher(ip).matches();
+    }
+
+    // Метод для маскирования API ключа (безопасность)
+    private String maskApiKey(String apiKey) {
+        if (apiKey == null || apiKey.length() <= 12) {
+            return apiKey;
+        }
+        return apiKey.substring(0, 8) + "..." + apiKey.substring(apiKey.length() - 4);
     }
 }

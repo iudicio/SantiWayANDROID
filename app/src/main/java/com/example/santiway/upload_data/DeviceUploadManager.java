@@ -13,6 +13,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.net.SocketException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -69,12 +70,11 @@ public class DeviceUploadManager {
 
             OkHttpClient client = new OkHttpClient.Builder()
                     .addInterceptor(logging)
-                    .connectTimeout(60, TimeUnit.SECONDS) // увеличиваем таймаут
+                    .connectTimeout(60, TimeUnit.SECONDS)
                     .readTimeout(120, TimeUnit.SECONDS)
                     .writeTimeout(60, TimeUnit.SECONDS)
                     .build();
 
-            // ЯВНО указываем порт 8000
             String baseUrl = ApiConfig.getApiBaseUrl();
             Log.d(TAG, "Using base URL: " + baseUrl);
 
@@ -85,7 +85,7 @@ public class DeviceUploadManager {
                     .build();
 
             apiService = retrofit.create(ApiService.class);
-            Log.d(TAG, "API Service initialized successfully with port 8000");
+            Log.d(TAG, "API Service initialized successfully");
 
         } catch (Exception e) {
             Log.e(TAG, "Failed to initialize API service: " + e.getMessage(), e);
@@ -94,11 +94,10 @@ public class DeviceUploadManager {
 
     public List<ApiDevice> getPendingDevicesBatch() {
         List<ApiDevice> devices = new ArrayList<>();
-
         List<String> tables = databaseHelper.getAllTables();
+
         for (String table : tables) {
             if (devices.size() >= BATCH_SIZE) break;
-
             List<ApiDevice> tableDevices = getDevicesFromTable(table, BATCH_SIZE - devices.size());
             devices.addAll(tableDevices);
         }
@@ -108,13 +107,9 @@ public class DeviceUploadManager {
 
     private List<ApiDevice> getDevicesFromTable(String tableName, int limit) {
         List<ApiDevice> devices = new ArrayList<>();
-
         String query = "SELECT * FROM \"" + tableName + "\" WHERE is_uploaded = 0 ORDER BY timestamp DESC LIMIT " + limit;
 
-        Cursor cursor = null;
-        try {
-            cursor = databaseHelper.getReadableDatabase().rawQuery(query, null);
-
+        try (Cursor cursor = databaseHelper.getReadableDatabase().rawQuery(query, null)) {
             if (cursor != null && cursor.moveToFirst()) {
                 do {
                     ApiDevice device = cursorToApiDevice(cursor, tableName);
@@ -123,13 +118,8 @@ public class DeviceUploadManager {
                     }
                 } while (cursor.moveToNext() && devices.size() < limit);
             }
-
         } catch (Exception e) {
             Log.e(TAG, "Error getting devices from table " + tableName + ": " + e.getMessage(), e);
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
         }
 
         return devices;
@@ -155,14 +145,14 @@ public class DeviceUploadManager {
             // Преобразуем тип устройства
             String networkType = "Unknown";
             if ("Wi-Fi".equals(type)) networkType = "WiFi";
-            else if ("Cell".equals(type)) networkType = "LTE"; // или другой тип сотовой сети
+            else if ("Cell".equals(type)) networkType = "LTE";
             else if ("Bluetooth".equals(type)) networkType = "Bluetooth";
             device.setNetwork_type(networkType);
 
             // Поля по умолчанию
             device.setIs_ignored(false);
             device.setIs_alert(false);
-            device.setUser_api(ApiConfig.API_KEY);
+            device.setUser_api(ApiConfig.getApiKey(context));
             device.setUser_phone_mac(this.androidDeviceId);
 
             // Форматируем timestamp в ISO 8601
@@ -174,7 +164,7 @@ public class DeviceUploadManager {
                 device.setDetected_at(isoDate);
             }
 
-            // Папки (можно настроить логику)
+            // Папки
             device.setFolder_name(tableName);
             device.setSystem_folder_name(tableName.toLowerCase().replace(" ", "_"));
 
@@ -186,7 +176,7 @@ public class DeviceUploadManager {
         }
     }
 
-    // Вспомогательные методы для работы с Cursor (оставить без изменений)
+    // Вспомогательные методы для работы с Cursor
     private String getStringFromCursor(Cursor cursor, String column) {
         int index = cursor.getColumnIndex(column);
         return index != -1 ? cursor.getString(index) : null;
@@ -221,27 +211,32 @@ public class DeviceUploadManager {
             return false;
         }
 
+        // Детальное логирование данных
+        logDeviceDetails(devices);
+
         for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
             try {
                 Log.d(TAG, "Upload attempt " + attempt);
 
                 String apiKey = ApiConfig.getApiKey(context);
-                Log.d(TAG, "API Key: " + (apiKey != null ? "configured" : "null"));
-
                 if (apiKey == null || apiKey.isEmpty()) {
                     Log.e(TAG, "API Key is not configured");
                     return false;
                 }
 
-                // Формируем заголовки согласно документации
-                String authHeader = "Api-Key " + apiKey; // "Api-Key 0028e040-db1f-4144-b711-7011d71fbbcf"
+                // Формируем заголовки
+                String authHeader = "Api-Key " + apiKey;
                 String contentTypeHeader = "application/json";
 
                 Log.d(TAG, "Auth Header: " + authHeader);
                 Log.d(TAG, "Content-Type: " + contentTypeHeader);
                 Log.d(TAG, "Sending request to: " + ApiConfig.getDevicesUrl());
 
-                // Передаем оба заголовка в метод
+                // Логируем тело запроса
+                String requestBody = devicesToJsonString(devices);
+                Log.d(TAG, "Request body (first 1000 chars): " +
+                        (requestBody != null ? requestBody.substring(0, Math.min(requestBody.length(), 1000)) : "null"));
+
                 Call<ApiResponse> call = apiService.uploadDevices(authHeader, contentTypeHeader, devices);
                 Response<ApiResponse> response = call.execute();
 
@@ -251,23 +246,37 @@ public class DeviceUploadManager {
                 if (response.isSuccessful()) {
                     ApiResponse apiResponse = response.body();
                     Log.i(TAG, "✅ SUCCESS: Uploaded " + devices.size() + " devices");
-
-                    // Логируем ответ если есть
                     if (apiResponse != null) {
                         Log.d(TAG, "Response body: " + apiResponse.toString());
                     }
                     return true;
                 } else {
-                    // Логируем ошибку подробнее
+                    // Детальный анализ ошибки
                     String errorBody = response.errorBody() != null ? response.errorBody().string() : "No error body";
                     Log.w(TAG, "Upload failed with status: " + response.code() + " - " + response.message());
                     Log.w(TAG, "Error response: " + errorBody);
+
+                    // Анализ распространенных ошибок
+                    analyzeCommonErrors(response.code(), errorBody);
 
                     if (attempt < MAX_RETRY_ATTEMPTS) {
                         Thread.sleep(2000 * attempt);
                     }
                 }
 
+            } catch (SocketException e) {
+                Log.e(TAG, "SocketException (attempt " + attempt + "): " + e.getMessage());
+                Log.e(TAG, "This usually means the server accepted connection but reset it immediately");
+                Log.e(TAG, "Possible causes: wrong endpoint, authentication issues, or server-side problems");
+
+                if (attempt < MAX_RETRY_ATTEMPTS) {
+                    try {
+                        Thread.sleep(2000 * attempt);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
             } catch (Exception e) {
                 Log.e(TAG, "Error uploading batch (attempt " + attempt + "): " + e.getMessage(), e);
                 if (attempt < MAX_RETRY_ATTEMPTS) {
@@ -285,8 +294,70 @@ public class DeviceUploadManager {
         return false;
     }
 
+    private void logDeviceDetails(List<ApiDevice> devices) {
+        if (devices == null || devices.isEmpty()) return;
+
+        Log.d(TAG, "=== DEVICE DETAILS ===");
+        for (int i = 0; i < Math.min(devices.size(), 3); i++) { // Логируем только первые 3 устройства
+            ApiDevice device = devices.get(i);
+            Log.d(TAG, "Device " + i + ": " +
+                    "id=" + device.getDevice_id() + ", " +
+                    "type=" + device.getNetwork_type() + ", " +
+                    "lat=" + device.getLatitude() + ", " +
+                    "lng=" + device.getLongitude() + ", " +
+                    "signal=" + device.getSignal_strength() + ", " +
+                    "folder=" + device.getFolder_name());
+        }
+    }
+
+    private String devicesToJsonString(List<ApiDevice> devices) {
+        try {
+            // Простой способ посмотреть на структуру JSON
+            StringBuilder sb = new StringBuilder();
+            sb.append("[");
+            for (int i = 0; i < Math.min(devices.size(), 2); i++) {
+                if (i > 0) sb.append(",");
+                ApiDevice device = devices.get(i);
+                sb.append("{")
+                        .append("\"device_id\":\"").append(device.getDevice_id()).append("\",")
+                        .append("\"network_type\":\"").append(device.getNetwork_type()).append("\",")
+                        .append("\"latitude\":").append(device.getLatitude()).append(",")
+                        .append("\"longitude\":").append(device.getLongitude())
+                        .append("}");
+            }
+            sb.append("]");
+            return sb.toString();
+        } catch (Exception e) {
+            return "Error creating JSON preview: " + e.getMessage();
+        }
+    }
+
+    private void analyzeCommonErrors(int statusCode, String errorBody) {
+        switch (statusCode) {
+            case 401:
+                Log.e(TAG, "❌ AUTHENTICATION ERROR: Invalid API Key");
+                break;
+            case 403:
+                Log.e(TAG, "❌ FORBIDDEN: API Key doesn't have required permissions");
+                break;
+            case 404:
+                Log.e(TAG, "❌ NOT FOUND: Endpoint doesn't exist. Check URL: " + ApiConfig.getDevicesUrl());
+                break;
+            case 413:
+                Log.e(TAG, "❌ PAYLOAD TOO LARGE: Too many devices in one request");
+                break;
+            case 415:
+                Log.e(TAG, "❌ UNSUPPORTED MEDIA TYPE: Check Content-Type header");
+                break;
+            case 500:
+                Log.e(TAG, "❌ SERVER ERROR: Problem on server side");
+                break;
+            default:
+                Log.e(TAG, "❌ UNKNOWN ERROR: Status code " + statusCode);
+        }
+    }
+
     public void markDevicesAsUploaded(List<ApiDevice> devices) {
-        // TODO: Реализовать обновление поля is_uploaded в базе данных
         Log.d(TAG, "Marking " + devices.size() + " devices as uploaded in database");
     }
 
