@@ -65,6 +65,6 @@
     <string name="all_permissions_granted_message">All permissions granted.</string>
 
     <string name="default_api_key">b6046144-51b6-438b-aaa7-6ca76f52296e</string>
-    <string name="default_server_ip">192.168.1.205</string>
+    <string name="default_server_ip">10.8.0.24</string>
 
 </resources>
