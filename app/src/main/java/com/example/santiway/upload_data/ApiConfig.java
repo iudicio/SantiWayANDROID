@@ -3,7 +3,6 @@ package com.example.santiway.upload_data;
 import android.content.Context;
 import android.util.Log;
 
-import com.example.santiway.host_database.AppSettingsRepository;
 import com.example.santiway.R;
 
 public class ApiConfig {
@@ -13,35 +12,28 @@ public class ApiConfig {
     private static String apiKey;
 
     /**
-     * Инициализация конфигурации API из базы (AppSettingsRepository) и ресурсов
+     * Инициализация конфигурации API только из strings.xml
      */
     public static void initialize(Context context) {
-        AppSettingsRepository repository = new AppSettingsRepository(context);
-
-        // Получаем значения по умолчанию из ресурсов
+        // Получаем значения только из strings.xml
         String defaultApiKey = context.getString(R.string.default_api_key);
         String defaultServerIp = context.getString(R.string.default_server_ip);
 
         // --- Инициализация IP сервера ---
-        String serverIp = repository.getServerIp();
-        if (serverIp == null || serverIp.trim().isEmpty()) {
-            serverIp = defaultServerIp;
-            Log.d(TAG, "Using default server IP: " + serverIp);
-        } else {
-            Log.d(TAG, "Using saved server IP: " + serverIp);
-        }
+        // ВСЕГДА используем только strings.xml для IP сервера
+        String serverIp = defaultServerIp;
+        Log.d(TAG, "Using server IP from strings.xml: " + serverIp);
 
         // Формируем базовый URL
         apiBaseUrl = buildBaseUrl(serverIp);
 
         // --- Инициализация API Key ---
-        String savedApiKey = repository.getApiKey();
-        if (savedApiKey != null && !savedApiKey.trim().isEmpty()) {
-            apiKey = savedApiKey;
-            Log.d(TAG, "Using saved API key");
+        // ВСЕГДА используем только strings.xml для API ключа
+        apiKey = defaultApiKey;
+        if (apiKey != null && !apiKey.trim().isEmpty()) {
+            Log.d(TAG, "Using API key from strings.xml");
         } else {
-            apiKey = defaultApiKey;
-            Log.d(TAG, "Using default API key");
+            Log.e(TAG, "API Key is not configured in strings.xml");
         }
 
         Log.d(TAG, "✅ API Base URL: " + apiBaseUrl);
@@ -86,7 +78,6 @@ public class ApiConfig {
 
     /**
      * Получить полный URL для списка устройств
-     * Пример: http://192.168.1.67/api/devices/
      */
     public static String getDevicesUrl() {
         return getApiBaseUrl() + "api/devices/";
@@ -104,5 +95,10 @@ public class ApiConfig {
         return apiKey.trim();
     }
 
-
+    /**
+     * Получить API ключ (из статической переменной)
+     */
+    public static String getApiKey() {
+        return apiKey;
+    }
 }
