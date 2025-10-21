@@ -10,39 +10,33 @@ public class AppSettingsRepository {
     private SharedPreferences sharedPreferences;
     private static final String PREFS_NAME = "AppSettings";
 
-    // Ключи для SharedPreferences
-    private static final String KEY_API_KEY = "api_key";
+    //
+    // private static final String KEY_API_KEY = "api_key";
     private static final String KEY_GEO_PROTOCOL = "geo_protocol";
     private static final String KEY_IS_SCANNING = "is_scanning";
-    private static final String KEY_SERVER_IP = "server_ip";
+    // private static final String KEY_SERVER_IP = "server_ip";
 
     public AppSettingsRepository(Context context) {
         this.sharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
     }
 
     // Метод для сохранения IPv4 адреса сервера
-    public void setServerIp(String serverIp) {
-        SharedPreferences.Editor editor = sharedPreferences.edit();
-        editor.putString(KEY_SERVER_IP, serverIp);
-        editor.apply();
-    }
+    //public void setServerIp(String serverIp) {
+    //    SharedPreferences.Editor editor = sharedPreferences.edit();
+    //    editor.putString(KEY_SERVER_IP, serverIp);
+    //    editor.apply();
+    //}
 
     // Метод для получения IPv4 адреса сервера
-    public String getServerIp() {
-        return sharedPreferences.getString(KEY_SERVER_IP, null);
-    }
+    //public String getServerIp() {
+    //    return sharedPreferences.getString(KEY_SERVER_IP, null);
+    //}
 
-    // Метод для сохранения API Key
-    public void setApiKey(String apiKey) {
-        SharedPreferences.Editor editor = sharedPreferences.edit();
-        editor.putString(KEY_API_KEY, apiKey);
-        editor.apply();
-    }
+    // УДАЛЕН: Метод для сохранения API Key
+    // УДАЛЕН: public void setApiKey(String apiKey)
 
-    // Метод для получения API Key
-    public String getApiKey() {
-        return sharedPreferences.getString(KEY_API_KEY, null);
-    }
+    // УДАЛЕН: Метод для получения API Key
+    // УДАЛЕН: public String getApiKey()
 
     // Метод для сохранения протокола геолокации
     public void setGeoProtocol(String protocol) {
