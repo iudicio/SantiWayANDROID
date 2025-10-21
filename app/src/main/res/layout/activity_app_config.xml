@@ -16,7 +16,7 @@
             android:text="Общие настройки"
             android:textStyle="bold"/>
 
-        <!-- Новое поле для IPv4 адреса (только для отображения) -->
+        <!-- Поле для IP адреса (только для отображения) -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
