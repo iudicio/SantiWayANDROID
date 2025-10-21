@@ -25,8 +25,8 @@ public class AppConfigViewActivity extends ComponentActivity {
     private EditText intervalInput;
     private Switch enabledSwitch;
     private EditText signalStrengthInput;
-    private EditText serverIpInput;
-    private TextView apiKeyDisplay; // Изменено с EditText на TextView
+    private TextView serverIpInput;
+    private TextView apiKeyDisplay;
 
     // Допустимые значения для протокола
     private final String[] allowedProtocols = {"GSM", "GPS"};
@@ -49,7 +49,7 @@ public class AppConfigViewActivity extends ComponentActivity {
         enabledSwitch = findViewById(R.id.enabled_switch);
         signalStrengthInput = findViewById(R.id.signal_strength_input);
         serverIpInput = findViewById(R.id.server_ip_input);
-        apiKeyDisplay = findViewById(R.id.api_key_display); // Новый ID
+        apiKeyDisplay = findViewById(R.id.api_key_display);
 
         setupSpinners();
         setupAppSettingsUI();
@@ -107,29 +107,23 @@ public class AppConfigViewActivity extends ComponentActivity {
     private void setupAppSettingsUI() {
         Button saveGeneralBtn = findViewById(R.id.save_general_btn);
 
-        // Загружаем API ключ из strings.xml
+        // Загружаем значения из strings.xml
         String defaultApiKey = getString(R.string.default_api_key);
+        String defaultServerIp = getString(R.string.default_server_ip);
 
         // Отображаем API ключ (только для чтения)
         if (defaultApiKey != null && !defaultApiKey.isEmpty()) {
-            // Показываем только первые 8 и последние 4 символа для безопасности
             String maskedApiKey = maskApiKey(defaultApiKey);
             apiKeyDisplay.setText(maskedApiKey);
         } else {
             apiKeyDisplay.setText("API ключ не настроен в приложении");
         }
 
-        // Загрузить текущие значения сервера
-        serverIpInput.setText(repository.getServerIp() != null ? repository.getServerIp() : "");
+        // Отображаем IP сервера из strings.xml (только для чтения)
+        serverIpInput.setText(defaultServerIp);
+        serverIpInput.setEnabled(false); // Делаем поле недоступным для редактирования
 
         saveGeneralBtn.setOnClickListener(v -> {
-            // ПРОВЕРКА: Корректный ли IPv4 адрес
-            String serverIp = serverIpInput.getText().toString().trim();
-            if (!isValidIPv4(serverIp)) {
-                showToast("Ошибка: введите корректный IPv4 адрес сервера");
-                return;
-            }
-
             // ПРОВЕРКА: Выбран ли допустимый протокол
             String selectedProtocol = (String) protocolSpinner.getSelectedItem();
             if (!isAllowedProtocol(selectedProtocol)) {
@@ -137,11 +131,10 @@ public class AppConfigViewActivity extends ComponentActivity {
                 return;
             }
 
-            // Сохраняем настройки (API ключ не сохраняем, он берется из strings.xml)
-            repository.setServerIp(serverIp);
+            // Сохраняем только протокол (IP и API ключ всегда из strings.xml)
             repository.setGeoProtocol(selectedProtocol);
 
-            showToast("Общие настройки сохранены!");
+            showToast("Настройки протокола сохранены!");
             showCurrentValues();
         });
     }
@@ -210,8 +203,14 @@ public class AppConfigViewActivity extends ComponentActivity {
 
         // Общие настройки
         stringBuilder.append("=== ОБЩИЕ НАСТРОЙКИ ===\n");
-        stringBuilder.append("IPv4 сервера: ").append(repository.getServerIp() != null ? repository.getServerIp() : "не установлен").append("\n");
-        stringBuilder.append("API Key: ").append(getString(R.string.default_api_key) != null ? "настроен в приложении" : "не настроен").append("\n");
+
+        // IP сервера всегда из strings.xml
+        String serverIp = getString(R.string.default_server_ip);
+        stringBuilder.append("IPv4 сервера: ").append(serverIp).append("\n");
+
+        // API ключ всегда из strings.xml
+        String apiKey = getString(R.string.default_api_key);
+        stringBuilder.append("API Key: ").append(apiKey != null && !apiKey.isEmpty() ? "настроен" : "не настроен").append("\n");
         stringBuilder.append("Протокол: ").append(repository.getGeoProtocol()).append("\n");
         stringBuilder.append("Сканирование активно: ").append(repository.isScanning()).append("\n");
 
