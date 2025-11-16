@@ -8,6 +8,7 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.MenuItem;
 import android.widget.Toast;
 import android.os.Build;
@@ -189,12 +190,23 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         isScanning = true;
         updateScanStatusUI(true);
 
-        Location currentLocation = (locationManager != null) ? locationManager.getCurrentLocation() : null;
+        // Получаем текущие координаты сканирующего устройства
+        double latitude = 0.0;
+        double longitude = 0.0;
+        double altitude = 0.0;
+        float accuracy = 0.0f;
 
-        double latitude = (currentLocation != null) ? currentLocation.getLatitude() : 0.0;
-        double longitude = (currentLocation != null) ? currentLocation.getLongitude() : 0.0;
-        double altitude = (currentLocation != null) ? currentLocation.getAltitude() : 0.0;
-        float accuracy = (currentLocation != null) ? currentLocation.getAccuracy() : 0.0f;
+        if (locationManager != null && locationManager.hasValidLocation()) {
+            Location currentLocation = locationManager.getCurrentLocation();
+            if (currentLocation != null) {
+                latitude = currentLocation.getLatitude();
+                longitude = currentLocation.getLongitude();
+                altitude = currentLocation.hasAltitude() ? currentLocation.getAltitude() : 0.0;
+                accuracy = currentLocation.getAccuracy();
+
+                Log.d("Scanning", "Using scanner coordinates: " + latitude + ", " + longitude);
+            }
+        }
 
         startScannerService(WifiForegroundService.class, latitude, longitude, altitude, accuracy);
         startScannerService(CellForegroundService.class, latitude, longitude, altitude, accuracy);
