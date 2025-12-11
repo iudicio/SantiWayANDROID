@@ -6,13 +6,15 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.MenuItem;
 import android.widget.Toast;
-import android.os.Build;
-
 
 import androidx.activity.EdgeToEdge;
 import androidx.activity.result.ActivityResultLauncher;
@@ -62,6 +64,14 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private String currentScanFolder = "unified_data";
     private DeviceUploadManager uploadManager;
 
+    // Флаги для проверки функционалов
+    private boolean isLocationEnabled = false;
+    private boolean isWifiEnabled = false;
+    private boolean isBluetoothEnabled = false;
+    private boolean isNetworkAvailable = false;
+    private boolean isGpsProviderEnabled = false;
+    private boolean isNetworkProviderEnabled = false;
+
     private final ActivityResultLauncher<String[]> requestPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(),
                     permissions -> {
@@ -74,8 +84,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                         }
                         if (allGranted) {
                             initializeLocationManager();
+                            checkAllFunctionalityAndWarn();
                         } else {
                             Toast.makeText(MainActivity.this, "Permissions denied", Toast.LENGTH_SHORT).show();
+                            showMissingPermissionsWarning();
                         }
                     });
 
@@ -102,7 +114,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         registerFolderSwitchedReceiver();
 
         databaseHelper = new MainDatabaseHelper(this);
-        //databaseHelper.deleteOldRecordsFromAllTables(2 * 24 * 60 * 60 * 1000);
 
         checkAndRequestPermissions();
 
@@ -118,6 +129,194 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         ApiConfig.initialize(this);
         uploadManager = new DeviceUploadManager(this);
         startUploadService();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (locationManager != null && checkAllPermissions()) {
+            locationManager.startLocationUpdates();
+        }
+        // Проверяем функционалы при каждом возобновлении активности
+        checkAllFunctionalityAndWarn();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        // Проверяем функционалы при запуске приложения
+        checkAllFunctionalityAndWarn();
+    }
+
+    private void checkAllFunctionalityAndWarn() {
+        List<String> missingFunctionality = new ArrayList<>();
+        StringBuilder warningMessage = new StringBuilder();
+
+        // Проверка геолокации
+        checkLocationEnabled();
+        if (!isLocationEnabled) {
+            missingFunctionality.add("Геолокация");
+            warningMessage.append("• Геолокация отключена\n");
+        } else {
+            if (!isGpsProviderEnabled) {
+                missingFunctionality.add("GPS-провайдер");
+                warningMessage.append("• GPS не доступен\n");
+            }
+            if (!isNetworkProviderEnabled) {
+                missingFunctionality.add("Сетевой провайдер");
+                warningMessage.append("• Сетевой провайдер не доступен\n");
+            }
+        }
+
+        // Проверка Wi-Fi
+        checkWifiEnabled();
+        if (!isWifiEnabled) {
+            missingFunctionality.add("Wi-Fi");
+            warningMessage.append("• Wi-Fi отключен\n");
+        }
+
+        // Проверка Bluetooth
+        checkBluetoothEnabled();
+        if (!isBluetoothEnabled) {
+            missingFunctionality.add("Bluetooth");
+            warningMessage.append("• Bluetooth отключен\n");
+        }
+
+        // Проверка общего подключения к сети (Wi-Fi или мобильный интернет)
+        checkNetworkAvailable();
+        if (!isNetworkAvailable) {
+            warningMessage.append("• Отсутствует подключение к интернету\n");
+        }
+
+        // Проверка разрешений
+        if (!checkAllPermissions()) {
+            warningMessage.append("• Отсутствуют необходимые разрешения\n");
+        }
+
+        // Если есть проблемы, показываем предупреждение
+        if (!missingFunctionality.isEmpty() || warningMessage.length() > 0) {
+            showFunctionalityWarning(missingFunctionality, warningMessage.toString());
+        }
+    }
+
+    private void checkLocationEnabled() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                android.location.LocationManager lm = (android.location.LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                isLocationEnabled = lm.isLocationEnabled();
+
+                // Проверяем доступность провайдеров
+                isGpsProviderEnabled = lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER);
+                isNetworkProviderEnabled = lm.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER);
+            } else {
+                // Для старых версий Android
+                int locationMode = Settings.Secure.getInt(getContentResolver(), Settings.Secure.LOCATION_MODE);
+                isLocationEnabled = (locationMode != Settings.Secure.LOCATION_MODE_OFF);
+
+                android.location.LocationManager lm = (android.location.LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                isGpsProviderEnabled = lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER);
+                isNetworkProviderEnabled = lm.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER);
+            }
+        } catch (Exception e) {
+            Log.e("MainActivity", "Error checking location: " + e.getMessage());
+            isLocationEnabled = false;
+            isGpsProviderEnabled = false;
+            isNetworkProviderEnabled = false;
+        }
+    }
+
+    private void checkWifiEnabled() {
+        try {
+            WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            isWifiEnabled = wifiManager != null && wifiManager.isWifiEnabled();
+        } catch (Exception e) {
+            Log.e("MainActivity", "Error checking Wi-Fi: " + e.getMessage());
+            isWifiEnabled = false;
+        }
+    }
+
+    private void checkBluetoothEnabled() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                android.bluetooth.BluetoothManager bluetoothManager =
+                        (android.bluetooth.BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+                isBluetoothEnabled = bluetoothManager != null && bluetoothManager.getAdapter() != null
+                        && bluetoothManager.getAdapter().isEnabled();
+            } else {
+                android.bluetooth.BluetoothAdapter bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+                isBluetoothEnabled = bluetoothAdapter != null && bluetoothAdapter.isEnabled();
+            }
+        } catch (Exception e) {
+            Log.e("MainActivity", "Error checking Bluetooth: " + e.getMessage());
+            isBluetoothEnabled = false;
+        }
+    }
+
+    private void checkNetworkAvailable() {
+        try {
+            ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm != null) {
+                NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+                isNetworkAvailable = activeNetwork != null && activeNetwork.isConnectedOrConnecting();
+            } else {
+                isNetworkAvailable = false;
+            }
+        } catch (Exception e) {
+            Log.e("MainActivity", "Error checking network: " + e.getMessage());
+            isNetworkAvailable = false;
+        }
+    }
+
+    private void showFunctionalityWarning(List<String> missingItems, String details) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Внимание! Функционал ограничен");
+
+        StringBuilder message = new StringBuilder();
+        message.append("Для стабильной работы приложения необходимо:\n\n");
+
+        if (!missingItems.isEmpty()) {
+            message.append("Включить:\n");
+            for (String item : missingItems) {
+                message.append("• ").append(item).append("\n");
+            }
+            message.append("\n");
+        }
+
+        message.append(details);
+        message.append("\n\nБез этих функций приложение может работать нестабильно или некорректно!");
+
+        builder.setMessage(message.toString());
+        builder.setPositiveButton("Понятно", null);
+
+        // Добавляем кнопки для быстрого перехода к настройкам
+        builder.setNeutralButton("Настройки", (dialog, which) -> {
+            openSettings();
+        });
+
+        builder.setCancelable(false);
+        builder.show();
+    }
+
+    private void showMissingPermissionsWarning() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Отсутствуют разрешения");
+        builder.setMessage("Для работы приложения необходимы все запрошенные разрешения. " +
+                "Без них сканирование и геолокация будут работать некорректно!");
+        builder.setPositiveButton("Запросить снова", (dialog, which) -> {
+            requestNecessaryPermissions();
+        });
+        builder.setNegativeButton("Позже", null);
+        builder.setCancelable(false);
+        builder.show();
+    }
+
+    private void openSettings() {
+        Intent intent = new Intent(Settings.ACTION_SETTINGS);
+        try {
+            startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, "Не удается открыть настройки", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void registerFolderSwitchedReceiver() {
@@ -187,6 +386,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     }
 
     private void startScanning() {
+        // Проверяем функционалы перед началом сканирования
+        checkAllFunctionalityAndWarn();
+
         isScanning = true;
         updateScanStatusUI(true);
 
@@ -295,14 +497,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
-        if (locationManager != null && checkAllPermissions()) {
-            locationManager.startLocationUpdates();
-        }
-    }
-
-    @Override
     protected void onDestroy() {
         super.onDestroy();
         if (locationManager != null) {
@@ -342,6 +536,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             requestNecessaryPermissions();
         } else {
             initializeLocationManager();
+            checkAllFunctionalityAndWarn();
         }
     }
 
