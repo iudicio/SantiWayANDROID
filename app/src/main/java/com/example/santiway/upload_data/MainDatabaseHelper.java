@@ -253,7 +253,13 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         Cursor cursor = null;
 
         try {
-            cursor = db.rawQuery("SELECT type, name, latitude, longitude, timestamp FROM \"" + tableName + "\"", null);
+            cursor = db.rawQuery(
+                    "SELECT type, name, latitude, longitude, timestamp " +
+                            "FROM \"" + tableName + "\" " +
+                            "ORDER BY timestamp DESC", // НОВЫЕ записи будут первыми
+                    null
+            );
+
             if (cursor != null && cursor.moveToFirst()) {
                 do {
                     String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
