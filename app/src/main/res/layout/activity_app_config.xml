@@ -1,5 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#172A46"> <androidx.appcompat.widget.Toolbar
+    android:id="@+id/toolbar"
+    android:layout_width="match_parent"
+    android:layout_height="?attr/actionBarSize"
+    android:background="#0B1A2C"
+    app:title="Настройки приложения"
+    app:titleTextColor="@android:color/white"
+    app:navigationIcon="@drawable/ic_cloud" /> <ScrollView
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -9,18 +22,20 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Общие настройки -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Общие настройки"
-            android:textStyle="bold"/>
+            android:textStyle="bold"
+            android:textColor="@android:color/white"
+            android:textSize="18sp"
+            android:layout_marginBottom="8dp"/>
 
-        <!-- Поле для IP адреса (только для отображения) -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="IPv4 адрес сервера (из настроек приложения):"
+            android:textColor="#CCCCCC"
             android:layout_marginTop="8dp"/>
 
         <TextView
@@ -28,32 +43,34 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:padding="12dp"
-            android:background="@android:color/transparent"
+            android:background="@drawable/dark_rounded_background"
             android:textColor="@android:color/white"
             android:text="Загрузка..."
             android:textStyle="italic"
-            android:textSize="14dp"
+            android:textSize="14sp"
+            android:layout_marginTop="4dp"
             android:focusable="false"
             android:clickable="false"
             android:longClickable="false"/>
 
-        <!-- API Key (только для отображения) -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="API Key (из настроек приложения):"
-            android:layout_marginTop="8dp"/>
+            android:textColor="#CCCCCC"
+            android:layout_marginTop="16dp"/>
 
         <TextView
             android:id="@+id/api_key_display"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:padding="12dp"
-            android:background="@android:color/transparent"
+            android:background="@drawable/dark_rounded_background"
             android:textColor="@android:color/white"
             android:text="Загрузка..."
             android:textStyle="italic"
-            android:textSize="14dp"
+            android:textSize="14sp"
+            android:layout_marginTop="4dp"
             android:focusable="false"
             android:clickable="false"
             android:longClickable="false"/>
@@ -62,83 +79,113 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Протокол геолокации:"
-            android:layout_marginTop="8dp"/>
+            android:textColor="#CCCCCC"
+            android:layout_marginTop="16dp"/>
 
         <Spinner
             android:id="@+id/protocol_spinner"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"/>
+            android:layout_height="wrap_content"
+            android:backgroundTint="@android:color/white"
+            android:popupBackground="#0B1A2C"
+            android:layout_marginTop="4dp"/>
 
         <Button
             android:id="@+id/save_general_btn"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Сохранить общие настройки"
-            android:layout_marginTop="8dp"/>
+            android:textColor="@android:color/white"
+            android:backgroundTint="#2C4872"
+            android:layout_marginTop="16dp"/>
 
-        <!-- Настройки сканера -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Настройки сканера"
             android:textStyle="bold"
-            android:layout_marginTop="24dp"/>
+            android:textColor="@android:color/white"
+            android:textSize="18sp"
+            android:layout_marginTop="32dp"
+            android:layout_marginBottom="8dp"/>
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Выберите сканер:"/>
+            android:text="Выберите сканер:"
+            android:textColor="#CCCCCC"/>
 
         <Spinner
             android:id="@+id/scanner_spinner"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"/>
+            android:layout_height="wrap_content"
+            android:backgroundTint="@android:color/white"
+            android:popupBackground="#0B1A2C"
+            android:layout_marginTop="4dp"/>
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Интервал сканирования (сек):"
-            android:layout_marginTop="8dp"/>
+            android:textColor="#CCCCCC"
+            android:layout_marginTop="16dp"/>
 
         <EditText
             android:id="@+id/interval_input"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:inputType="numberDecimal"/>
+            android:inputType="numberDecimal"
+            android:padding="12dp"
+            android:background="@drawable/dark_rounded_background"
+            android:textColor="@android:color/white"
+            android:textCursorDrawable="@drawable/white_cursor"
+            android:layout_marginTop="4dp"/>
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Сила сигнала обнаружения:"
-            android:layout_marginTop="8dp"/>
+            android:textColor="#CCCCCC"
+            android:layout_marginTop="16dp"/>
 
         <EditText
             android:id="@+id/signal_strength_input"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:inputType="numberDecimal|numberSigned"/>
+            android:inputType="numberDecimal|numberSigned"
+            android:padding="12dp"
+            android:background="@drawable/dark_rounded_background"
+            android:textColor="@android:color/white"
+            android:textCursorDrawable="@drawable/white_cursor"
+            android:layout_marginTop="4dp"/>
 
         <Switch
             android:id="@+id/enabled_switch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Включен"
-            android:layout_marginTop="8dp"/>
+            android:textColor="@android:color/white"
+            android:thumbTint="@android:color/white"
+            android:trackTint="#44FFFFFF"
+            android:layout_marginTop="16dp"/>
 
         <Button
             android:id="@+id/save_scanner_btn"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Сохранить настройки сканера"
-            android:layout_marginTop="8dp"/>
+            android:textColor="@android:color/white"
+            android:backgroundTint="#2C4872"
+            android:layout_marginTop="16dp"/>
 
-        <!-- Результат -->
         <TextView
             android:id="@+id/result_text"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:textSize="12sp"/>
+            android:layout_marginTop="32dp"
+            android:textSize="12sp"
+            android:textColor="#AAAAAA"/>
 
     </LinearLayout>
 </ScrollView>
+</LinearLayout>

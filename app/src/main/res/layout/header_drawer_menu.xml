@@ -2,8 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="176dp"
-    android:background="@color/black"
-    android:gravity="bottom"
+    android:background="#172A46"  android:gravity="bottom"
     android:orientation="vertical"
     android:padding="16dp"
     android:theme="@style/ThemeOverlay.AppCompat.Dark">
@@ -12,8 +11,7 @@
         android:id="@+id/imageView"
         android:layout_width="64dp"
         android:layout_height="64dp"
-        android:src="@drawable/ic_cloud"
-        android:contentDescription="Application logo" />
+        android:src="@drawable/ic_mark" android:contentDescription="Application logo" />
 
     <TextView
         android:layout_width="match_parent"
@@ -30,7 +28,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="User Name"
-        android:textColor="@android:color/white"
-        android:textSize="14sp" />
+        android:textColor="#CCCCCC" android:textSize="14sp" />
 
 </LinearLayout>
