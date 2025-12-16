@@ -2,4 +2,14 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="list_item_pressed">#1F3A5A</color>
+    <color name="list_item_focused">#1F3A5A</color>
+
+    <color name="drawer_background">#0B1A2C</color>
+    <color name="drawer_item_selected_dark">#2C4872</color>
+    <color name="drawer_item_selected_light">#402C4872</color>
+
+    <color name="green_accent">#3DDC84</color>
+
+    <color name="ripple_green_drawer">#403DDC84</color>
 </resources>

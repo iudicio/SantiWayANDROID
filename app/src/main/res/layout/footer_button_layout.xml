@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center"
+    android:background="@android:color/transparent">
+
+    <LinearLayout
+        android:id="@+id/footer_notifications"
+        style="@style/FooterActionButton"
+        android:layout_weight="1"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true"
+        android:focusable="true">
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_notifications"
+            app:tint="#FF6B6B" android:contentDescription="Notifications Icon"/>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Notifications"
+            style="@style/FooterActionText" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/footer_device"
+        style="@style/FooterActionButton"
+        android:layout_weight="1"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true">
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_device"
+            app:tint="@android:color/white" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Device"
+            style="@style/FooterActionText" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/footer_create"
+        style="@style/FooterActionButton"
+        android:layout_weight="1"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true">
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_create"
+            app:tint="@android:color/white" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Create"
+            style="@style/FooterActionText" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/footer_delete"
+        style="@style/FooterActionButton"
+        android:layout_weight="1"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true">
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_block"
+            app:tint="@android:color/white" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Delete"
+            style="@style/FooterActionText" />
+    </LinearLayout>
+
+</LinearLayout>

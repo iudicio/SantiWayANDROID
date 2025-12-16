@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/bottom_sheet_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Выберите папку"
+        android:textColor="@android:color/white"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:paddingBottom="16dp"/>
+
+    <ListView
+        android:id="@+id/folder_list_view"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:divider="@android:color/transparent"
+        android:dividerHeight="0dp"
+        android:listSelector="@drawable/list_item_selector" /> </LinearLayout>
