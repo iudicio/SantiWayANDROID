@@ -1,6 +1,7 @@
 package com.example.santiway;
 
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.MenuItem;
 import android.widget.Toast; // НОВЫЙ ИМПОРТ
 import androidx.annotation.NonNull;
@@ -28,6 +29,17 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
     private RecyclerView devicesRecyclerView;
     private MainDatabaseHelper databaseHelper;
     private DeviceListAdapter adapter;
+    private LinearLayoutManager layoutManager;
+
+    // Для пагинации
+    private boolean isLoading = false;
+    private boolean hasMoreData = true;
+    private int currentOffset = 0;
+    private final int PAGE_SIZE = 50; // Количество элементов на странице
+    private String currentTable = "";
+
+    // Хендлер для задержки
+    private Handler handler = new Handler();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,6 +61,27 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         adapter = new DeviceListAdapter(new ArrayList<>(), this);
         devicesRecyclerView.setAdapter(adapter);
 
+        // Добавление слушателя для бесконечного скроллинга
+        devicesRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                super.onScrolled(recyclerView, dx, dy);
+
+                if (!isLoading && hasMoreData && dy > 0) {
+                    int visibleItemCount = layoutManager.getChildCount();
+                    int totalItemCount = layoutManager.getItemCount();
+                    int firstVisibleItemPosition = layoutManager.findFirstVisibleItemPosition();
+
+                    // Проверяем, достигли ли мы конца списка
+                    if ((visibleItemCount + firstVisibleItemPosition) >= totalItemCount
+                            && firstVisibleItemPosition >= 0) {
+
+                        loadMoreData();
+                    }
+                }
+            }
+        });
+
         // Динамическая загрузка вкладок из базы данных
         setupTabLayout();
     }
@@ -64,8 +97,10 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
-                String tableName = tab.getText().toString();
-                loadDevicesForTable(tableName);
+                // Сброс состояния пагинации при смене вкладки
+                resetPagination();
+                currentTable = tab.getText().toString();
+                loadDevicesForTable(currentTable, true);
             }
 
             @Override
@@ -76,13 +111,18 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
             @Override
             public void onTabReselected(TabLayout.Tab tab) {
                 String tableName = tab.getText().toString();
-                loadDevicesForTable(tableName);
+                if (!tableName.equals(currentTable)) {
+                    resetPagination();
+                    currentTable = tableName;
+                    loadDevicesForTable(currentTable, true);
+                }
             }
         });
 
         // Загружаем данные для первой вкладки по умолчанию
         if (!tables.isEmpty()) {
-            loadDevicesForTable(tables.get(0));
+            currentTable = tables.get(0);
+            loadDevicesForTable(currentTable, true);
         }
     }
 

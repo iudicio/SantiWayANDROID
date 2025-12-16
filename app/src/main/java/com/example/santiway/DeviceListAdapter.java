@@ -1,5 +1,6 @@
 package com.example.santiway;
 
+import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -7,9 +8,13 @@ import android.widget.Button; // Добавить импорт Button
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
+import java.util.ArrayList;
 import java.util.List;
 
-public class DeviceListAdapter extends RecyclerView.Adapter<DeviceListAdapter.DeviceViewHolder> {
+public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+
+    private static final int VIEW_TYPE_ITEM = 0;
+    private static final int VIEW_TYPE_LOADING = 1;
 
     // ДОБАВЛЕНО: Интерфейс для обработки нажатий
     public interface OnInfoClickListener {
@@ -30,6 +35,45 @@ public class DeviceListAdapter extends RecyclerView.Adapter<DeviceListAdapter.De
         this.deviceList.clear(); //
         this.deviceList.addAll(newData); //
         notifyDataSetChanged(); //
+    }
+
+    // Метод для добавления данных (пагинация)
+    public void addData(List<DeviceListActivity.Device> newData) {
+        int startPosition = deviceList.size();
+        deviceList.addAll(newData);
+        notifyItemRangeInserted(startPosition, newData.size());
+    }
+
+    // Очистить все данные
+    public void clearData() {
+        deviceList.clear();
+        showLoading = false;
+        isFirstLoad = true;
+        notifyDataSetChanged();
+    }
+
+    // Показать/скрыть индикатор загрузки
+    public void showLoading(boolean isFirstLoad) {
+        this.isFirstLoad = isFirstLoad;
+        if (!showLoading) {
+            showLoading = true;
+            if (isFirstLoad) {
+                notifyDataSetChanged();
+            } else {
+                notifyItemInserted(deviceList.size());
+            }
+        }
+    }
+
+    public void hideLoading() {
+        if (showLoading) {
+            showLoading = false;
+            if (isFirstLoad) {
+                notifyDataSetChanged();
+            } else {
+                notifyItemRemoved(deviceList.size());
+            }
+        }
     }
 
     @NonNull
@@ -75,6 +119,26 @@ public class DeviceListAdapter extends RecyclerView.Adapter<DeviceListAdapter.De
             deviceLocationTextView = itemView.findViewById(R.id.device_location); //
             deviceTimeTextView = itemView.findViewById(R.id.device_time); //
             infoButton = itemView.findViewById(R.id.info_button); // ДОБАВЛЕНО
+        }
+
+        public void bind(DeviceListActivity.Device device) {
+            deviceNameTextView.setText(device.name != null ? device.name : "Unknown");
+            deviceTypeTextView.setText(device.type != null ? device.type : "N/A");
+            deviceLocationTextView.setText(device.location != null ? device.location : "N/A");
+            deviceTimeTextView.setText(device.time != null ? device.time : "N/A");
+        }
+    }
+
+    public static class LoadingViewHolder extends RecyclerView.ViewHolder {
+        ProgressBar progressBar;
+
+        public LoadingViewHolder(@NonNull View itemView) {
+            super(itemView);
+            progressBar = itemView.findViewById(R.id.progress_bar);
+        }
+
+        public void bind() {
+            // Прогресс бар уже отображается
         }
     }
 }

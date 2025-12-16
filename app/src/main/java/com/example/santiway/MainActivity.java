@@ -6,6 +6,9 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -95,6 +98,14 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     };
 
 
+    // Флаги для проверки функционалов
+    private boolean isLocationEnabled = false;
+    private boolean isWifiEnabled = false;
+    private boolean isBluetoothEnabled = false;
+    private boolean isNetworkAvailable = false;
+    private boolean isGpsProviderEnabled = false;
+    private boolean isNetworkProviderEnabled = false;
+
     private final ActivityResultLauncher<String[]> requestPermissionLauncher =
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(),
                     permissions -> {
@@ -107,8 +118,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                         }
                         if (allGranted) {
                             initializeLocationManager();
+                            checkAllFunctionalityAndWarn();
                         } else {
                             Toast.makeText(MainActivity.this, "Permissions denied", Toast.LENGTH_SHORT).show();
+                            showMissingPermissionsWarning();
                         }
                     });
 
@@ -273,6 +286,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     }
 
     private void startScanning() {
+        // Проверяем функционалы перед началом сканирования
+        checkAllFunctionalityAndWarn();
+
         isScanning = true;
         updateScanStatusUI(true);
 
@@ -392,14 +408,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
-        if (locationManager != null && checkAllPermissions()) {
-            locationManager.startLocationUpdates();
-        }
-    }
-
-    @Override
     protected void onDestroy() {
         super.onDestroy();
         if (locationManager != null) {
@@ -440,6 +448,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             requestNecessaryPermissions();
         } else {
             initializeLocationManager();
+            checkAllFunctionalityAndWarn();
         }
     }
 
