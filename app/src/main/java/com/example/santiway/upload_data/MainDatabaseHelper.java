@@ -282,6 +282,49 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         }
         return deviceList;
     }
+
+    public List<DeviceListActivity.Device> getAllDataFromTableWithPagination(
+            String tableName,
+            int offset,
+            int limit) {
+
+        List<DeviceListActivity.Device> deviceList = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+
+        try {
+            // Используем LIMIT и OFFSET для пагинации
+            cursor = db.rawQuery(
+                    "SELECT type, name, latitude, longitude, timestamp " +
+                            "FROM \"" + tableName + "\" " +
+                            "ORDER BY timestamp DESC " +
+                            "LIMIT ? OFFSET ?",
+                    new String[]{String.valueOf(limit), String.valueOf(offset)}
+            );
+
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
+                    String type = cursor.getString(cursor.getColumnIndexOrThrow("type"));
+                    double latitude = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
+                    double longitude = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
+                    long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
+
+                    String locationStr = String.format("Lat: %.4f, Lon: %.4f", latitude, longitude);
+                    String timeStr = new java.text.SimpleDateFormat("HH:mm:ss")
+                            .format(new java.util.Date(timestamp));
+
+                    deviceList.add(new DeviceListActivity.Device(name, type, locationStr, timeStr));
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting paginated data from table " + tableName + ": " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            db.close();
+        }
+        return deviceList;
+    }
     public boolean deleteTable(String tableName) {
         if (tableName.equals("unified_data")) return false;
 
