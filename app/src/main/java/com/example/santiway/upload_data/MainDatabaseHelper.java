@@ -325,6 +325,72 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         }
         return deviceList;
     }
+
+    public int updateDeviceStatus(String tableName, String mac, String newStatus) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        int rowsAffected = 0;
+
+        try {
+            ContentValues values = new ContentValues();
+            values.put("status", newStatus);
+
+            // Обновляем по MAC-адресу (поле bssid) и типу
+            // Для Wi-Fi и Bluetooth используем поле bssid, для Cell - другие поля
+            String selection;
+            String[] selectionArgs;
+
+            if (mac != null && !mac.isEmpty()) {
+                // Если есть MAC, обновляем по bssid
+                selection = "bssid = ?";
+                selectionArgs = new String[]{mac};
+            } else {
+                // Если MAC нет, обновляем все записи без фильтра
+                selection = null;
+                selectionArgs = null;
+            }
+
+            rowsAffected = db.update("\"" + tableName + "\"", values, selection, selectionArgs);
+            Log.d(TAG, "Updated status for " + rowsAffected + " devices in table: " + tableName);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating device status: " + e.getMessage());
+        } finally {
+            db.close();
+        }
+
+        return rowsAffected;
+    }
+
+    // Добавлен метод из dev для массового обновления статуса
+    public int updateAllDeviceStatusForTable(String tableName, String newStatus) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put("status", newStatus);
+
+        int rowsAffected = 0;
+
+        try {
+            db.beginTransaction();
+            // Обновляем все записи в таблице без условия WHERE
+            rowsAffected = db.update("\"" + tableName + "\"", values, null, null);
+
+            if (rowsAffected > 0) {
+                db.setTransactionSuccessful();
+                Log.d(TAG, "Status updated for all devices in table: " + tableName + ". Affected: " + rowsAffected);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating all device statuses in table " + tableName + ": " + e.getMessage());
+        } finally {
+            try {
+                db.endTransaction();
+            } catch (Exception e) {
+                Log.e(TAG, "Error ending transaction: " + e.getMessage());
+            }
+            db.close();
+        }
+        return rowsAffected;
+    }
+
     public boolean deleteTable(String tableName) {
         if (tableName.equals("unified_data")) return false;
 

@@ -3,10 +3,15 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="4dp"
-    app:cardBackgroundColor="#212121"
-    app:cardCornerRadius="8dp"
-    app:contentPadding="12dp">
+    android:layout_marginStart="8dp"
+    android:layout_marginEnd="8dp"
+    android:layout_marginTop="4dp"
+    android:layout_marginBottom="4dp"
+    app:cardBackgroundColor="#172A46" app:cardCornerRadius="12dp" app:contentPadding="16dp"
+    app:cardElevation="4dp"
+    android:foreground="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -24,8 +29,8 @@
                 android:id="@+id/device_name"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@color/white"
-                android:textSize="16sp"
+                android:textColor="@android:color/white"
+                android:textSize="18sp"
                 android:textStyle="bold"
                 android:text="Device Name" />
 
@@ -33,16 +38,17 @@
                 android:id="@+id/device_type"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@color/white"
+                android:textColor="@android:color/white"
                 android:textSize="14sp"
+                android:layout_marginTop="2dp"
                 android:text="Type" />
 
             <TextView
                 android:id="@+id/device_location"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="@color/white"
-                android:textSize="14sp"
+                android:textColor="#AAAAAA" android:textSize="14sp"
+                android:layout_marginTop="2dp"
                 android:text="Location" />
 
         </LinearLayout>
@@ -53,7 +59,22 @@
             android:layout_height="wrap_content"
             android:textColor="#AAAAAA"
             android:textSize="14sp"
+            android:layout_marginEnd="16dp"
             android:text="Time" />
+
+        <Button
+            android:id="@+id/info_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:backgroundTint="#3DDC84" android:minWidth="0dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="Info"
+            android:textColor="@android:color/black" android:textSize="12sp"
+            app:cornerRadius="8dp"
+            android:minHeight="0dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"/>
 
     </LinearLayout>
 

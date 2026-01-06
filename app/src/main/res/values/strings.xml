@@ -5,7 +5,7 @@
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
     <string name="app_name">Network Scanner</string>
-
+    <string name="time_label_initial">Время работы : 00:00:00</string>
     <string name="bluetooth_text">Bluetooth</string>
     <string name="wifi_text">Wi-Fi</string>
     <string name="cellular_text">Cellular</string>

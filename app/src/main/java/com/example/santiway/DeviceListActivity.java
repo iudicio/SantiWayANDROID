@@ -12,6 +12,8 @@ import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.google.android.material.tabs.TabLayout;
 import java.util.ArrayList;
 import java.util.List;
+import android.os.Parcel;
+import android.os.Parcelable;
 
 public class DeviceListActivity extends AppCompatActivity {
 
@@ -192,12 +194,14 @@ public class DeviceListActivity extends AppCompatActivity {
         handler.removeCallbacksAndMessages(null);
     }
 
-    // Вспомогательный класс Device
-    public static class Device {
+    // Вспомогательный класс Device (расширенный с добавлением полей из dev)
+    public static class Device implements Parcelable {
         String name;
         String type;
         String location;
         String time;
+        String mac;
+        String status;
 
         public Device(String name, String type, String location, String time) {
             this.name = name;
@@ -205,5 +209,63 @@ public class DeviceListActivity extends AppCompatActivity {
             this.location = location;
             this.time = time;
         }
+
+        public Device(String name, String type, String location, String time, String mac, String status) {
+            this.name = name;
+            this.type = type;
+            this.location = location;
+            this.time = time;
+            this.mac = mac;
+            this.status = status;
+        }
+
+        // Parcelable implementation
+        protected Device(Parcel in) {
+            name = in.readString();
+            type = in.readString();
+            location = in.readString();
+            time = in.readString();
+            mac = in.readString();
+            status = in.readString();
+        }
+
+        public static final Creator<Device> CREATOR = new Creator<Device>() {
+            @Override
+            public Device createFromParcel(Parcel in) {
+                return new Device(in);
+            }
+
+            @Override
+            public Device[] newArray(int size) {
+                return new Device[size];
+            }
+        };
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        @Override
+        public void writeToParcel(Parcel dest, int flags) {
+            dest.writeString(name);
+            dest.writeString(type);
+            dest.writeString(location);
+            dest.writeString(time);
+            dest.writeString(mac);
+            dest.writeString(status);
+        }
+
+        // Getters
+        public String getName() { return name; }
+        public String getType() { return type; }
+        public String getLocation() { return location; }
+        public String getTime() { return time; }
+        public String getMac() { return mac; }
+        public String getStatus() { return status; }
+
+        // Setters
+        public void setStatus(String status) { this.status = status; }
+        public void setMac(String mac) { this.mac = mac; }
     }
 }
