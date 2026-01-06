@@ -13,3 +13,8 @@ build-output/
 !app/build.gradle
 !gradle.properties
 !settings.gradle
+
+.idea
+build
+local.properties
+.DS_Store
