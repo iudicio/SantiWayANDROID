@@ -28,9 +28,9 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         // Создание единой таблицы для всех данных
         String createUnifiedTable = "CREATE TABLE \"unified_data\" (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                "type TEXT NOT NULL," + // 'Wi-Fi', 'Cell' или 'Bluetooth'
+                "type TEXT NOT NULL," + // 'Wi-Fi' или 'Cell'
                 "name TEXT," + // SSID или Operator name
-                "bssid TEXT," + // BSSID для Wi-Fi/MAC для Bluetooth
+                "bssid TEXT," + // BSSID для Wi-Fi
                 "signal_strength INTEGER," +
                 "frequency INTEGER," +
                 "capabilities TEXT," +
@@ -58,7 +58,6 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 ");";
         db.execSQL(createUnifiedTable);
     }
-
     public void deleteOldRecordsFromAllTables(long maxAgeMillis) {
         SQLiteDatabase db = this.getWritableDatabase();
         try {
@@ -128,7 +127,6 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             onCreate(db);
         }
     }
-
     public long addBluetoothDevice(BluetoothDevice device, String tableName) {
         ContentValues values = new ContentValues();
         values.put("type", "Bluetooth"); // Тип устройства
@@ -152,7 +150,6 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         // Используем существующий общий метод addOrUpdateUnifiedDevice
         return addOrUpdateUnifiedDevice(tableName, values, selection, selectionArgs, device.getTimestamp());
     }
-
     public long addWifiDevice(WifiDevice device, String tableName) {
         ContentValues values = new ContentValues();
         values.put("type", "Wi-Fi");
@@ -250,127 +247,31 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         return result;
     }
 
-    // ДОБАВЛЕНО: Приватный метод для получения списка таблиц, не закрывающий DB.
-    private List<String> getTables(SQLiteDatabase db) {
-        List<String> tables = new ArrayList<>();
-        Cursor cursor = null;
-        try {
-            cursor = db.rawQuery(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%'",
-                    null
-            );
-            if (cursor != null && cursor.moveToFirst()) {
-                do {
-                    tables.add(cursor.getString(0));
-                } while (cursor.moveToNext());
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error getting tables list: " + e.getMessage());
-        } finally {
-            if (cursor != null) cursor.close();
-        }
-        return tables;
-    }
-
-
-    /**
-     * ИСПРАВЛЕНО: Обновляет статус устройства по его MAC-адресу (bssid)
-     * во всех таблицах, используя транзакцию.
-     */
-    public int updateDeviceStatus(String macAddress, String newStatus) {
-        SQLiteDatabase db = this.getWritableDatabase();
-        ContentValues values = new ContentValues();
-        values.put("status", newStatus);
-
-        // Условие поиска по MAC-адресу (bssid)
-        String selection = "bssid = ?";
-        String[] selectionArgs = {macAddress};
-
-        int rowsAffected = 0;
-
-        try {
-            db.beginTransaction(); // НАЧАЛО ТРАНЗАКЦИИ
-
-            // Получаем список всех таблиц, используя текущее соединение
-            List<String> tables = getTables(db);
-
-            // Обновляем запись в каждой таблице
-            for (String tableName : tables) {
-                try {
-                    // Используем безопасное имя таблицы
-                    int affected = db.update("\"" + tableName + "\"", values, selection, selectionArgs);
-                    rowsAffected += affected;
-                    if (affected > 0) {
-                        Log.d(TAG, "Status updated for MAC: " + macAddress + " to " + newStatus + " in table: " + tableName + ". Affected: " + affected);
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Error updating status in table " + tableName + ": " + e.getMessage());
-                }
-            }
-
-            if (rowsAffected > 0) {
-                db.setTransactionSuccessful(); // КОММИТ
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error updating device status: " + e.getMessage());
-        } finally {
-            try {
-                db.endTransaction(); // ЗАВЕРШЕНИЕ ТРАНЗАКЦИИ
-            } catch (Exception e) {
-                Log.e(TAG, "Error ending transaction: " + e.getMessage());
-            }
-            db.close(); // ЗАКРЫТИЕ СОЕДИНЕНИЯ В КОНЦЕ
-        }
-        return rowsAffected;
-    }
-
-
-    /**
-     * ПУБЛИЧНЫЙ МЕТОД ДЛЯ ПОЛУЧЕНИЯ ВСЕХ ТАБЛИЦ.
-     */
-    public List<String> getAllTables() {
-        SQLiteDatabase db = this.getReadableDatabase();
-        try {
-            return getTables(db);
-        } finally {
-            db.close();
-        }
-    }
-
-    /**
-     * НОВЫЙ/ИСПРАВЛЕННЫЙ МЕТОД: Извлекает все данные из указанной таблицы
-     * и возвращает их в виде списка объектов Device.
-     */
     public List<DeviceListActivity.Device> getAllDataFromTable(String tableName) {
         List<DeviceListActivity.Device> deviceList = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = null;
 
         try {
-            // ИЗМЕНЕНО: Добавлены столбцы bssid (для mac) и status
-            String query = "SELECT type, name, latitude, longitude, timestamp, bssid, status FROM \"" + tableName + "\"";
-            cursor = db.rawQuery(query, null);
+            cursor = db.rawQuery(
+                    "SELECT type, name, latitude, longitude, timestamp " +
+                            "FROM \"" + tableName + "\" " +
+                            "ORDER BY timestamp DESC", // НОВЫЕ записи будут первыми
+                    null
+            );
 
             if (cursor != null && cursor.moveToFirst()) {
                 do {
-                    // Извлечение основных данных
                     String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
                     String type = cursor.getString(cursor.getColumnIndexOrThrow("type"));
                     double latitude = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
                     double longitude = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
                     long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
 
-                    // Извлечение новых полей
-                    String mac = cursor.getString(cursor.getColumnIndexOrThrow("bssid"));
-                    String status = cursor.getString(cursor.getColumnIndexOrThrow("status"));
-
-                    // Форматирование данных для отображения в списке
                     String locationStr = String.format("Lat: %.4f, Lon: %.4f", latitude, longitude);
                     String timeStr = new java.text.SimpleDateFormat("HH:mm:ss").format(new java.util.Date(timestamp));
 
-                    // ИЗМЕНЕНО: Используем конструктор с 6 аргументами
-                    deviceList.add(new DeviceListActivity.Device(name, type, locationStr, timeStr, mac, status));
+                    deviceList.add(new DeviceListActivity.Device(name, type, locationStr, timeStr));
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
@@ -382,21 +283,85 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         return deviceList;
     }
 
-    public boolean deleteTable(String tableName) {
-        if (tableName.equals("unified_data")) return false;
+    public List<DeviceListActivity.Device> getAllDataFromTableWithPagination(
+            String tableName,
+            int offset,
+            int limit) {
 
-        SQLiteDatabase db = this.getWritableDatabase();
+        List<DeviceListActivity.Device> deviceList = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+
         try {
-            String safeName = "\"" + tableName + "\"";
-            db.execSQL("DROP TABLE IF EXISTS " + safeName);
-            return true;
+            // Используем LIMIT и OFFSET для пагинации
+            cursor = db.rawQuery(
+                    "SELECT type, name, latitude, longitude, timestamp " +
+                            "FROM \"" + tableName + "\" " +
+                            "ORDER BY timestamp DESC " +
+                            "LIMIT ? OFFSET ?",
+                    new String[]{String.valueOf(limit), String.valueOf(offset)}
+            );
+
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
+                    String type = cursor.getString(cursor.getColumnIndexOrThrow("type"));
+                    double latitude = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
+                    double longitude = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
+                    long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
+
+                    String locationStr = String.format("Lat: %.4f, Lon: %.4f", latitude, longitude);
+                    String timeStr = new java.text.SimpleDateFormat("HH:mm:ss")
+                            .format(new java.util.Date(timestamp));
+
+                    deviceList.add(new DeviceListActivity.Device(name, type, locationStr, timeStr));
+                } while (cursor.moveToNext());
+            }
         } catch (Exception e) {
-            e.printStackTrace();
-            return false;
+            Log.e(TAG, "Error getting paginated data from table " + tableName + ": " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            db.close();
+        }
+        return deviceList;
+    }
+
+    public int updateDeviceStatus(String tableName, String mac, String newStatus) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        int rowsAffected = 0;
+
+        try {
+            ContentValues values = new ContentValues();
+            values.put("status", newStatus);
+
+            // Обновляем по MAC-адресу (поле bssid) и типу
+            // Для Wi-Fi и Bluetooth используем поле bssid, для Cell - другие поля
+            String selection;
+            String[] selectionArgs;
+
+            if (mac != null && !mac.isEmpty()) {
+                // Если есть MAC, обновляем по bssid
+                selection = "bssid = ?";
+                selectionArgs = new String[]{mac};
+            } else {
+                // Если MAC нет, обновляем все записи без фильтра
+                selection = null;
+                selectionArgs = null;
+            }
+
+            rowsAffected = db.update("\"" + tableName + "\"", values, selection, selectionArgs);
+            Log.d(TAG, "Updated status for " + rowsAffected + " devices in table: " + tableName);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating device status: " + e.getMessage());
         } finally {
             db.close();
         }
+
+        return rowsAffected;
     }
+
+    // Добавлен метод из dev для массового обновления статуса
     public int updateAllDeviceStatusForTable(String tableName, String newStatus) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
@@ -426,7 +391,44 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         return rowsAffected;
     }
 
+    public boolean deleteTable(String tableName) {
+        if (tableName.equals("unified_data")) return false;
 
+        SQLiteDatabase db = this.getWritableDatabase();
+        try {
+            String safeName = "\"" + tableName + "\"";
+            db.execSQL("DROP TABLE IF EXISTS " + safeName);
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        } finally {
+            db.close();
+        }
+    }
+
+    public List<String> getAllTables() {
+        List<String> tables = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            cursor = db.rawQuery(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%'",
+                    null
+            );
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    tables.add(cursor.getString(0));
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting all tables: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            db.close();
+        }
+        return tables;
+    }
     public void createTableIfNotExists(String tableName) {
         SQLiteDatabase db = this.getWritableDatabase();
         try {

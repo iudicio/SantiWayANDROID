@@ -12,13 +12,13 @@ import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.MenuItem;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 import android.widget.ImageButton;
 import android.widget.TextView;
-
 
 import androidx.activity.EdgeToEdge;
 import androidx.activity.result.ActivityResultLauncher;
@@ -54,28 +54,25 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener,CreateFolderDialogFragment.CreateFolderListener
-    ,FolderDeletionBottomSheet.FolderDeletionListener{
+public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener, CreateFolderDialogFragment.CreateFolderListener, FolderDeletionListener {
     private TextView timeLabelTextView;
     private BroadcastReceiver folderSwitchedReceiver;
     private DrawerLayout drawerLayout;
     private Toolbar toolbar;
 
     private ImageButton playPauseButton;
-
-    private android.widget.TextView wifiStatusTextView;
-    private android.widget.TextView bluetoothStatusTextView;
-    private android.widget.TextView cellularStatusTextView;
-    private android.widget.TextView coordinatesTextView;
-
+    private TextView wifiStatusTextView;
+    private TextView bluetoothStatusTextView;
+    private TextView cellularStatusTextView;
+    private TextView coordinatesTextView;
     private TextView toolbarFolderTitleTextView;
-    private TextView scanTimerText;
 
     private MainDatabaseHelper databaseHelper;
     private LocationManager locationManager;
     private boolean isScanning = false;
     private String currentScanFolder = "unified_data";
     private DeviceUploadManager uploadManager;
+
     private Handler timerHandler = new Handler();
     private long startTime = 0L;
     private long timeInMilliseconds = 0L;
@@ -90,13 +87,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             minutes = minutes % 60;
 
             String timeString = String.format("%02d:%02d:%02d", hours, minutes, seconds);
-
             timeLabelTextView.setText("Время работы : " + timeString);
-
             timerHandler.postDelayed(this, 1000);
         }
     };
-
 
     // Флаги для проверки функционалов
     private boolean isLocationEnabled = false;
@@ -137,7 +131,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         playPauseButton = findViewById(R.id.play_pause_button);
         toolbarFolderTitleTextView = findViewById(R.id.toolbar_folder_title);
-
         wifiStatusTextView = findViewById(R.id.wifi_status);
         bluetoothStatusTextView = findViewById(R.id.bluetooth_status);
         cellularStatusTextView = findViewById(R.id.cellular_status);
@@ -159,7 +152,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         checkAndRequestPermissions();
 
-        // ИСПРАВЛЕНО: Использование новой кнопки playPauseButton
         playPauseButton.setOnClickListener(v -> {
             if (checkAllPermissions()) {
                 toggleScanState();
@@ -168,16 +160,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             }
         });
 
+        findViewById(R.id.footer_device).setOnClickListener(v -> openDeviceListActivity());
+        findViewById(R.id.footer_create).setOnClickListener(v -> showCreateFolderDialog());
+        findViewById(R.id.footer_delete).setOnClickListener(v -> showFolderManagementDialog());
 
-
-        // ДОБАВЛЕНО: Обработчики нажатий для кнопок нижней панели (Footer)
-        findViewById(R.id.footer_device).setOnClickListener(v -> openDeviceListActivity()); // Список устройств
-        findViewById(R.id.footer_create).setOnClickListener(v -> showCreateFolderDialog()); // Создать папку
-        findViewById(R.id.footer_delete).setOnClickListener(v -> showFolderManagementDialog()); // Удалить папку
-
-
-
-        // Инициализация конфигурации API
         ApiConfig.initialize(this);
         uploadManager = new DeviceUploadManager(this);
         startUploadService();
@@ -191,31 +177,26 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         } else {
             Log.e("MainActivity", "Notifications button (footer_notifications) not found.");
         }
-
     }
 
-    // ДОБАВЛЕН НОВЫЙ МЕТОД: Обновление заголовка Toolbar
     private void updateToolbarTitle(String folderName) {
         if (toolbarFolderTitleTextView != null) {
             toolbarFolderTitleTextView.setText(folderName);
         }
     }
+
     @Override
     public void onFolderCreated(String folderName) {
-        // Вся логика, которая была внутри AlertDialog
         if (folderName.equals("unified_data")) {
-            // Эта проверка должна была быть в диалоге, но на всякий случай оставим
             Toast.makeText(this, "Имя папки недоступно", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // databaseHelper уже инициализирован в onCreate
         databaseHelper.createTableIfNotExists(folderName);
         currentScanFolder = folderName;
-        updateToolbarTitle(currentScanFolder); // <-- Обновление заголовка
+        updateToolbarTitle(currentScanFolder);
         Toast.makeText(this, "Создана папка: " + folderName, Toast.LENGTH_SHORT).show();
     }
-
 
     private void registerFolderSwitchedReceiver() {
         folderSwitchedReceiver = new BroadcastReceiver() {
@@ -225,7 +206,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     String newTableName = intent.getStringExtra("newTableName");
                     if (newTableName != null && !newTableName.isEmpty()) {
                         currentScanFolder = newTableName;
-                        // ДОБАВЛЕНО: Обновление заголовка при переключении извне
                         updateToolbarTitle(currentScanFolder);
                         runOnUiThread(() -> Toast.makeText(MainActivity.this,
                                 "Папка сканирования переключена на: " + newTableName, Toast.LENGTH_LONG).show());
@@ -235,12 +215,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         };
         IntentFilter filter = new IntentFilter("com.example.santiway.FOLDER_SWITCHED");
 
-        // Добавить проверку версии Android
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Для Android 13+ нужно указать флаг экспорта
             registerReceiver(folderSwitchedReceiver, filter, RECEIVER_NOT_EXPORTED);
         } else {
-            // Для старых версий Android
             registerReceiver(folderSwitchedReceiver, filter);
         }
     }
@@ -292,7 +269,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         isScanning = true;
         updateScanStatusUI(true);
 
-        // Получаем текущие координаты сканирующего устройства
         double latitude = 0.0;
         double longitude = 0.0;
         double altitude = 0.0;
@@ -305,7 +281,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 longitude = currentLocation.getLongitude();
                 altitude = currentLocation.hasAltitude() ? currentLocation.getAltitude() : 0.0;
                 accuracy = currentLocation.getAccuracy();
-
                 Log.d("Scanning", "Using scanner coordinates: " + latitude + ", " + longitude);
             }
         }
@@ -314,7 +289,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         startScannerService(CellForegroundService.class, latitude, longitude, altitude, accuracy);
         startScannerService(BluetoothForegroundService.class, latitude, longitude, altitude, accuracy);
 
-        // Запускаем периодическую отправку данных
         schedulePeriodicUpload();
         timerHandler.removeCallbacks(timerRunnable);
         startTime = System.currentTimeMillis();
@@ -331,7 +305,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         stopScannerService(CellForegroundService.class);
         stopScannerService(BluetoothForegroundService.class);
 
-        // Отправляем оставшиеся данные перед остановкой
         uploadRemainingData();
         timerHandler.removeCallbacks(timerRunnable);
 
@@ -339,7 +312,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     }
 
     private void schedulePeriodicUpload() {
-        // Запускаем WorkManager для периодической отправки
         Constraints constraints = new Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build();
@@ -373,13 +345,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     private void updateScanStatusUI(boolean scanning) {
         int textRes = scanning ? R.string.scanning_status : R.string.stopped_status;
-
-        // ИСПРАВЛЕНО: Меняем иконку ImageButton: ic_start/ic_stop
-        // Использую ic_cloud в качестве заглушки для "Stop"
         playPauseButton.setImageResource(scanning ? R.drawable.ic_pause : R.drawable.ic_starts);
-        // Если у вас есть ic_start и ic_stop, замените на:
-        // playPauseButton.setImageResource(scanning ? R.drawable.ic_stop : R.drawable.ic_start);
-
 
         wifiStatusTextView.setText(textRes);
         bluetoothStatusTextView.setText(textRes);
@@ -414,8 +380,116 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             locationManager.cleanup();
         }
         stopScanning();
-        unregisterReceiver(folderSwitchedReceiver);
+        if (folderSwitchedReceiver != null) {
+            unregisterReceiver(folderSwitchedReceiver);
+        }
         timerHandler.removeCallbacks(timerRunnable);
+    }
+
+    // ВАЖНО: МЕТОДЫ ПРОВЕРКИ ФУНКЦИОНАЛОВ И ПРЕДУПРЕЖДЕНИЙ
+
+    private void checkAllFunctionalityAndWarn() {
+        checkNetworkAvailability();
+        checkLocationProviders();
+        checkWifiState();
+        checkBluetoothState();
+
+        if (!isNetworkAvailable || !isLocationEnabled || !isWifiEnabled || !isBluetoothEnabled) {
+            showMissingFunctionalityWarning();
+        }
+    }
+
+    private void showMissingPermissionsWarning() {
+        new AlertDialog.Builder(this)
+                .setTitle("Недостаточно разрешений")
+                .setMessage("Для корректной работы приложения необходимы все запрошенные разрешения. " +
+                        "Без них сканирование и определение местоположения будут невозможны.")
+                .setPositiveButton("Повторно запросить", (dialog, which) -> requestNecessaryPermissions())
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void showMissingFunctionalityWarning() {
+        StringBuilder warningMessage = new StringBuilder();
+        warningMessage.append("Включите следующие функции для корректной работы приложения:\n\n");
+
+        if (!isNetworkAvailable) {
+            warningMessage.append("• Мобильный интернет или Wi-Fi (для отправки данных)\n");
+        }
+        if (!isLocationEnabled) {
+            warningMessage.append("• Геолокация (GPS и сетевое определение местоположения)\n");
+        }
+        if (!isWifiEnabled) {
+            warningMessage.append("• Wi-Fi (для сканирования Wi-Fi сетей)\n");
+        }
+        if (!isBluetoothEnabled) {
+            warningMessage.append("• Bluetooth (для сканирования Bluetooth устройств)\n");
+        }
+
+        warningMessage.append("\nБез этих функций данные могут собираться неполно или некорректно.");
+
+        new AlertDialog.Builder(this)
+                .setTitle("Внимание: ограниченная функциональность")
+                .setMessage(warningMessage.toString())
+                .setPositiveButton("Перейти к настройкам", (dialog, which) -> openSettings())
+                .setNegativeButton("Продолжить", null)
+                .show();
+    }
+
+    private void checkNetworkAvailability() {
+        ConnectivityManager connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (connectivityManager != null) {
+            NetworkInfo activeNetwork = connectivityManager.getActiveNetworkInfo();
+            isNetworkAvailable = activeNetwork != null && activeNetwork.isConnectedOrConnecting();
+        } else {
+            isNetworkAvailable = false;
+        }
+    }
+
+    private void checkLocationProviders() {
+        android.location.LocationManager locationManager = (android.location.LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        if (locationManager != null) {
+            isGpsProviderEnabled = locationManager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER);
+            isNetworkProviderEnabled = locationManager.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER);
+            isLocationEnabled = isGpsProviderEnabled || isNetworkProviderEnabled;
+        } else {
+            isLocationEnabled = false;
+        }
+    }
+
+    private void checkWifiState() {
+        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        if (wifiManager != null) {
+            isWifiEnabled = wifiManager.isWifiEnabled();
+        } else {
+            isWifiEnabled = false;
+        }
+    }
+
+    private void checkBluetoothState() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Для Android 12+
+            android.bluetooth.BluetoothAdapter bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+            isBluetoothEnabled = bluetoothAdapter != null && bluetoothAdapter.isEnabled();
+        } else {
+            // Для старых версий
+            try {
+                android.bluetooth.BluetoothAdapter bluetoothAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+                isBluetoothEnabled = bluetoothAdapter != null && bluetoothAdapter.isEnabled();
+            } catch (Exception e) {
+                isBluetoothEnabled = false;
+                Log.e("MainActivity", "Error checking Bluetooth state: " + e.getMessage());
+            }
+        }
+    }
+
+    private void openSettings() {
+        Intent intent = new Intent(Settings.ACTION_SETTINGS);
+        if (intent.resolveActivity(getPackageManager()) != null) {
+            startActivity(intent);
+        } else {
+            Toast.makeText(this, "Не удается открыть настройки", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private boolean checkAllPermissions() {
@@ -472,36 +546,27 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
 
-        if (id == R.id.nav_clear_status) { // Настройки
+        if (id == R.id.nav_clear_status) {
             viewAppConfig();
         }
 
         if (id == R.id.nav_make_safe) {
-            // НОВОЕ: Массовое обновление статуса для текущей папки
-            // currentScanFolder хранит имя таблицы, которую мы сейчас сканируем
-
-            // Проверяем, что папка не пуста
             if (currentScanFolder != null && !currentScanFolder.isEmpty()) {
-                // Вызываем массовое обновление в базе данных
                 int affectedRows = databaseHelper.updateAllDeviceStatusForTable(currentScanFolder, "SAFE");
-
                 Toast.makeText(this, affectedRows + " устройств в '" + currentScanFolder + "' помечены как SAFE.", Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, "Текущая папка для сканирования не определена.", Toast.LENGTH_SHORT).show();
             }
         }
         if (id == R.id.nav_clear_triggers) {
-            // Массовое обновление статуса на "CLEAR" для текущей папки
             if (currentScanFolder != null && !currentScanFolder.isEmpty()) {
                 int affectedRows = databaseHelper.updateAllDeviceStatusForTable(currentScanFolder, "CLEAR");
-
                 Toast.makeText(this, affectedRows + " устройств в '" + currentScanFolder + "' помечены как CLEAR.", Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, "Текущая папка для сканирования не определена.", Toast.LENGTH_SHORT).show();
             }
         }
 
-        // Логика закрытия drawer должна быть в конце
         drawerLayout.closeDrawer(GravityCompat.START);
         return true;
     }
@@ -548,13 +613,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         bottomSheet.show(getSupportFragmentManager(), "FolderSelectionTag");
     }
 
-
-    // ИЗМЕНЕННЫЙ МЕТОД
     private void showFolderManagementDialog() {
         List<String> folders = databaseHelper.getAllTables();
         List<String> deletableFolders = new ArrayList<>();
 
-        // Папку "unified_data" нельзя удалять
         for (String folder : folders) {
             if (!folder.isEmpty() && !folder.equals("unified_data")) {
                 deletableFolders.add(folder);
@@ -566,26 +628,20 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             return;
         }
 
-        // Запуск нового стилизованного BottomSheet
         FolderDeletionBottomSheet bottomSheet = new FolderDeletionBottomSheet(
                 deletableFolders,
-                this // MainActivity реализует FolderDeletionListener
+                this
         );
 
         bottomSheet.show(getSupportFragmentManager(), "FolderDeletionTag");
     }
 
-    // УДАЛИТЬ старый метод, который вы предоставили:
-    // private void showDeleteConfirmationDialog(String folderName) { ... }
-
-    // НОВЫЙ МЕТОД: Обработка запроса на удаление из BottomSheet
     @Override
     public void onDeleteRequested(String folderName) {
         boolean success = databaseHelper.deleteTable(folderName);
         if (success) {
             Toast.makeText(this, "Папка удалена: " + folderName, Toast.LENGTH_SHORT).show();
 
-            // Если удалена текущая папка сканирования, переключаемся на unified_data
             if (currentScanFolder.equals(folderName)) {
                 stopScanning();
                 currentScanFolder = "unified_data";
@@ -597,9 +653,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
     }
 
-    // Старый метод showCreateFolderDialog() удаляется и заменяется на:
     private void showCreateFolderDialog() {
-        // Мы используем CreateFolderDialogFragment, который мы исправляли
         CreateFolderDialogFragment dialogFragment = new CreateFolderDialogFragment();
         dialogFragment.show(getSupportFragmentManager(), "create_folder_dialog");
     }

@@ -4,7 +4,7 @@ import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button; // Добавить импорт Button
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
@@ -16,25 +16,22 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
     private static final int VIEW_TYPE_ITEM = 0;
     private static final int VIEW_TYPE_LOADING = 1;
 
-    // ДОБАВЛЕНО: Интерфейс для обработки нажатий
-    public interface OnInfoClickListener {
-        void onInfoClick(DeviceListActivity.Device device);
-    }
-
     private List<DeviceListActivity.Device> deviceList;
-    private final OnInfoClickListener listener; // ДОБАВЛЕНО: Объект слушателя
+    private Context context;
+    private boolean showLoading = false;
+    private boolean isFirstLoad = true;
 
-    // ИЗМЕНЕНО: Конструктор теперь принимает слушателя
-    public DeviceListAdapter(List<DeviceListActivity.Device> deviceList, OnInfoClickListener listener) {
-        this.deviceList = deviceList;
-        this.listener = listener; // Сохраняем слушателя
+    public DeviceListAdapter(List<DeviceListActivity.Device> deviceList, Context context) {
+        this.deviceList = new ArrayList<>(deviceList);
+        this.context = context;
     }
 
     // Метод для обновления данных в адаптере
     public void updateData(List<DeviceListActivity.Device> newData) {
-        this.deviceList.clear(); //
-        this.deviceList.addAll(newData); //
-        notifyDataSetChanged(); //
+        this.deviceList.clear();
+        this.deviceList.addAll(newData);
+        isFirstLoad = false;
+        notifyDataSetChanged();
     }
 
     // Метод для добавления данных (пагинация)
@@ -78,31 +75,39 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
     @NonNull
     @Override
-    public DeviceViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_device, parent, false); //
-        return new DeviceViewHolder(view);
+    public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        if (viewType == VIEW_TYPE_ITEM) {
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_device, parent, false);
+            return new DeviceViewHolder(view);
+        } else {
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_loading, parent, false);
+            return new LoadingViewHolder(view);
+        }
     }
 
     @Override
-    public void onBindViewHolder(@NonNull DeviceViewHolder holder, int position) {
-        DeviceListActivity.Device device = deviceList.get(position); //
-
-        holder.deviceNameTextView.setText(device.name); //
-        holder.deviceTypeTextView.setText(device.type); //
-        holder.deviceLocationTextView.setText(device.location); //
-        holder.deviceTimeTextView.setText(device.time); //
-
-        // ДОБАВЛЕНО: Установка обработчика нажатия на кнопку "Info"
-        holder.infoButton.setOnClickListener(v -> {
-            if (listener != null) {
-                listener.onInfoClick(device);
-            }
-        });
+    public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
+        if (holder instanceof DeviceViewHolder) {
+            DeviceListActivity.Device device = deviceList.get(position);
+            ((DeviceViewHolder) holder).bind(device);
+        } else if (holder instanceof LoadingViewHolder) {
+            ((LoadingViewHolder) holder).bind();
+        }
     }
 
     @Override
     public int getItemCount() {
-        return deviceList.size(); //
+        return deviceList.size() + (showLoading ? 1 : 0);
+    }
+
+    @Override
+    public int getItemViewType(int position) {
+        if (showLoading && position == deviceList.size()) {
+            return VIEW_TYPE_LOADING;
+        }
+        return VIEW_TYPE_ITEM;
     }
 
     public static class DeviceViewHolder extends RecyclerView.ViewHolder {
@@ -110,15 +115,13 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
         TextView deviceTypeTextView;
         TextView deviceLocationTextView;
         TextView deviceTimeTextView;
-        Button infoButton; // ДОБАВЛЕНО
 
         public DeviceViewHolder(@NonNull View itemView) {
             super(itemView);
-            deviceNameTextView = itemView.findViewById(R.id.device_name); //
-            deviceTypeTextView = itemView.findViewById(R.id.device_type); //
-            deviceLocationTextView = itemView.findViewById(R.id.device_location); //
-            deviceTimeTextView = itemView.findViewById(R.id.device_time); //
-            infoButton = itemView.findViewById(R.id.info_button); // ДОБАВЛЕНО
+            deviceNameTextView = itemView.findViewById(R.id.device_name);
+            deviceTypeTextView = itemView.findViewById(R.id.device_type);
+            deviceLocationTextView = itemView.findViewById(R.id.device_location);
+            deviceTimeTextView = itemView.findViewById(R.id.device_time);
         }
 
         public void bind(DeviceListActivity.Device device) {
