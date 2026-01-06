@@ -128,7 +128,7 @@ public class DeviceDetailsBottomSheet extends BottomSheetDialogFragment implemen
             }
 
             // 1. ОБНОВЛЕНИЕ СТАТУСА В БАЗЕ ДАННЫХ
-            databaseHelper.updateDeviceStatus(currentDevice.mac, newStatus);
+            databaseHelper.updateDeviceStatus("unified_data", currentDevice.mac, newStatus);
 
             // 2. ОБНОВЛЕНИЕ ЛОКАЛЬНОГО ОБЪЕКТА И ЭКРАНА
             currentDevice.status = newStatus;
