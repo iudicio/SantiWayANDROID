@@ -5,27 +5,49 @@
     android:versionCode="1"
     android:versionName="1.0">
 
-    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- ========== ВСЕ uses-permission и uses-feature ДОЛЖНЫ БЫТЬ ЗДЕСЬ ========== -->
 
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"/>
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-    <uses-permission android:name="android.permission.READ_CELL_BROADCASTS" />
+    <!-- Базовые сетевые -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Wi-Fi -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+
+    <!-- Bluetooth (Android 12+) -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- Локация -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Фоновое сканирование (если нужно) -->
+    <!--<uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />-->
+
+    <!-- Фоновые сервисы -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- Уведомления (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- READ_PHONE_STATE - если используется для сотовых сетей -->
+    <!--<uses-permission android:name="android.permission.READ_PHONE_STATE" />-->
+
+    <!-- Для карт -->
     <uses-feature
         android:glEsVersion="0x00020000"
         android:required="true" />
+
+    <!-- Декларация использования Bluetooth для старых версий Android -->
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
+    <!-- Декларация для локации -->
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.location.network" android:required="false" />
+
+    <!-- ========== ЗДЕСЬ НАЧИНАЕТСЯ application ========== -->
 
     <application
         android:allowBackup="true"
@@ -44,6 +66,7 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyCC403LVvNftLfazMl7fXVUNxi1rBnCQAA"/>
 
+        <!-- Активности -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -52,10 +75,29 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
         <activity
             android:name=".NotificationsActivity"
             android:parentActivityName=".MainActivity"
             android:theme="@style/Theme.SantiWay" />
+
+        <activity
+            android:name=".NotificationDetailActivity"
+            android:parentActivityName=".NotificationsActivity"
+            android:theme="@style/Theme.SantiWay" />
+
+        <activity
+            android:name=".DeviceListActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".DatabaseViewActivity"
+            android:exported="false" />
+
+        <activity android:name=".AppConfigViewActivity"
+            android:exported="false" />
+
+        <!-- FileProvider -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
@@ -66,42 +108,36 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <activity
-            android:name=".NotificationDetailActivity"
-            android:parentActivityName=".NotificationsActivity"
-            android:theme="@style/Theme.SantiWay" />
-        <activity
-            android:name=".DeviceListActivity"
-            android:exported="false" />
-        <activity
-            android:name=".DatabaseViewActivity"
-            android:exported="false" />
-        <activity android:name=".AppConfigViewActivity"></activity>
-
+        <!-- Сервисы сканирования -->
         <service
             android:name=".wifi_scanner.WifiForegroundService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice|location|dataSync"/>
+            android:foregroundServiceType="location"/>
+
         <service
             android:name=".cell_scanner.CellForegroundService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice|location|dataSync"/>
+            android:foregroundServiceType="location"/>
+
         <service
             android:name=".bluetooth_scanner.BluetoothForegroundService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice|location|dataSync"/>
+            android:foregroundServiceType="location"/>
+
+        <!-- Сервисы загрузки -->
         <service
-            android:name=".upload.DeviceUploadService"
+            android:name=".upload_data.DeviceUploadService"
             android:enabled="true"
             android:exported="false" />
 
-        <service
-            android:name=".upload.DeviceUploadWorker"
+        <!-- Дополнительно: если у вас есть Worker как сервис -->
+        <!-- <service
+            android:name=".upload_data.DeviceUploadWorker"
             android:enabled="true"
-            android:exported="false" />
+            android:exported="false" /> -->
 
     </application>
 

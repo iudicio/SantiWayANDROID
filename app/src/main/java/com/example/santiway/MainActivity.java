@@ -1,9 +1,11 @@
 package com.example.santiway;
 
+import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.net.ConnectivityManager;
@@ -76,6 +78,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private Handler timerHandler = new Handler();
     private long startTime = 0L;
     private long timeInMilliseconds = 0L;
+
     private Runnable timerRunnable = new Runnable() {
         @Override
         public void run() {
@@ -110,11 +113,19 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                                 break;
                             }
                         }
+
                         if (allGranted) {
+                            // Разрешения получены
                             initializeLocationManager();
                             checkAllFunctionalityAndWarn();
+
+                            // Запрашиваем дополнительные разрешения, если нужно
+                            requestOptionalPermissions();
                         } else {
-                            Toast.makeText(MainActivity.this, "Permissions denied", Toast.LENGTH_SHORT).show();
+                            // Не все разрешения даны
+                            Toast.makeText(MainActivity.this,
+                                    "Некоторые разрешения не предоставлены",
+                                    Toast.LENGTH_SHORT).show();
                             showMissingPermissionsWarning();
                         }
                     });
@@ -150,13 +161,14 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         databaseHelper = new MainDatabaseHelper(this);
 
-        checkAndRequestPermissions();
+        checkAndRequestPermissionsStepByStep();
 
         playPauseButton.setOnClickListener(v -> {
-            if (checkAllPermissions()) {
+            if (checkEssentialPermissions()) {
                 toggleScanState();
+                requestOptionalPermissions();
             } else {
-                requestNecessaryPermissions();
+                showInitialPermissionsExplanation();
             }
         });
 
@@ -492,54 +504,110 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
     }
 
-    private boolean checkAllPermissions() {
-        boolean hasLocationPermission = ContextCompat.checkSelfPermission(this,
-                android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
-        boolean hasPhoneStatePermission = ContextCompat.checkSelfPermission(this,
-                android.Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED;
-
-        boolean hasNotificationPermission = true;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            hasNotificationPermission = ContextCompat.checkSelfPermission(this,
-                    android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
-        }
-
-        boolean hasBluetoothScanPermission = true;
-        boolean hasBluetoothConnectPermission = true;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            hasBluetoothScanPermission = ContextCompat.checkSelfPermission(this,
-                    android.Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
-            hasBluetoothConnectPermission = ContextCompat.checkSelfPermission(this,
-                    android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
-        }
-
-        return hasLocationPermission && hasPhoneStatePermission && hasNotificationPermission
-                && hasBluetoothScanPermission && hasBluetoothConnectPermission;
-    }
-
-    private void checkAndRequestPermissions() {
-        if (!checkAllPermissions()) {
-            requestNecessaryPermissions();
-        } else {
-            initializeLocationManager();
-            checkAllFunctionalityAndWarn();
-        }
+    private void showInitialPermissionsExplanation() {
+        new AlertDialog.Builder(this)
+                .setTitle("Необходимые разрешения")
+                .setMessage("Для сканирования Wi-Fi и Bluetooth устройств приложению нужны:\n\n" +
+                        "• Доступ к местоположению (для обнаружения устройств)\n" +
+                        "• Разрешение на сканирование Bluetooth (Android 12+)\n\n" +
+                        "Эти разрешения необходимы для основной работы приложения.")
+                .setPositiveButton("Запросить", (dialog, which) -> requestEssentialPermissions())
+                .setNegativeButton("Позже", (dialog, which) -> {
+                    // Показываем предупреждение о ограниченной функциональности
+                    showMissingPermissionsWarning();
+                })
+                .setCancelable(false)
+                .show();
     }
 
     private void requestNecessaryPermissions() {
         List<String> permissionsToRequest = new ArrayList<>();
-        permissionsToRequest.add(android.Manifest.permission.ACCESS_FINE_LOCATION);
-        permissionsToRequest.add(android.Manifest.permission.READ_PHONE_STATE);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissionsToRequest.add(android.Manifest.permission.POST_NOTIFICATIONS);
-        }
+        // Основное разрешение
+        permissionsToRequest.add(android.Manifest.permission.ACCESS_FINE_LOCATION);
+
+        // Bluetooth (Android 12+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             permissionsToRequest.add(android.Manifest.permission.BLUETOOTH_SCAN);
             permissionsToRequest.add(android.Manifest.permission.BLUETOOTH_CONNECT);
         }
 
-        requestPermissionLauncher.launch(permissionsToRequest.toArray(new String[0]));
+        // Уведомления (Android 13+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissionsToRequest.add(android.Manifest.permission.POST_NOTIFICATIONS);
+        }
+
+        // READ_PHONE_STATE запрашивайте отдельно, только если действительно нужно
+        // permissionsToRequest.add(android.Manifest.permission.READ_PHONE_STATE);
+
+        if (!permissionsToRequest.isEmpty()) {
+            requestPermissionLauncher.launch(permissionsToRequest.toArray(new String[0]));
+        }
+    }
+
+    private void checkAndRequestPermissionsStepByStep() {
+        // Шаг 1: Проверяем и запрашиваем только самое необходимое
+        if (!checkEssentialPermissions()) {
+            requestEssentialPermissions();
+        } else {
+            // Шаг 2: Если основные есть, запрашиваем опциональные
+            requestOptionalPermissions();
+        }
+    }
+
+    private boolean checkEssentialPermissions() {
+        // Только локация и Bluetooth
+        boolean hasLocation = ContextCompat.checkSelfPermission(this,
+                Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+
+        boolean hasBluetooth = true;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            boolean hasBluetoothScan = ContextCompat.checkSelfPermission(this,
+                    Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED;
+            boolean hasBluetoothConnect = ContextCompat.checkSelfPermission(this,
+                    Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
+            hasBluetooth = hasBluetoothScan && hasBluetoothConnect;
+        }
+
+        return hasLocation && hasBluetooth;
+    }
+
+    private void requestEssentialPermissions() {
+        List<String> permissions = new ArrayList<>();
+        permissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            permissions.add(Manifest.permission.BLUETOOTH_SCAN);
+            permissions.add(Manifest.permission.BLUETOOTH_CONNECT);
+        }
+
+        // ИСПОЛЬЗУЙТЕ СУЩЕСТВУЮЩИЙ requestPermissionLauncher
+        requestPermissionLauncher.launch(permissions.toArray(new String[0]));
+    }
+
+    private void requestOptionalPermissions() {
+        // Уведомления запрашиваем только когда они понадобятся
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this,
+                    Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+
+                // Запрашиваем при первом запуске или когда пользователь начинает сканирование
+                SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+                if (!prefs.getBoolean("notifications_asked", false)) {
+                    new AlertDialog.Builder(this)
+                            .setTitle("Уведомления")
+                            .setMessage("Разрешить уведомления для получения информации о сканировании?")
+                            .setPositiveButton("Разрешить", (d, w) -> {
+                                requestPermissionLauncher.launch(
+                                        new String[]{Manifest.permission.POST_NOTIFICATIONS}
+                                );
+                                prefs.edit().putBoolean("notifications_asked", true).apply();
+                            })
+                            .setNegativeButton("Позже", null)
+                            .show();
+                }
+            }
+        }
     }
 
     @Override
