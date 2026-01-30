@@ -97,6 +97,10 @@
         <activity android:name=".AppConfigViewActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".activity_map.ActivityMapActivity"
+            android:screenOrientation="portrait" />
+
         <!-- FileProvider -->
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -132,12 +136,6 @@
             android:name=".upload_data.DeviceUploadService"
             android:enabled="true"
             android:exported="false" />
-
-        <!-- Дополнительно: если у вас есть Worker как сервис -->
-        <!-- <service
-            android:name=".upload_data.DeviceUploadWorker"
-            android:enabled="true"
-            android:exported="false" /> -->
 
     </application>
 

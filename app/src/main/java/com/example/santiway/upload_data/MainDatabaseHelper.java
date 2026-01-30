@@ -293,10 +293,11 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         Cursor cursor = null;
 
         try {
-            // Используем LIMIT и OFFSET для пагинации
+            // Добавляем bssid (MAC адрес) в запрос
             cursor = db.rawQuery(
-                    "SELECT type, name, latitude, longitude, timestamp " +
+                    "SELECT type, name, bssid, latitude, longitude, timestamp " +
                             "FROM \"" + tableName + "\" " +
+                            "WHERE type IN ('Wi-Fi', 'Bluetooth') " + // Только устройства с MAC
                             "ORDER BY timestamp DESC " +
                             "LIMIT ? OFFSET ?",
                     new String[]{String.valueOf(limit), String.valueOf(offset)}
@@ -306,6 +307,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 do {
                     String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
                     String type = cursor.getString(cursor.getColumnIndexOrThrow("type"));
+                    String mac = cursor.getString(cursor.getColumnIndexOrThrow("bssid"));
                     double latitude = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
                     double longitude = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
                     long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
@@ -314,7 +316,8 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                     String timeStr = new java.text.SimpleDateFormat("HH:mm:ss")
                             .format(new java.util.Date(timestamp));
 
-                    deviceList.add(new DeviceListActivity.Device(name, type, locationStr, timeStr));
+                    // Теперь создаем Device с MAC адресом
+                    deviceList.add(new DeviceListActivity.Device(name, type, locationStr, timeStr, mac, "scanned"));
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
@@ -467,6 +470,91 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             Log.e(TAG, "Error creating table " + tableName + ": " + e.getMessage());
         } finally {
             db.close();
+        }
+    }
+
+    // Метод для получения всех записей устройства по MAC адресу (bssid)
+    public List<DeviceLocation> getDeviceHistoryByMac(String tableName, String mac) {
+        List<DeviceLocation> history = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+
+        try {
+            String query = "SELECT * FROM \"" + tableName + "\" " +
+                    "WHERE bssid = ? AND type IN ('Wi-Fi', 'Bluetooth') " +
+                    "ORDER BY timestamp DESC";
+            cursor = db.rawQuery(query, new String[]{mac});
+
+            while (cursor.moveToNext()) {
+                double latitude = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
+                double longitude = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
+                long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
+                String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
+
+                DeviceLocation location = new DeviceLocation(name, latitude, longitude,
+                        String.valueOf(timestamp), mac);
+                history.add(location);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting device history: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            db.close();
+        }
+        return history;
+    }
+
+    // Метод для получения устройства с MAC адресом
+    public DeviceListActivity.Device getDeviceWithMac(String tableName, int position) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+
+        try {
+            // Получаем запись по позиции
+            String query = "SELECT type, name, bssid, latitude, longitude, timestamp " +
+                    "FROM \"" + tableName + "\" " +
+                    "WHERE type IN ('Wi-Fi', 'Bluetooth') " +
+                    "ORDER BY timestamp DESC " +
+                    "LIMIT 1 OFFSET ?";
+            cursor = db.rawQuery(query, new String[]{String.valueOf(position)});
+
+            if (cursor != null && cursor.moveToFirst()) {
+                String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
+                String type = cursor.getString(cursor.getColumnIndexOrThrow("type"));
+                String mac = cursor.getString(cursor.getColumnIndexOrThrow("bssid"));
+                double latitude = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
+                double longitude = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
+                long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
+
+                String locationStr = String.format("Lat: %.4f, Lon: %.4f", latitude, longitude);
+                String timeStr = new java.text.SimpleDateFormat("HH:mm:ss")
+                        .format(new java.util.Date(timestamp));
+
+                return new DeviceListActivity.Device(name, type, locationStr, timeStr, mac, "scanned");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting device with MAC: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            db.close();
+        }
+        return null;
+    }
+
+    // Класс для хранения местоположения устройства
+    public static class DeviceLocation {
+        public String deviceName;
+        public double latitude;
+        public double longitude;
+        public String timestamp;
+        public String mac;
+
+        public DeviceLocation(String name, double lat, double lon, String time, String mac) {
+            this.deviceName = name;
+            this.latitude = lat;
+            this.longitude = lon;
+            this.timestamp = time;
+            this.mac = mac;
         }
     }
 }

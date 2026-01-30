@@ -1,5 +1,4 @@
 package com.example.santiway.activity_map;
-
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -11,8 +10,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
-import com.graphhopper.util.shapes.GHPoint;
-
 import org.osmdroid.api.IMapController;
 import org.osmdroid.config.Configuration;
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
@@ -23,8 +20,8 @@ import org.osmdroid.views.overlay.Polyline;
 import org.osmdroid.views.overlay.gestures.RotationGestureOverlay;
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider;
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay;
-import com.example.santiway.R;
 
+import com.example.santiway.R;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,37 +29,42 @@ import java.util.List;
 public class ActivityMapOSM extends Fragment {
 
     private MapView mapView;
-    private RoutingHelper routingHelper;
-    private Polyline routeOverlay;
     private MyLocationNewOverlay myLocationOverlay;
     private IMapController mapController;
 
-    private GeoPoint startPoint = null;
-    private GeoPoint endPoint = null;
-    private Marker startMarker;
-    private Marker endMarker;
-    private GeoPoint devicePoint = null;
-    private String deviceMarkerName = null;
-    private Marker deviceMarker;
-
-    private boolean isSelectingStart = true;
+    private List<GeoPoint> deviceHistoryPoints = new ArrayList<>();
+    private List<String> deviceHistoryTimestamps = new ArrayList<>();
+    private List<Marker> historyMarkers = new ArrayList<>();
+    private Polyline historyPolyline;
+    private String deviceMac;
+    private String deviceName;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Получаем координаты устройства
+        // Получаем историю устройства
         Bundle args = getArguments();
-        if (args != null && args.containsKey("device_latitude") && args.containsKey("device_longitude")) {
-            double lat = args.getDouble("device_latitude");
-            double lon = args.getDouble("device_longitude");
-            devicePoint = new GeoPoint(lat, lon);
-            deviceMarkerName = args.getString("device_name", "Устройство");
+        if (args != null && args.containsKey("history_latitudes")) {
+            double[] lats = args.getDoubleArray("history_latitudes");
+            double[] lons = args.getDoubleArray("history_longitudes");
+            String[] timestamps = args.getStringArray("history_timestamps");
+            deviceMac = args.getString("device_mac");
+            deviceName = args.getString("device_name", "Устройство");
+
+            if (lats != null && lons != null && lats.length == lons.length) {
+                for (int i = 0; i < lats.length; i++) {
+                    deviceHistoryPoints.add(new GeoPoint(lats[i], lons[i]));
+                    if (timestamps != null && i < timestamps.length) {
+                        deviceHistoryTimestamps.add(timestamps[i]);
+                    } else {
+                        deviceHistoryTimestamps.add("Запись #" + (i + 1));
+                    }
+                }
+            }
         }
 
         Configuration.getInstance().setUserAgentValue(requireContext().getPackageName());
-        routingHelper = new RoutingHelper();
-        routingHelper.initialize(requireContext(), "moscow");
     }
 
     @Nullable
@@ -70,7 +72,7 @@ public class ActivityMapOSM extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        // ВРЕМЕННО: используем программное создание MapView
+        // Создаем MapView
         mapView = new MapView(getContext());
         mapView.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -82,47 +84,10 @@ public class ActivityMapOSM extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         setupMap();
-        setupSimpleClickListeners();
-    }
-
-    private void addDeviceMarker() {
-        if (devicePoint != null && mapView != null) {
-            // Удаляем старый маркер, если есть
-            if (deviceMarker != null) {
-                mapView.getOverlays().remove(deviceMarker);
-            }
-
-            // Создаем новый маркер
-            deviceMarker = new Marker(mapView);
-            deviceMarker.setPosition(devicePoint);
-            deviceMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
-            deviceMarker.setTitle(deviceMarkerName != null ? deviceMarkerName : "Устройство");
-            deviceMarker.setSnippet("MAC: " + (deviceMarkerName != null ? deviceMarkerName : ""));
-
-            // Устанавливаем кастомную иконку (можно использовать свою)
-            try {
-                deviceMarker.setIcon(getResources().getDrawable(R.drawable.ic_device_marker));
-            } catch (Exception e) {
-                // Используем стандартную иконку
-                deviceMarker.setIcon(getResources().getDrawable(android.R.drawable.ic_dialog_map));
-            }
-
-            // Добавляем маркер на карту
-            mapView.getOverlays().add(deviceMarker);
-
-            // Центрируем карту на маркере
-            mapController.setCenter(devicePoint);
-            mapController.animateTo(devicePoint);
-
-            // Увеличиваем зум для лучшего обзора
-            mapController.setZoom(17.0);
-
-            mapView.invalidate();
-        }
     }
 
     private void setupMap() {
-        // Настройка источника тайлов
+        // Настройка источника тайлов (онлайн карта)
         mapView.setTileSource(TileSourceFactory.MAPNIK);
         mapView.setMultiTouchControls(true);
 
@@ -140,156 +105,134 @@ public class ActivityMapOSM extends Fragment {
         myLocationOverlay.enableMyLocation();
         mapView.getOverlays().add(myLocationOverlay);
 
-        // Устанавливаем центр карты на текущее местоположение
+        // Устанавливаем центр карты и добавляем маркеры устройства
         myLocationOverlay.runOnFirstFix(() -> requireActivity().runOnUiThread(() -> {
             GeoPoint myLocation = myLocationOverlay.getMyLocation();
             if (myLocation != null) {
                 mapController.setCenter(myLocation);
-                startPoint = myLocation; // Устанавливаем стартовую точку как текущее местоположение
-                addStartMarker(myLocation);
             } else {
-                // Устанавливаем центр на Москву по умолчанию
-                GeoPoint moscow = new GeoPoint(55.7558, 37.6173);
-                mapController.setCenter(moscow);
-                startPoint = moscow;
-                addStartMarker(moscow);
-            }
-        }));
-
-        // После установки центра карты добавляем маркер устройства
-        myLocationOverlay.runOnFirstFix(() -> requireActivity().runOnUiThread(() -> {
-            GeoPoint myLocation = myLocationOverlay.getMyLocation();
-            if (myLocation != null) {
-                mapController.setCenter(myLocation);
-                startPoint = myLocation;
-                addStartMarker(myLocation);
-            } else {
-                GeoPoint moscow = new GeoPoint(55.7558, 37.6173);
-                mapController.setCenter(moscow);
-                startPoint = moscow;
-                addStartMarker(moscow);
+                // Если нет местоположения, центрируем на первой точке устройства
+                if (!deviceHistoryPoints.isEmpty()) {
+                    mapController.setCenter(deviceHistoryPoints.get(0));
+                } else {
+                    // Или на Москве по умолчанию
+                    mapController.setCenter(new GeoPoint(55.7558, 37.6173));
+                }
             }
 
-            // Добавляем маркер устройства (после установки стартовой точки)
-            addDeviceMarker();
+            // Добавляем маркеры устройства
+            addDeviceHistoryMarkers();
         }));
     }
 
-    private void setupSimpleClickListeners() {
-        // Простой обработчик нажатий на карту
-        mapView.setOnTouchListener((v, event) -> {
-            if (event.getAction() == android.view.MotionEvent.ACTION_UP) {
-                GeoPoint geoPoint = (GeoPoint) mapView.getProjection().fromPixels(
-                        (int) event.getX(),
-                        (int) event.getY()
-                );
-
-                handleMapClick(geoPoint);
-                return true;
-            }
-            return false;
-        });
-    }
-
-    private void handleMapClick(GeoPoint geoPoint) {
-        if (isSelectingStart) {
-            // Устанавливаем стартовую точку
-            if (startMarker != null) {
-                mapView.getOverlays().remove(startMarker);
-            }
-            startPoint = geoPoint;
-            addStartMarker(geoPoint);
-            isSelectingStart = false;
-            Toast.makeText(getContext(), "Выберите конечную точку", Toast.LENGTH_SHORT).show();
-        } else {
-            // Устанавливаем конечную точку
-            if (endMarker != null) {
-                mapView.getOverlays().remove(endMarker);
-            }
-            endPoint = geoPoint;
-            addEndMarker(geoPoint);
-            isSelectingStart = true;
-
-            // Строим маршрут
-            if (startPoint != null && endPoint != null && routingHelper.isReady()) {
-                buildRoute();
-            }
-        }
-    }
-
-    private void addStartMarker(GeoPoint point) {
-        startMarker = new Marker(mapView);
-        startMarker.setPosition(point);
-        startMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
-        startMarker.setTitle("Старт");
-        startMarker.setIcon(getResources().getDrawable(android.R.drawable.ic_menu_mylocation));
-        mapView.getOverlays().add(startMarker);
-        mapView.invalidate();
-    }
-
-    private void addEndMarker(GeoPoint point) {
-        endMarker = new Marker(mapView);
-        endMarker.setPosition(point);
-        endMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
-        endMarker.setTitle("Конец");
-        endMarker.setIcon(getResources().getDrawable(android.R.drawable.ic_dialog_map));
-        mapView.getOverlays().add(endMarker);
-        mapView.invalidate();
-    }
-
-    private void buildRoute() {
-        if (startPoint == null || endPoint == null) {
+    private void addDeviceHistoryMarkers() {
+        if (deviceHistoryPoints.isEmpty() || mapView == null) {
             return;
         }
 
-        // Преобразуем GeoPoint в GHPoint
-        GHPoint startGH = new GHPoint(startPoint.getLatitude(), startPoint.getLongitude());
-        GHPoint endGH = new GHPoint(endPoint.getLatitude(), endPoint.getLongitude());
+        // Очищаем старые маркеры
+        for (Marker marker : historyMarkers) {
+            mapView.getOverlays().remove(marker);
+        }
+        historyMarkers.clear();
 
-        // Строим маршрут в отдельном потоке
-        new Thread(() -> {
-            try {
-                List<GHPoint> routePoints = routingHelper.calculateRoute(startGH, endGH, "car");
+        // Удаляем старую линию
+        if (historyPolyline != null) {
+            mapView.getOverlays().remove(historyPolyline);
+        }
 
-                requireActivity().runOnUiThread(() -> {
-                    if (routePoints != null && !routePoints.isEmpty()) {
-                        drawRouteOnMap(routePoints);
-                    } else {
-                        Toast.makeText(requireContext(),
-                                "Не удалось построить маршрут",
-                                Toast.LENGTH_SHORT).show();
-                    }
-                });
-            } catch (Exception e) {
-                e.printStackTrace();
-                requireActivity().runOnUiThread(() ->
-                        Toast.makeText(requireContext(),
-                                "Ошибка построения маршрута",
-                                Toast.LENGTH_SHORT).show());
+        // Создаем маркеры для каждой точки истории
+        for (int i = 0; i < deviceHistoryPoints.size(); i++) {
+            GeoPoint point = deviceHistoryPoints.get(i);
+            Marker marker = new Marker(mapView);
+            marker.setPosition(point);
+            marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
+
+            // Для первой (текущей/последней) точки используем другой маркер
+            if (i == 0) {
+                marker.setTitle(deviceName + " (Текущее/Последнее)");
+                marker.setSnippet("MAC: " + (deviceMac != null ? deviceMac : "N/A"));
+                try {
+                    // Используем вашу иконку ic_mark
+                    marker.setIcon(getResources().getDrawable(R.drawable.ic_mark));
+                } catch (Exception e) {
+                    marker.setIcon(getResources().getDrawable(android.R.drawable.ic_dialog_map));
+                }
+            } else {
+                marker.setTitle(deviceName + " (" + deviceHistoryTimestamps.get(i) + ")");
+                marker.setSnippet("Историческая запись");
+                marker.setIcon(getResources().getDrawable(android.R.drawable.ic_menu_mylocation));
             }
-        }).start();
+
+            mapView.getOverlays().add(marker);
+            historyMarkers.add(marker);
+        }
+
+        // Если есть более одной точки, рисуем линию
+        if (deviceHistoryPoints.size() > 1) {
+            drawHistoryLine();
+        }
+
+        // Центрируем карту на всех точках
+        centerMapOnHistory();
+
+        mapView.invalidate();
     }
 
-    private void drawRouteOnMap(List<GHPoint> ghPoints) {
-        // Удаляем старый маршрут, если есть
-        if (routeOverlay != null) {
-            mapView.getOverlays().remove(routeOverlay);
+    private void drawHistoryLine() {
+        if (deviceHistoryPoints.size() < 2) {
+            return;
         }
 
-        // Конвертируем GHPoint в GeoPoint
-        List<GeoPoint> geoPoints = new ArrayList<>();
-        for (GHPoint p : ghPoints) {
-            geoPoints.add(new GeoPoint(p.getLat(), p.getLon()));
+        // Создаем линию
+        historyPolyline = new Polyline();
+        historyPolyline.setPoints(deviceHistoryPoints);
+        historyPolyline.setColor(Color.parseColor("#3DDC84")); // Зеленый цвет как в дизайне
+        historyPolyline.setWidth(8f);
+        historyPolyline.setGeodesic(true);
+
+        mapView.getOverlays().add(historyPolyline);
+    }
+
+    private void centerMapOnHistory() {
+        if (deviceHistoryPoints.isEmpty()) {
+            return;
         }
 
-        // Создаем Polyline из точек
-        routeOverlay = new Polyline();
-        routeOverlay.setPoints(geoPoints);
-        routeOverlay.setColor(Color.parseColor("#500084F5"));
-        routeOverlay.setWidth(12f);
+        // Вычисляем границы всех точек
+        double minLat = deviceHistoryPoints.get(0).getLatitude();
+        double maxLat = deviceHistoryPoints.get(0).getLatitude();
+        double minLon = deviceHistoryPoints.get(0).getLongitude();
+        double maxLon = deviceHistoryPoints.get(0).getLongitude();
 
-        mapView.getOverlays().add(routeOverlay);
-        mapView.invalidate();
+        for (GeoPoint point : deviceHistoryPoints) {
+            minLat = Math.min(minLat, point.getLatitude());
+            maxLat = Math.max(maxLat, point.getLatitude());
+            minLon = Math.min(minLon, point.getLongitude());
+            maxLon = Math.max(maxLon, point.getLongitude());
+        }
+
+        // Центрируем карту на всем маршруте
+        GeoPoint center = new GeoPoint(
+                (minLat + maxLat) / 2,
+                (minLon + maxLon) / 2
+        );
+
+        mapController.setCenter(center);
+        mapController.animateTo(center);
+
+        // Устанавливаем зум, чтобы все точки были видны
+        double latSpan = maxLat - minLat;
+        double lonSpan = maxLon - minLon;
+        double span = Math.max(latSpan, lonSpan);
+
+        // Рассчитываем подходящий зум
+        if (span > 0) {
+            double zoomLevel = Math.max(10.0, 15.0 - Math.log10(span * 100));
+            mapController.setZoom(zoomLevel);
+        } else {
+            mapController.setZoom(17.0);
+        }
     }
 
     @Override
