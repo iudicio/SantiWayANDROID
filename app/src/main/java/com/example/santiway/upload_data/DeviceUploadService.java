@@ -113,3 +113,4 @@ public class DeviceUploadService extends Service {
         stopForeground(true);  // Удаляем уведомление при остановке сервиса
     }
 }
+}
