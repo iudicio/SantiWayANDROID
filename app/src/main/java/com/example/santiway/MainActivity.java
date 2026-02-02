@@ -43,7 +43,7 @@ import com.example.santiway.cell_scanner.CellForegroundService;
 import com.example.santiway.upload_data.ApiConfig;
 import com.example.santiway.upload_data.ApiDevice;
 import com.example.santiway.upload_data.DeviceUploadManager;
-//import com.example.santiway.upload_data.DeviceUploadService;
+import com.example.santiway.upload_data.DeviceUploadService;
 import com.example.santiway.upload_data.DeviceUploadWorker;
 import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.example.santiway.wifi_scanner.WifiForegroundService;
@@ -178,7 +178,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         ApiConfig.initialize(this);
         uploadManager = new DeviceUploadManager(this);
-//        startUploadService();
+        startUploadService();
 
         LinearLayout notificationsButton = findViewById(R.id.footer_notifications);
         if (notificationsButton != null) {
@@ -729,12 +729,12 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         dialogFragment.show(getSupportFragmentManager(), "create_folder_dialog");
     }
 
-//    private void startUploadService() {
-//        Intent serviceIntent = new Intent(this, DeviceUploadService.class);
-//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-//            startForegroundService(serviceIntent);
-//        } else {
-//            startService(serviceIntent);
-//        }
-//    }
+    private void startUploadService() {
+        Intent serviceIntent = new Intent(this, DeviceUploadService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
+    }
 }
