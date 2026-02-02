@@ -163,6 +163,13 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                     }
                 });
             }
+
+            // Также делаем кликабельной всю карточку
+            itemView.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onDeviceClick(device, tableName, position);
+                }
+            });
         }
     }
 

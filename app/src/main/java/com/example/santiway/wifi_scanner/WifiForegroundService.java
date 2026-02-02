@@ -1,6 +1,7 @@
 package com.example.santiway.wifi_scanner;
 
 import android.app.Notification;
+import android.Manifest;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
@@ -22,6 +23,8 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
 import com.example.santiway.upload_data.MainDatabaseHelper;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
 
 import java.util.List;
 import java.lang.IllegalArgumentException;
@@ -192,10 +195,45 @@ public class WifiForegroundService extends Service {
 
     private void startWifiScan() {
         if (wifiManager != null && wifiManager.isWifiEnabled()) {
+            updateCurrentLocation();
             boolean scanStarted = wifiManager.startScan();
             Log.d(TAG, "WiFi scan started: " + scanStarted + " for table: " + currentTableName);
         } else {
             Log.w(TAG, "Cannot start scan - WiFi not available or disabled");
+        }
+    }
+
+    private void updateCurrentLocation() {
+        // Если координаты нулевые, пытаемся получить их сейчас
+        if (currentLatitude == 0.0 && currentLongitude == 0.0) {
+            try {
+                // Используем FusedLocationProvider для быстрого получения координат
+                FusedLocationProviderClient fusedLocationClient =
+                        LocationServices.getFusedLocationProviderClient(this);
+
+                if (ActivityCompat.checkSelfPermission(this,
+                        Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+
+                    fusedLocationClient.getLastLocation()
+                            .addOnSuccessListener(location -> {
+                                if (location != null) {
+                                    currentLatitude = location.getLatitude();
+                                    currentLongitude = location.getLongitude();
+                                    currentAltitude = location.getAltitude();
+                                    currentAccuracy = location.getAccuracy();
+                                    Log.d(TAG, "Got fresh location: " +
+                                            currentLatitude + ", " + currentLongitude);
+                                } else {
+                                    Log.w(TAG, "Last location is null, using zero coordinates");
+                                }
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to get location: " + e.getMessage());
+                            });
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error getting location: " + e.getMessage());
+            }
         }
     }
 
@@ -254,6 +292,11 @@ public class WifiForegroundService extends Service {
 
     private boolean saveToDatabase(ScanResult result) {
         try {
+
+            //Проверка на нулевые координаты
+            if (currentLatitude == 0.0 && currentLongitude == 0.0) {
+                Log.w(TAG, "WARNING: Saving device with zero coordinates!");
+            }
             WifiDevice device = new WifiDevice();
             device.setSsid(result.SSID != null ? result.SSID : "Unknown");
             device.setBssid(result.BSSID != null ? result.BSSID : "Unknown");

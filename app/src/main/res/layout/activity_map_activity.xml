@@ -4,21 +4,247 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#0B1A2C">
+    android:background="@android:color/white">
 
+    <!-- Статусная полоса (меняет цвет в зависимости от статуса) -->
+    <View
+        android:id="@+id/status_header"
+        android:layout_width="match_parent"
+        android:layout_height="4dp"
+        android:background="#FF3D3D" />
+
+    <!-- Toolbar -->
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar_map"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:background="#0B1A2C"
+        android:theme="?attr/actionBarTheme"
         app:titleTextColor="@android:color/white"
         app:navigationIcon="@drawable/ic_arrow_back"
         app:title="Карта устройства" />
 
-    <FrameLayout
-        android:id="@+id/map_container"
+    <!-- Блок с информацией об устройстве -->
+    <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:background="#0B1A2C"
+        android:padding="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Информация об устройстве -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Информация об устройстве"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@android:color/white"
+                android:layout_marginBottom="16dp" />
+
+            <!-- MAC адрес -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:textColor="@android:color/white"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="MAC адрес:"
+                    android:textColor="@android:color/white" />
+
+                <TextView
+                    android:id="@+id/tv_mac_address"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="00:00:00:00:00:00"
+                    android:textColor="@android:color/white"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Название устройства -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:textColor="@android:color/white"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Название:"
+                    android:textColor="@android:color/white" />
+
+                <TextView
+                    android:id="@+id/tv_device_name"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Неизвестно"
+                    android:textColor="@android:color/white"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Тип устройства -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Тип:"
+                    android:textColor="@android:color/white"/>
+
+                <TextView
+                    android:id="@+id/tv_device_type"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Wi-Fi/Bluetooth"
+                    android:textColor="@android:color/white"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Время первого обнаружения -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Первое обнаружение:"
+                    android:textColor="@android:color/white" />
+
+                <TextView
+                    android:id="@+id/tv_first_detected"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Неизвестно"
+                    android:textColor="@android:color/white"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Время последнего обнаружения -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Последнее обнаружение:"
+                    android:textColor="@android:color/white" />
+
+                <TextView
+                    android:id="@+id/tv_last_detected"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Неизвестно"
+                    android:textColor="@android:color/white"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Количество обнаружений -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="16dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Количество обнаружений:"
+                    android:textColor="@android:color/white" />
+
+                <TextView
+                    android:id="@+id/tv_detection_count"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="0"
+                    android:textColor="@android:color/white"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Карта -->
+            <FrameLayout
+                android:id="@+id/map_container"
+                android:layout_width="match_parent"
+                android:layout_height="300dp"
+                android:layout_marginTop="16dp"
+                android:background="@android:color/darker_gray" />
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Кнопки действий -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:background="#0B1A2C"
+        android:elevation="4dp">
+
+        <!-- Кнопка Сделать Target (красная) -->
+        <Button
+            android:id="@+id/btn_make_target"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="8dp"
+            android:text="Сделать Target"
+            android:textColor="@android:color/white"
+            android:backgroundTint="#FF3D3D" />
+
+        <!-- Кнопка Сделать Safe (зеленая) -->
+        <Button
+            android:id="@+id/btn_make_safe"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="Сделать Safe"
+            android:textColor="@android:color/white"
+            android:backgroundTint="#4CAF50" />
+
+        <!-- Кнопка Clear (синяя, показывается вместо двух других) -->
+        <Button
+            android:id="@+id/btn_make_clear"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Сделать Clear"
+            android:textColor="@android:color/white"
+            android:backgroundTint="#2196F3"
+            android:visibility="gone" />
+
+    </LinearLayout>
 
 </LinearLayout>

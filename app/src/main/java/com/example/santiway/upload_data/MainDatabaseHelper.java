@@ -271,22 +271,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             db.beginTransaction();
             cursor = db.query("\"" + tableName + "\"", new String[]{"id", "timestamp", "status"}, selection, selectionArgs, null, null, null);
 
-            if (cursor != null && cursor.moveToFirst()) {
-                long existingId = cursor.getLong(cursor.getColumnIndexOrThrow("id"));
-                long existingTimestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
-                String oldStatus = cursor.getString(cursor.getColumnIndexOrThrow("status"));
-
-                // Если устройство уже было в статусе Target, не позволяем сменить его обратно на scanned
-                if ("Target".equals(oldStatus)) {
-                    values.put("status", "Target");
-                }
-
-                if (newTimestamp >= existingTimestamp) {
-                    result = db.update("\"" + tableName + "\"", values, "id = ?", new String[]{String.valueOf(existingId)});
-                }
-            } else {
-                result = db.insert("\"" + tableName + "\"", null, values);
-            }
+            result = db.insert("\"" + tableName + "\"", null, values);
             db.setTransactionSuccessful();
         } catch (Exception e) {
             android.util.Log.e("STATUS_CHECK", "Ошибка в addOrUpdateUnifiedDevice: " + e.getMessage());

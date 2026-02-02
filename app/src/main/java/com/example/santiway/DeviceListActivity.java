@@ -97,6 +97,7 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
             Toast.makeText(this, "Ошибка: имя таблицы не указано", Toast.LENGTH_SHORT).show();
             return;
         }
+
         // Получаем полные данные устройства с MAC адресом
         Device fullDevice = databaseHelper.getDeviceWithMac(tableName, position);
 
@@ -109,34 +110,21 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         List<MainDatabaseHelper.DeviceLocation> history =
                 databaseHelper.getDeviceHistoryByMac(tableName, fullDevice.getMac());
 
-        // Извлекаем координаты из location строки (формат: "Lat: XX.XXXX, Lon: YY.YYYY")
-        double latitude = 0;
-        double longitude = 0;
-
-        if (device.getLocation() != null && !device.getLocation().isEmpty()) {
-            try {
-                String[] parts = device.getLocation().split(",");
-                if (parts.length >= 2) {
-                    // Извлекаем широту
-                    String latStr = parts[0].replace("Lat:", "").trim();
-                    latitude = Double.parseDouble(latStr);
-
-                    // Извлекаем долготу
-                    String lonStr = parts[1].replace("Lon:", "").trim();
-                    longitude = Double.parseDouble(lonStr);
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-                Toast.makeText(this, "Ошибка парсинга координат", Toast.LENGTH_SHORT).show();
-            }
+        if (history.isEmpty()) {
+            Toast.makeText(this, "Нет данных о местоположении устройства", Toast.LENGTH_SHORT).show();
+            return;
         }
 
-        // Открываем ActivityMapActivity
+        // Берем последнюю точку из истории
+        MainDatabaseHelper.DeviceLocation lastLocation = history.get(0);
+
+        // Открываем новую Activity с картой и информацией
         Intent intent = new Intent(this, ActivityMapActivity.class);
-        intent.putExtra("latitude", latitude);
-        intent.putExtra("longitude", longitude);
+        intent.putExtra("latitude", lastLocation.latitude);
+        intent.putExtra("longitude", lastLocation.longitude);
         intent.putExtra("device_name", device.getName());
         intent.putExtra("device_mac", fullDevice.getMac());
+        intent.putExtra("device_type", device.getType());
         intent.putExtra("table_name", tableName);
         startActivity(intent);
     }
