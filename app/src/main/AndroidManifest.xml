@@ -49,6 +49,7 @@
 
     <!-- ========== ЗДЕСЬ НАЧИНАЕТСЯ application ========== -->
 
+    <uses-permission android:name="android.permission.VIBRATE" />
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -134,9 +135,12 @@
         <!-- Сервисы загрузки -->
         <service
             android:name=".upload_data.DeviceUploadService"
-            android:enabled="true"
-            android:exported="false" />
+            android:enabled="true">
 
+        </service>
     </application>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+
+
 
 </manifest>
