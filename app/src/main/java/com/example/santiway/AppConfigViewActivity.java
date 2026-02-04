@@ -27,6 +27,7 @@ public class AppConfigViewActivity extends ComponentActivity {
     private EditText signalStrengthInput;
     private TextView serverIpInput;
     private TextView apiKeyDisplay;
+    private EditText deviceNameInput;
 
     // Допустимые значения для протокола
     private final String[] allowedProtocols = {"GSM", "GPS"};
@@ -50,6 +51,7 @@ public class AppConfigViewActivity extends ComponentActivity {
         signalStrengthInput = findViewById(R.id.signal_strength_input);
         serverIpInput = findViewById(R.id.server_ip_input);
         apiKeyDisplay = findViewById(R.id.api_key_display);
+        deviceNameInput = findViewById(R.id.device_scanner);
 
         setupSpinners();
         setupAppSettingsUI();
@@ -123,6 +125,10 @@ public class AppConfigViewActivity extends ComponentActivity {
         serverIpInput.setText(defaultServerIp);
         serverIpInput.setEnabled(false); // Делаем поле недоступным для редактирования
 
+        // Загружаем текущее имя устройства из репозитория
+        String currentDeviceName = repository.getDeviceName();
+        deviceNameInput.setText(currentDeviceName);
+
         saveGeneralBtn.setOnClickListener(v -> {
             // ПРОВЕРКА: Выбран ли допустимый протокол
             String selectedProtocol = (String) protocolSpinner.getSelectedItem();
@@ -131,8 +137,16 @@ public class AppConfigViewActivity extends ComponentActivity {
                 return;
             }
 
-            // Сохраняем только протокол (IP и API ключ всегда из strings.xml)
+            // Получаем и проверяем имя устройства
+            String deviceName = deviceNameInput.getText().toString().trim();
+            if (deviceName.isEmpty()) {
+                deviceName = "Telephone"; // Если пустое, устанавливаем по умолчанию
+                deviceNameInput.setText(deviceName);
+            }
+
+            // Сохраняем протокол и имя устройства
             repository.setGeoProtocol(selectedProtocol);
+            repository.setDeviceName(deviceName);
 
             showToast("Настройки протокола сохранены!");
             showCurrentValues();
@@ -213,6 +227,13 @@ public class AppConfigViewActivity extends ComponentActivity {
         stringBuilder.append("API Key: ").append(apiKey != null && !apiKey.isEmpty() ? "настроен" : "не настроен").append("\n");
         stringBuilder.append("Протокол: ").append(repository.getGeoProtocol()).append("\n");
         stringBuilder.append("Сканирование активно: ").append(repository.isScanning()).append("\n");
+
+        // Имя устройства из репозитория
+        String deviceName = repository.getDeviceName();
+        if (deviceName == null || deviceName.isEmpty()) {
+            deviceName = "Telephone (по умолчанию)";
+        }
+        stringBuilder.append("Имя устройства: ").append(deviceName).append("\n");
 
         // Настройки сканеров
         stringBuilder.append("\n=== НАСТРОЙКИ СКАНЕРОВ ===\n");
