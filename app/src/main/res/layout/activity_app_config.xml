@@ -34,7 +34,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="IPv4 адрес сервера (из настроек приложения):"
+            android:text="IPv4 адрес сервера:"
             android:textColor="#CCCCCC"
             android:layout_marginTop="8dp"/>
 
@@ -56,7 +56,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="API Key (из настроек приложения):"
+            android:text="API Key:"
             android:textColor="#CCCCCC"
             android:layout_marginTop="16dp"/>
 
@@ -74,6 +74,24 @@
             android:focusable="false"
             android:clickable="false"
             android:longClickable="false"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Device name:"
+            android:textColor="#CCCCCC"
+            android:layout_marginTop="16dp"/>
+
+        <EditText
+            android:id="@+id/device_scanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="text"
+            android:padding="12dp"
+            android:background="@drawable/dark_rounded_background"
+            android:textColor="@android:color/white"
+            android:textCursorDrawable="@drawable/white_cursor"
+            android:layout_marginTop="4dp"/>
 
         <TextView
             android:layout_width="match_parent"
