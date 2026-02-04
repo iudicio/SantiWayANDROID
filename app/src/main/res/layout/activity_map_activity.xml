@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="@android:color/white">
 
     <!-- Статусная полоса (меняет цвет в зависимости от статуса) -->
@@ -24,42 +23,113 @@
         app:navigationIcon="@drawable/ic_arrow_back"
         app:title="Карта устройства" />
 
-    <!-- Блок с информацией об устройстве -->
+    <!-- Карта (теперь сверху и занимает всё пространство под Toolbar) -->
+    <FrameLayout
+        android:id="@+id/map_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="?attr/actionBarSize"
+        android:background="@android:color/darker_gray" />
+
+    <!-- Кнопки действий (поверх карты) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:layout_marginTop="?attr/actionBarSize"
+        android:layout_margin="80dp"
+        android:background="@android:color/transparent"
+        android:gravity="center_horizontal">
+
+        <!-- Кнопка Target (маленькая) -->
+        <Button
+            android:id="@+id/btn_make_target"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            android:text="Target"
+            android:textSize="12sp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:textColor="@android:color/white"
+            android:backgroundTint="#FF3D3D"
+            android:elevation="8dp" />
+
+        <!-- Кнопка Safe (маленькая) -->
+        <Button
+            android:id="@+id/btn_make_safe"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:text="Safe"
+            android:textSize="12sp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:textColor="@android:color/white"
+            android:backgroundTint="#4CAF50"
+            android:elevation="8dp" />
+
+        <!-- Кнопка Clear (маленькая, показывается вместо двух других) -->
+        <Button
+            android:id="@+id/btn_make_clear"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Clear"
+            android:textSize="12sp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:textColor="@android:color/white"
+            android:backgroundTint="#2196F3"
+            android:elevation="8dp"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+    <!-- Блок с информацией об устройстве (поверх карты внизу) -->
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:background="#0B1A2C"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_margin="16dp"
+        android:background="#880B1A2C"
         android:padding="16dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:minHeight="100dp">
 
             <!-- Информация об устройстве -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Информация об устройстве"
-                android:textSize="18sp"
+                android:textSize="16sp"
                 android:textStyle="bold"
                 android:textColor="@android:color/white"
-                android:layout_marginBottom="16dp" />
+                android:layout_marginBottom="12dp" />
 
             <!-- MAC адрес -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:textColor="@android:color/white"
-                android:layout_marginBottom="8dp">
+                android:layout_marginBottom="6dp">
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="MAC адрес:"
+                    android:textSize="12sp"
                     android:textColor="@android:color/white" />
 
                 <TextView
@@ -68,6 +138,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="00:00:00:00:00:00"
+                    android:textSize="12sp"
                     android:textColor="@android:color/white"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -77,14 +148,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:textColor="@android:color/white"
-                android:layout_marginBottom="8dp">
+                android:layout_marginBottom="6dp">
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Название:"
+                    android:textSize="12sp"
                     android:textColor="@android:color/white" />
 
                 <TextView
@@ -93,6 +164,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Неизвестно"
+                    android:textSize="12sp"
                     android:textColor="@android:color/white"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -102,13 +174,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginBottom="8dp">
+                android:layout_marginBottom="6dp">
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Тип:"
+                    android:textSize="12sp"
                     android:textColor="@android:color/white"/>
 
                 <TextView
@@ -117,6 +190,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Wi-Fi/Bluetooth"
+                    android:textSize="12sp"
                     android:textColor="@android:color/white"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -126,13 +200,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginBottom="8dp">
+                android:layout_marginBottom="6dp">
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Первое обнаружение:"
+                    android:textSize="12sp"
                     android:textColor="@android:color/white" />
 
                 <TextView
@@ -141,6 +216,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Неизвестно"
+                    android:textSize="12sp"
                     android:textColor="@android:color/white"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -150,13 +226,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginBottom="8dp">
+                android:layout_marginBottom="6dp">
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Последнее обнаружение:"
+                    android:textSize="12sp"
                     android:textColor="@android:color/white" />
 
                 <TextView
@@ -165,6 +242,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Неизвестно"
+                    android:textSize="12sp"
                     android:textColor="@android:color/white"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -174,13 +252,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginBottom="16dp">
+                android:layout_marginBottom="6dp">
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Количество обнаружений:"
+                    android:textSize="12sp"
                     android:textColor="@android:color/white" />
 
                 <TextView
@@ -189,62 +268,12 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="0"
+                    android:textSize="12sp"
                     android:textColor="@android:color/white"
                     android:textStyle="bold" />
             </LinearLayout>
 
-            <!-- Карта -->
-            <FrameLayout
-                android:id="@+id/map_container"
-                android:layout_width="match_parent"
-                android:layout_height="300dp"
-                android:layout_marginTop="16dp"
-                android:background="@android:color/darker_gray" />
-
         </LinearLayout>
     </ScrollView>
 
-    <!-- Кнопки действий -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="16dp"
-        android:background="#0B1A2C"
-        android:elevation="4dp">
-
-        <!-- Кнопка Сделать Target (красная) -->
-        <Button
-            android:id="@+id/btn_make_target"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginEnd="8dp"
-            android:text="Сделать Target"
-            android:textColor="@android:color/white"
-            android:backgroundTint="#FF3D3D" />
-
-        <!-- Кнопка Сделать Safe (зеленая) -->
-        <Button
-            android:id="@+id/btn_make_safe"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="8dp"
-            android:text="Сделать Safe"
-            android:textColor="@android:color/white"
-            android:backgroundTint="#4CAF50" />
-
-        <!-- Кнопка Clear (синяя, показывается вместо двух других) -->
-        <Button
-            android:id="@+id/btn_make_clear"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Сделать Clear"
-            android:textColor="@android:color/white"
-            android:backgroundTint="#2196F3"
-            android:visibility="gone" />
-
-    </LinearLayout>
-
-</LinearLayout>
+</FrameLayout>
