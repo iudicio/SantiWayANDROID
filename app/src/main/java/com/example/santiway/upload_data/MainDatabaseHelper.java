@@ -1,11 +1,26 @@
 package com.example.santiway.upload_data;
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.media.RingtoneManager;
+import android.os.Build;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.util.Log;
+
+import androidx.core.app.NotificationCompat;
+
+import com.example.santiway.NotificationData;
+import com.example.santiway.NotificationDatabaseHelper;
+import com.example.santiway.NotificationsActivity;
+import com.example.santiway.R;
 import com.example.santiway.cell_scanner.CellTower;
 import com.example.santiway.wifi_scanner.WifiDevice;
 import java.util.ArrayList;
@@ -18,9 +33,11 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     private static final String TAG = "MainDatabaseHelper";
     private static final String DATABASE_NAME = "UnifiedScanner.db";
     private static final int DATABASE_VERSION = 7; // УВЕЛИЧЕНО
+    private final Context mContext;
 
     public MainDatabaseHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
+        this.mContext = context;
     }
 
     @Override
@@ -207,42 +224,62 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         Cursor cursor = null;
 
         try {
-            db.beginTransaction();
-            cursor = db.query("\"" + tableName + "\"",
-                    new String[]{"id", "timestamp"},
-                    selection,
-                    selectionArgs,
-                    null, null, null);
-
-            if (cursor != null && cursor.moveToFirst()) {
-                long existingId = cursor.getLong(cursor.getColumnIndexOrThrow("id"));
-                long existingTimestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
-
-                if (newTimestamp > existingTimestamp) {
-                    result = db.update("\"" + tableName + "\"", values, "id = ?", new String[]{String.valueOf(existingId)});
-                    Log.d(TAG, "Updated device in table: " + tableName);
-                } else {
-                    result = 1;
-                    Log.d(TAG, "Skipped older device in table: " + tableName);
-                }
-            } else {
-                result = db.insert("\"" + tableName + "\"", null, values);
-                Log.d(TAG, "Inserted new device in table: " + tableName);
+            // 1. Определяем уникальный ID устройства (MAC-адрес или Cell ID вышки)
+            String uniqueId = values.getAsString("bssid");
+            if (uniqueId == null && values.containsKey("cell_id")) {
+                uniqueId = String.valueOf(values.getAsInteger("cell_id"));
             }
+
+            if (uniqueId != null) {
+                double curLat = values.getAsDouble("latitude");
+                double curLon = values.getAsDouble("longitude");
+
+                // 2. Рассчитываем статус (ваша логика движения)
+                String calculatedStatus = evaluateTargetStatus(uniqueId, curLat, curLon, newTimestamp, tableName);
+                values.put("status", calculatedStatus);
+
+                // 3. Если статус стал "Target", обрабатываем уведомление
+                if ("Target".equals(calculatedStatus)) {
+                    NotificationDatabaseHelper notifDb = new NotificationDatabaseHelper(mContext);
+
+                    // Проверка на уникальность (чтобы не спамить звуком каждую секунду)
+                    if (notifDb.isUniqueAlert(uniqueId)) {
+                        String deviceName = values.getAsString("name");
+                        String type = values.getAsString("type");
+
+                        // Сохраняем в локальную базу данных для вкладки
+                        NotificationData alert = new NotificationData(
+                                java.util.UUID.randomUUID().toString(),
+                                "Target: " + type,
+                                "Устройство " + (deviceName != null ? deviceName : uniqueId) + " в движении!",
+                                new java.util.Date(),
+                                NotificationData.NotificationType.ALARM,
+                                null, null, curLat, curLon
+                        );
+                        notifDb.addNotification(alert, uniqueId);
+
+                        // 4. ЗАПУСКАЕМ ЗВУК И ВИБРАЦИЮ (Системный Push)
+                        sendSystemNotification(
+                                "Обнаружен ТАРГЕТ (" + type + ")",
+                                "Объект " + (deviceName != null ? deviceName : uniqueId) + " перемещается!"
+                        );
+                    }
+                }
+            }
+
+            // 5. Работа с основной базой данных (Update или Insert)
+            db.beginTransaction();
+            cursor = db.query("\"" + tableName + "\"", new String[]{"id", "timestamp", "status"}, selection, selectionArgs, null, null, null);
+
+            result = db.insert("\"" + tableName + "\"", null, values);
             db.setTransactionSuccessful();
         } catch (Exception e) {
-            Log.e(TAG, "Error in transaction: " + e.getMessage());
-            result = -1;
+            android.util.Log.e("STATUS_CHECK", "Ошибка в addOrUpdateUnifiedDevice: " + e.getMessage());
         } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
-            try {
+            if (cursor != null) cursor.close();
+            if (db != null && db.isOpen()) {
                 db.endTransaction();
-            } catch (Exception e) {
-                Log.e(TAG, "Error ending transaction: " + e.getMessage());
             }
-            db.close();
         }
         return result;
     }
@@ -293,10 +330,11 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         Cursor cursor = null;
 
         try {
-            // Используем LIMIT и OFFSET для пагинации
+            // Добавляем bssid (MAC адрес) в запрос
             cursor = db.rawQuery(
-                    "SELECT type, name, latitude, longitude, timestamp " +
+                    "SELECT type, name, bssid, latitude, longitude, timestamp " +
                             "FROM \"" + tableName + "\" " +
+                            "WHERE type IN ('Wi-Fi', 'Bluetooth') " + // Только устройства с MAC
                             "ORDER BY timestamp DESC " +
                             "LIMIT ? OFFSET ?",
                     new String[]{String.valueOf(limit), String.valueOf(offset)}
@@ -306,6 +344,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 do {
                     String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
                     String type = cursor.getString(cursor.getColumnIndexOrThrow("type"));
+                    String mac = cursor.getString(cursor.getColumnIndexOrThrow("bssid"));
                     double latitude = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
                     double longitude = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
                     long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
@@ -314,7 +353,8 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                     String timeStr = new java.text.SimpleDateFormat("HH:mm:ss")
                             .format(new java.util.Date(timestamp));
 
-                    deviceList.add(new DeviceListActivity.Device(name, type, locationStr, timeStr));
+                    // Теперь создаем Device с MAC адресом
+                    deviceList.add(new DeviceListActivity.Device(name, type, locationStr, timeStr, mac, "scanned"));
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
@@ -467,6 +507,245 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             Log.e(TAG, "Error creating table " + tableName + ": " + e.getMessage());
         } finally {
             db.close();
+        }
+    }
+
+    // Метод для получения всех записей устройства по MAC адресу (bssid)
+    public List<DeviceLocation> getDeviceHistoryByMac(String tableName, String mac) {
+        List<DeviceLocation> history = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+
+        try {
+            String query = "SELECT * FROM \"" + tableName + "\" " +
+                    "WHERE bssid = ? AND type IN ('Wi-Fi', 'Bluetooth') " +
+                    "ORDER BY timestamp DESC";
+            cursor = db.rawQuery(query, new String[]{mac});
+
+            while (cursor.moveToNext()) {
+                double latitude = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
+                double longitude = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
+                long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
+                String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
+
+                DeviceLocation location = new DeviceLocation(name, latitude, longitude,
+                        String.valueOf(timestamp), mac);
+                history.add(location);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting device history: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            db.close();
+        }
+        return history;
+    }
+
+    // Метод для получения устройства с MAC адресом
+    public DeviceListActivity.Device getDeviceWithMac(String tableName, int position) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+
+        try {
+            // Получаем запись по позиции
+            String query = "SELECT type, name, bssid, latitude, longitude, timestamp " +
+                    "FROM \"" + tableName + "\" " +
+                    "WHERE type IN ('Wi-Fi', 'Bluetooth') " +
+                    "ORDER BY timestamp DESC " +
+                    "LIMIT 1 OFFSET ?";
+            cursor = db.rawQuery(query, new String[]{String.valueOf(position)});
+
+            if (cursor != null && cursor.moveToFirst()) {
+                String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
+                String type = cursor.getString(cursor.getColumnIndexOrThrow("type"));
+                String mac = cursor.getString(cursor.getColumnIndexOrThrow("bssid"));
+                double latitude = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
+                double longitude = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
+                long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
+
+                String locationStr = String.format("Lat: %.4f, Lon: %.4f", latitude, longitude);
+                String timeStr = new java.text.SimpleDateFormat("HH:mm:ss")
+                        .format(new java.util.Date(timestamp));
+
+                return new DeviceListActivity.Device(name, type, locationStr, timeStr, mac, "scanned");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting device with MAC: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            db.close();
+        }
+        return null;
+    }
+    // 1. Расчет расстояния (в метрах)
+    private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+        float[] results = new float[1];
+        android.location.Location.distanceBetween(lat1, lon1, lat2, lon2, results);
+        return results[0];
+    }
+
+    // 2. Расчет пути за последние 24 часа (в километрах)
+    private double getDistanceLast24h(String uniqueId, String tableName) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        double totalDistance = 0;
+
+        // Определяем колонку (как мы договорились: если есть ":", это MAC, иначе CellID)
+        String column = uniqueId.contains(":") ? "bssid" : "cell_id";
+        long twentyFourHoursAgo = System.currentTimeMillis() - 86400000;
+
+        // Выбираем все точки этого устройства за последние 24 часа в хронологическом порядке
+        Cursor cursor = db.query("\"" + tableName + "\"",
+                new String[]{"latitude", "longitude"},
+                column + " = ? AND timestamp > ?",
+                new String[]{uniqueId, String.valueOf(twentyFourHoursAgo)},
+                null, null, "timestamp ASC");
+
+        if (cursor != null) {
+            if (cursor.moveToFirst()) {
+                double prevLat = cursor.getDouble(0);
+                double prevLon = cursor.getDouble(1);
+
+                while (cursor.moveToNext()) {
+                    double curLat = cursor.getDouble(0);
+                    double curLon = cursor.getDouble(1);
+
+                    // Суммируем расстояние между последовательными точками
+                    totalDistance += calculateDistance(prevLat, prevLon, curLat, curLon);
+
+                    prevLat = curLat;
+                    prevLon = curLon;
+                }
+            }
+            cursor.close();
+        }
+
+
+        // Возвращаем результат в километрах
+        return totalDistance / 1000.0;
+    }
+
+    // 3. Проверка условий Target
+    private String evaluateTargetStatus(String uniqueId, double curLat, double curLon, long curTime, String tableName) {
+        if (uniqueId == null || uniqueId.isEmpty()) return "scanned";
+
+        SQLiteDatabase db = this.getReadableDatabase();
+        // Определяем колонку: MAC-адрес (с двоеточиями) или CellID
+        String column = uniqueId.contains(":") ? "bssid" : "cell_id";
+
+        // Ищем последнюю известную точку устройства
+        Cursor cursor = db.query("\"" + tableName + "\"",
+                new String[]{"latitude", "longitude", "timestamp"},
+                "CAST(" + column + " AS TEXT) = ?",
+                new String[]{uniqueId},
+                null, null, "timestamp DESC", "1");
+
+        double speedKmH = 0;
+        double dist24h = 0;
+
+        if (cursor != null && cursor.moveToFirst()) {
+            double prevLat = cursor.getDouble(0);
+            double prevLon = cursor.getDouble(1);
+            long prevTime = cursor.getLong(2);
+            cursor.close();
+
+            // 1. Считаем дистанцию текущего "прыжка"
+            double currentJumpMeters = calculateDistance(prevLat, prevLon, curLat, curLon);
+
+            // 2. Считаем скорость
+            double timeHours = (double) (curTime - prevTime) / 3600000.0;
+            if (timeHours > 0) {
+                speedKmH = (currentJumpMeters / 1000.0) / timeHours;
+            }
+
+            // 3. Считаем накопленный путь за 24ч и ПРИБАВЛЯЕМ текущий прыжок
+            // Это важно, так как в базе новой точки еще нет
+            dist24h = getDistanceLast24h(uniqueId, tableName) + (currentJumpMeters / 1000.0);
+
+            Log.d("MATH_CHECK", String.format("ID: %s | Скорость: %.2f км/ч | Итоговый путь: %.2f км",
+                    uniqueId, speedKmH, dist24h));
+        } else {
+            // Если устройства еще нет в базе, это первый скан
+            Log.d("MATH_CHECK", "ID: " + uniqueId + " - первая встреча, статус scanned");
+            return "scanned";
+        }
+
+        // Условия из задания
+        if (speedKmH > 20 && dist24h > 10.0) {
+            Log.d("MATH_CHECK", "!!! TARGET DETECTED (High Speed) !!!");
+            return "Target";
+        }
+
+        if (speedKmH <= 20 && dist24h > 1.0) {
+            Log.d("MATH_CHECK", "!!! TARGET DETECTED (Movement) !!!");
+            return "Target";
+        }
+
+        return "scanned";
+    }
+    private void sendSystemNotification(String title, String message) {
+        String channelId = "target_alerts";
+        NotificationManager notificationManager = (NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);
+
+        // 1. Создаем канал для Android 8.0+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    channelId, "Target Alerts",
+                    NotificationManager.IMPORTANCE_HIGH // Высокая важность дает звук и всплывающий баннер
+            );
+            channel.setDescription("Уведомления об обнаружении целей");
+            channel.enableVibration(true);
+            if (notificationManager != null) {
+                notificationManager.createNotificationChannel(channel);
+            }
+        }
+
+        // 2. Куда перейдет юзер при клике на пуш (открываем твою NotificationsActivity)
+        Intent intent = new Intent(mContext, NotificationsActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent pendingIntent = PendingIntent.getActivity(mContext, 0, intent,
+                PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
+
+        // 3. Собираем само уведомление
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(mContext, channelId)
+                .setSmallIcon(R.drawable.ic_cloud) // Замени на свою иконку!
+                .setContentTitle(title)
+                .setContentText(message)
+                .setAutoCancel(true)
+                .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(pendingIntent);
+
+        // 4. Отправляем
+        if (notificationManager != null) {
+            notificationManager.notify((int) System.currentTimeMillis(), builder.build());
+        }
+
+        // 5. Дополнительная вибрация (если нужно, чтобы вибрировало сильнее)
+        Vibrator vibrator = (Vibrator) mContext.getSystemService(Context.VIBRATOR_SERVICE);
+        if (vibrator != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(500, VibrationEffect.DEFAULT_AMPLITUDE));
+            } else {
+                vibrator.vibrate(500);
+            }
+        }
+    }
+
+
+    // Класс для хранения местоположения устройства
+    public static class DeviceLocation {
+        public String deviceName;
+        public double latitude;
+        public double longitude;
+        public String timestamp;
+        public String mac;
+
+        public DeviceLocation(String name, double lat, double lon, String time, String mac) {
+            this.deviceName = name;
+            this.latitude = lat;
+            this.longitude = lon;
+            this.timestamp = time;
+            this.mac = mac;
         }
     }
 }

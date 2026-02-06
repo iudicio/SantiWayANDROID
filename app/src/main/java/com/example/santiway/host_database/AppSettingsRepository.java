@@ -10,33 +10,13 @@ public class AppSettingsRepository {
     private SharedPreferences sharedPreferences;
     private static final String PREFS_NAME = "AppSettings";
 
-    //
-    // private static final String KEY_API_KEY = "api_key";
     private static final String KEY_GEO_PROTOCOL = "geo_protocol";
     private static final String KEY_IS_SCANNING = "is_scanning";
-    // private static final String KEY_SERVER_IP = "server_ip";
+    private static final String KEY_DEVICE_NAME = "device_name";
 
     public AppSettingsRepository(Context context) {
         this.sharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
     }
-
-    // Метод для сохранения IPv4 адреса сервера
-    //public void setServerIp(String serverIp) {
-    //    SharedPreferences.Editor editor = sharedPreferences.edit();
-    //    editor.putString(KEY_SERVER_IP, serverIp);
-    //    editor.apply();
-    //}
-
-    // Метод для получения IPv4 адреса сервера
-    //public String getServerIp() {
-    //    return sharedPreferences.getString(KEY_SERVER_IP, null);
-    //}
-
-    // УДАЛЕН: Метод для сохранения API Key
-    // УДАЛЕН: public void setApiKey(String apiKey)
-
-    // УДАЛЕН: Метод для получения API Key
-    // УДАЛЕН: public String getApiKey()
 
     // Метод для сохранения протокола геолокации
     public void setGeoProtocol(String protocol) {
@@ -54,6 +34,17 @@ public class AppSettingsRepository {
     public void setScanning(boolean isScanning) {
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putBoolean(KEY_IS_SCANNING, isScanning);
+        editor.apply();
+    }
+
+    public String getDeviceName() {
+        return sharedPreferences.getString(KEY_DEVICE_NAME, "Telephone"); // значение по умолчанию
+    }
+
+    // Метод для сохранения имени устройства
+    public void setDeviceName(String deviceName) {
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString(KEY_DEVICE_NAME, deviceName);
         editor.apply();
     }
 

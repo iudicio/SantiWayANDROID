@@ -1,5 +1,6 @@
 package com.example.santiway;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.MenuItem;
@@ -8,14 +9,17 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.example.santiway.activity_map.ActivityMapActivity;
 import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.google.android.material.tabs.TabLayout;
 import java.util.ArrayList;
 import java.util.List;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.widget.Toast;
 
-public class DeviceListActivity extends AppCompatActivity {
+public class DeviceListActivity extends AppCompatActivity implements DeviceListAdapter.OnDeviceClickListener {
 
     private Toolbar toolbar;
     private TabLayout tabLayout;
@@ -33,6 +37,11 @@ public class DeviceListActivity extends AppCompatActivity {
 
     // Хендлер для задержки
     private Handler handler = new Handler();
+    @Override
+    public void onDeviceClick(Device device, String tableName, int position) {
+        openDeviceMap(device, tableName, position);
+    }
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,8 +62,8 @@ public class DeviceListActivity extends AppCompatActivity {
         layoutManager = new LinearLayoutManager(this);
         devicesRecyclerView.setLayoutManager(layoutManager);
 
-        // Инициализация адаптера с пустым списком
-        adapter = new DeviceListAdapter(new ArrayList<>(), this);
+        // Инициализация адаптера - передаем this как слушатель
+        adapter = new DeviceListAdapter(new ArrayList<>(), this, this);
         devicesRecyclerView.setAdapter(adapter);
 
         // Добавление слушателя для бесконечного скроллинга
@@ -80,6 +89,44 @@ public class DeviceListActivity extends AppCompatActivity {
 
         // Динамическая загрузка вкладок из базы данных
         setupTabLayout();
+    }
+
+    // Метод для открытия карты устройства
+    private void openDeviceMap(Device device, String tableName, int position) {
+        if (tableName == null || tableName.isEmpty()) {
+            Toast.makeText(this, "Ошибка: имя таблицы не указано", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Получаем полные данные устройства с MAC адресом
+        Device fullDevice = databaseHelper.getDeviceWithMac(tableName, position);
+
+        if (fullDevice == null) {
+            Toast.makeText(this, "Не удалось получить данные устройства", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Получаем историю устройства по MAC адресу
+        List<MainDatabaseHelper.DeviceLocation> history =
+                databaseHelper.getDeviceHistoryByMac(tableName, fullDevice.getMac());
+
+        if (history.isEmpty()) {
+            Toast.makeText(this, "Нет данных о местоположении устройства", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Берем последнюю точку из истории
+        MainDatabaseHelper.DeviceLocation lastLocation = history.get(0);
+
+        // Открываем новую Activity с картой и информацией
+        Intent intent = new Intent(this, ActivityMapActivity.class);
+        intent.putExtra("latitude", lastLocation.latitude);
+        intent.putExtra("longitude", lastLocation.longitude);
+        intent.putExtra("device_name", device.getName());
+        intent.putExtra("device_mac", fullDevice.getMac());
+        intent.putExtra("device_type", device.getType());
+        intent.putExtra("table_name", tableName);
+        startActivity(intent);
     }
 
     private void setupTabLayout() {
@@ -135,6 +182,9 @@ public class DeviceListActivity extends AppCompatActivity {
             hasMoreData = true;
             adapter.showLoading(true);
         }
+
+        // УСТАНАВЛИВАЕМ ТЕКУЩУЮ ТАБЛИЦУ В АДАПТЕР!
+        adapter.setCurrentTableName(tableName);
 
         isLoading = true;
 

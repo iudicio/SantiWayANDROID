@@ -4,6 +4,7 @@ import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
@@ -20,10 +21,23 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
     private Context context;
     private boolean showLoading = false;
     private boolean isFirstLoad = true;
+    public interface OnDeviceClickListener {
+        void onDeviceClick(DeviceListActivity.Device device, String tableName, int position);
+    }
 
-    public DeviceListAdapter(List<DeviceListActivity.Device> deviceList, Context context) {
+    private OnDeviceClickListener deviceClickListener;
+    private String currentTableName; // Поле для текущей таблицы
+
+    public DeviceListAdapter(List<DeviceListActivity.Device> deviceList, Context context,
+                             OnDeviceClickListener listener) {
         this.deviceList = new ArrayList<>(deviceList);
         this.context = context;
+        this.deviceClickListener = listener;
+    }
+
+    // Метод для установки текущей таблицы
+    public void setCurrentTableName(String tableName) {
+        this.currentTableName = tableName;
     }
 
     // Метод для обновления данных в адаптере
@@ -79,7 +93,7 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
         if (viewType == VIEW_TYPE_ITEM) {
             View view = LayoutInflater.from(parent.getContext())
                     .inflate(R.layout.item_device, parent, false);
-            return new DeviceViewHolder(view);
+            return new DeviceViewHolder(view, deviceClickListener);
         } else {
             View view = LayoutInflater.from(parent.getContext())
                     .inflate(R.layout.item_loading, parent, false);
@@ -91,7 +105,7 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
         if (holder instanceof DeviceViewHolder) {
             DeviceListActivity.Device device = deviceList.get(position);
-            ((DeviceViewHolder) holder).bind(device);
+            ((DeviceViewHolder) holder).bind(device, deviceClickListener, currentTableName, position);
         } else if (holder instanceof LoadingViewHolder) {
             ((LoadingViewHolder) holder).bind();
         }
@@ -115,20 +129,47 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
         TextView deviceTypeTextView;
         TextView deviceLocationTextView;
         TextView deviceTimeTextView;
+        Button infoButton; // Добавим кнопку Info
 
-        public DeviceViewHolder(@NonNull View itemView) {
+        public DeviceViewHolder(@NonNull View itemView, OnDeviceClickListener listener) {
             super(itemView);
             deviceNameTextView = itemView.findViewById(R.id.device_name);
             deviceTypeTextView = itemView.findViewById(R.id.device_type);
             deviceLocationTextView = itemView.findViewById(R.id.device_location);
             deviceTimeTextView = itemView.findViewById(R.id.device_time);
+            infoButton = itemView.findViewById(R.id.info_button); // Находим кнопку
+
+            // Обработчик клика на кнопку Info
+            if (infoButton != null) {
+                infoButton.setOnClickListener(v -> {
+                    if (listener != null && getAdapterPosition() != RecyclerView.NO_POSITION) {
+                        // Нужно передать таблицу и позицию - это сделаем в onBindViewHolder
+                    }
+                });
+            }
         }
 
-        public void bind(DeviceListActivity.Device device) {
+        public void bind(DeviceListActivity.Device device, OnDeviceClickListener listener, String tableName, int position) {
             deviceNameTextView.setText(device.name != null ? device.name : "Unknown");
             deviceTypeTextView.setText(device.type != null ? device.type : "N/A");
             deviceLocationTextView.setText(device.location != null ? device.location : "N/A");
             deviceTimeTextView.setText(device.time != null ? device.time : "N/A");
+
+            // Устанавливаем обработчик для кнопки Info
+            if (infoButton != null) {
+                infoButton.setOnClickListener(v -> {
+                    if (listener != null) {
+                        listener.onDeviceClick(device, tableName, position);
+                    }
+                });
+            }
+
+            // Также делаем кликабельной всю карточку
+            itemView.setOnClickListener(v -> {
+                if (listener != null) {
+                    listener.onDeviceClick(device, tableName, position);
+                }
+            });
         }
     }
 
