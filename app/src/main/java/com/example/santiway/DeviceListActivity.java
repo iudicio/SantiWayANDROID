@@ -1,8 +1,11 @@
 package com.example.santiway;
 
+import android.app.AlertDialog;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 import android.view.MenuItem;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -17,6 +20,10 @@ import java.util.ArrayList;
 import java.util.List;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.view.ViewGroup;
+import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 public class DeviceListActivity extends AppCompatActivity implements DeviceListAdapter.OnDeviceClickListener {
@@ -57,6 +64,145 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         getSupportActionBar().setTitle("Database Tables");
 
         databaseHelper = new MainDatabaseHelper(this);
+        // 1. Находим кнопку Alarm в макете DeviceListActivity
+        LinearLayout alarmButton = findViewById(R.id.action_alarm);
+
+        if (alarmButton != null) {
+            alarmButton.setOnClickListener(v -> {
+                // 2. Определяем, какая папка сейчас выбрана в TabLayout
+                int selectedTabPos = tabLayout.getSelectedTabPosition();
+                if (selectedTabPos != -1) {
+                    String currentFolder = tabLayout.getTabAt(selectedTabPos).getText().toString();
+
+                    // 3. Используем твой MainDatabaseHelper (без изменений метода)
+                    MainDatabaseHelper dbHelper = new MainDatabaseHelper(DeviceListActivity.this);
+                    int rowsAffected = dbHelper.updateAllDeviceStatusForTable(currentFolder, "ALARM");
+
+                    // 4. Показываем результат, чтобы убедиться, что всё сработало
+                    Toast.makeText(DeviceListActivity.this,
+                            "Обновлено устройств: " + rowsAffected + " в папке " + currentFolder,
+                            Toast.LENGTH_SHORT).show();
+
+                    // 5. Опционально: обнови список на экране, если нужно сразу увидеть изменения
+                    // refreshListData(currentFolder);
+                } else {
+                    Toast.makeText(DeviceListActivity.this, "Ошибка: вкладка не выбрана", Toast.LENGTH_SHORT).show();
+                }
+            });
+        } else {
+            // Если в Logcat будет эта ошибка, значит кнопка не найдена в XML
+            Log.e("ALARM_ERROR", "Кнопка action_alarm не найдена в DeviceListActivity");
+        }
+        LinearLayout clearButton = findViewById(R.id.action_clear);
+
+        if (clearButton != null) {
+            clearButton.setOnClickListener(v -> {
+                // Получаем имя текущей папки
+                int selectedTabPos = tabLayout.getSelectedTabPosition();
+                if (selectedTabPos == -1) return;
+                String currentFolder = tabLayout.getTabAt(selectedTabPos).getText().toString();
+
+                // Создаем стильное подтверждение
+                AlertDialog dialog = new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
+                        .setTitle("Очистка")
+                        .setMessage("Удалить все записи из " + currentFolder + "?")
+                        .setPositiveButton("УДАЛИТЬ", (d, which) -> {
+                            // Сама очистка
+                            MainDatabaseHelper dbHelper = new MainDatabaseHelper(this);
+                            dbHelper.clearTableData(currentFolder);
+
+                            Toast.makeText(this, "Данные удалены", Toast.LENGTH_SHORT).show();
+
+                            // Обнови список (если у тебя есть метод загрузки)
+                            // loadDataForTable(currentFolder);
+                        })
+                        .setNegativeButton("ОТМЕНА", null)
+                        .create();
+
+                dialog.show();
+
+                // Стилизация кнопок диалога под твой дизайн после показа
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.parseColor("#FF6B6B")); // Красный для удаления
+                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.parseColor("#3DDC84")); // Зеленый для отмены
+            });
+        }
+        LinearLayout renameButton = findViewById(R.id.action_rename);
+
+        if (renameButton != null) {
+            renameButton.setOnClickListener(v -> {
+                int selectedTabPos = tabLayout.getSelectedTabPosition();
+                if (selectedTabPos == -1) return;
+
+                String oldName = tabLayout.getTabAt(selectedTabPos).getText().toString();
+
+                // Поле ввода
+                final EditText input = new EditText(this);
+                input.setText(oldName);
+                input.setTextColor(Color.WHITE);
+
+                FrameLayout container = new FrameLayout(this);
+                FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                params.leftMargin = 50; params.rightMargin = 50;
+                input.setLayoutParams(params);
+                container.addView(input);
+
+                AlertDialog dialog = new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
+                        .setTitle("Переименовать")
+                        .setView(container)
+                        .setPositiveButton("СОХРАНИТЬ", null) // Ставим null, чтобы диалог не закрылся сам при ошибке
+                        .setNegativeButton("ОТМЕНА", null)
+                        .create();
+
+                dialog.show();
+
+                // Переопределяем нажатие на "СОХРАНИТЬ", чтобы контролировать закрытие диалога
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+                    String newName = input.getText().toString().trim();
+
+                    // 1. Проверка на пустое имя
+                    if (newName.isEmpty()) {
+                        input.setError("Имя не может быть пустым");
+                        return;
+                    }
+
+                    // 2. ПРОВЕРКА НА СУЩЕСТВУЮЩЕЕ ИМЯ
+                    boolean alreadyExists = false;
+                    for (int i = 0; i < tabLayout.getTabCount(); i++) {
+                        if (tabLayout.getTabAt(i).getText().toString().equalsIgnoreCase(newName)) {
+                            alreadyExists = true;
+                            break;
+                        }
+                    }
+
+                    if (alreadyExists && !newName.equalsIgnoreCase(oldName)) {
+                        input.setError("Папка с таким именем уже есть!");
+                        Toast.makeText(this, "Название уже занято", Toast.LENGTH_SHORT).show();
+                    } else {
+                        // 3. Если всё ок — переименовываем
+                        MainDatabaseHelper dbHelper = new MainDatabaseHelper(this);
+                        dbHelper.renameTable(oldName, newName);
+
+                        tabLayout.getTabAt(selectedTabPos).setText(newName);
+                        dialog.dismiss(); // Закрываем только если переименовали успешно
+                        Toast.makeText(this, "Готово!", Toast.LENGTH_SHORT).show();
+                    }
+                });
+
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.parseColor("#3DDC84"));
+            });
+        }
+        LinearLayout safeButton = findViewById(R.id.action_safe);
+        if (safeButton != null) {
+            safeButton.setOnClickListener(v -> {
+                int pos = tabLayout.getSelectedTabPosition();
+                if (pos != -1) {
+                    String folder = tabLayout.getTabAt(pos).getText().toString();
+                    int count = new MainDatabaseHelper(this).updateAllDeviceStatusForTable(folder, "SAFE");
+                    Toast.makeText(this, count + " устройств теперь SAFE", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
 
         // Инициализация LayoutManager
         layoutManager = new LinearLayoutManager(this);
@@ -127,6 +273,37 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         intent.putExtra("device_type", device.getType());
         intent.putExtra("table_name", tableName);
         startActivity(intent);
+    }
+    // В файле DeviceListActivity.java
+    public void shareDeviceAsJson(Device device) {
+        // Исправлено: используем currentTable (твоя глобальная переменная)
+        String jsonString = databaseHelper.getDeviceExportJson(currentTable, device.getMac());
+
+        if (jsonString == null || jsonString.isEmpty()) {
+            Toast.makeText(this, "Нет данных для экспорта", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try {
+            java.io.File cachePath = new java.io.File(getExternalCacheDir(), "exports");
+            cachePath.mkdirs();
+            java.io.File tempFile = new java.io.File(cachePath, "device_" + device.getMac().replace(":", "") + ".json");
+
+            java.io.FileOutputStream stream = new java.io.FileOutputStream(tempFile);
+            stream.write(jsonString.getBytes());
+            stream.close();
+
+            android.net.Uri contentUri = androidx.core.content.FileProvider.getUriForFile(
+                    this, getPackageName() + ".provider", tempFile);
+
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType("application/json");
+            shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(shareIntent, "Отправить JSON"));
+        } catch (Exception e) {
+            Toast.makeText(this, "Ошибка: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void setupTabLayout() {
