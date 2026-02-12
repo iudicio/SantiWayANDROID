@@ -283,6 +283,29 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         }
         return result;
     }
+    public void clearTableData(String tableName) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        try {
+            db.delete("\"" + tableName + "\"", null, null);
+            Log.d("DB_CHECK", "Все данные из таблицы " + tableName + " удалены.");
+        } catch (Exception e) {
+            Log.e("DB_CHECK", "Ошибка при очистке: " + e.getMessage());
+        } finally {
+            db.close();
+        }
+    }
+    public void renameTable(String oldName, String newName) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        try {
+            // Оборачиваем имена в двойные кавычки
+            String query = "ALTER TABLE \"" + oldName + "\" RENAME TO \"" + newName + "\"";
+            db.execSQL(query);
+        } catch (Exception e) {
+            Log.e("DB_RENAME", "Error: " + e.getMessage());
+        } finally {
+            db.close();
+        }
+    }
 
     public List<DeviceListActivity.Device> getAllDataFromTable(String tableName) {
         List<DeviceListActivity.Device> deviceList = new ArrayList<>();
@@ -320,48 +343,50 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         return deviceList;
     }
 
-    public List<DeviceListActivity.Device> getAllDataFromTableWithPagination(
-            String tableName,
-            int offset,
-            int limit) {
-
+    public List<DeviceListActivity.Device> getAllDataFromTableWithPagination(String tableName, int offset, int limit) {
         List<DeviceListActivity.Device> deviceList = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = null;
-
         try {
-            // Добавляем bssid (MAC адрес) в запрос
-            cursor = db.rawQuery(
-                    "SELECT type, name, bssid, latitude, longitude, timestamp " +
-                            "FROM \"" + tableName + "\" " +
-                            "WHERE type IN ('Wi-Fi', 'Bluetooth') " + // Только устройства с MAC
-                            "ORDER BY timestamp DESC " +
-                            "LIMIT ? OFFSET ?",
-                    new String[]{String.valueOf(limit), String.valueOf(offset)}
-            );
+            // 1. Добавляем 'status' в SQL запрос
+            String sql = "SELECT type, name, bssid, latitude, longitude, timestamp, status " +
+                    "FROM \"" + tableName + "\" " +
+                    "WHERE type IN ('Wi-Fi', 'Bluetooth') " +
+                    "ORDER BY timestamp DESC " +
+                    "LIMIT ? OFFSET ?";
+
+            cursor = db.rawQuery(sql, new String[]{String.valueOf(limit), String.valueOf(offset)});
 
             if (cursor != null && cursor.moveToFirst()) {
                 do {
                     String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
                     String type = cursor.getString(cursor.getColumnIndexOrThrow("type"));
                     String mac = cursor.getString(cursor.getColumnIndexOrThrow("bssid"));
-                    double latitude = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
-                    double longitude = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
-                    long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
+                    double lat = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
+                    double lon = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
+                    long ts = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
 
-                    String locationStr = String.format("Lat: %.4f, Lon: %.4f", latitude, longitude);
-                    String timeStr = new java.text.SimpleDateFormat("HH:mm:ss")
-                            .format(new java.util.Date(timestamp));
+                    // 2. ЧИТАЕМ СТАТУС ИЗ БАЗЫ (а не пишем его вручную)
+                    int statusIdx = cursor.getColumnIndex("status");
+                    String currentStatus = "scanned"; // значение по умолчанию
+                    if (statusIdx != -1) {
+                        String dbStatus = cursor.getString(statusIdx);
+                        if (dbStatus != null && !dbStatus.isEmpty()) {
+                            currentStatus = dbStatus;
+                        }
+                    }
 
-                    // Теперь создаем Device с MAC адресом
-                    deviceList.add(new DeviceListActivity.Device(name, type, locationStr, timeStr, mac, "scanned"));
+                    String loc = String.format("Lat: %.4f, Lon: %.4f", lat, lon);
+                    String time = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date(ts));
+
+                    // 3. ПЕРЕДАЕМ ПЕРЕМЕННУЮ currentStatus
+                    deviceList.add(new DeviceListActivity.Device(name, type, loc, time, mac, currentStatus));
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error getting paginated data from table " + tableName + ": " + e.getMessage());
+            Log.e(TAG, "Pagination error: " + e.getMessage());
         } finally {
             if (cursor != null) cursor.close();
-            db.close();
         }
         return deviceList;
     }
@@ -622,6 +647,35 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
         // Возвращаем результат в километрах
         return totalDistance / 1000.0;
+    }
+    public String getDeviceExportJson(String tableName, String mac) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        org.json.JSONObject root = new org.json.JSONObject();
+        try {
+            Cursor cursor = db.rawQuery("SELECT * FROM \"" + tableName + "\" WHERE bssid = ? ORDER BY timestamp ASC", new String[]{mac});
+
+            org.json.JSONArray historyArray = new org.json.JSONArray();
+            if (cursor != null && cursor.moveToFirst()) {
+                root.put("name", cursor.getString(cursor.getColumnIndexOrThrow("name")));
+                root.put("mac", mac);
+                root.put("type", cursor.getString(cursor.getColumnIndexOrThrow("type")));
+                root.put("status", cursor.getString(cursor.getColumnIndexOrThrow("status")));
+
+                do {
+                    org.json.JSONObject point = new org.json.JSONObject();
+                    point.put("lat", cursor.getDouble(cursor.getColumnIndexOrThrow("latitude")));
+                    point.put("lon", cursor.getDouble(cursor.getColumnIndexOrThrow("longitude")));
+                    point.put("timestamp", cursor.getLong(cursor.getColumnIndexOrThrow("timestamp")));
+                    historyArray.put(point);
+                } while (cursor.moveToNext());
+
+                root.put("points_history", historyArray);
+                cursor.close();
+            }
+            return root.toString(4);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // 3. Проверка условий Target

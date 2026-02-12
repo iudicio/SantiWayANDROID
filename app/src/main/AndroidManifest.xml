@@ -135,11 +135,14 @@
         <!-- Сервисы загрузки -->
         <service
             android:name=".upload_data.DeviceUploadService"
-            android:enabled="true">
+            android:exported="false"
+            android:foregroundServiceType="dataSync">
 
         </service>
     </application>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+
 
 
 
