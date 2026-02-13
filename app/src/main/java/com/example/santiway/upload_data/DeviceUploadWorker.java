@@ -1,6 +1,7 @@
 package com.example.santiway.upload_data;
 
 import android.content.Context;
+import android.content.Intent;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -40,11 +41,17 @@ public class DeviceUploadWorker extends Worker {
             boolean success = uploadManager.uploadBatch(batch);
 
             if (success) {
-                Log.d(TAG, "Successfully uploaded batch of " + batch.size() + " devices to RabbitMQ");
-                uploadManager.markDevicesAsUploaded(batch);
+                Log.d(TAG, "Successfully uploaded batch of " + batch.size() + " devices");
+
+                // ОТПРАВЛЯЕМ BROADCAST ОБ УСПЕШНОЙ ОТПРАВКЕ
+                Intent intent = new Intent("com.example.santiway.UPLOAD_COMPLETED");
+                intent.putExtra("device_count", batch.size());
+                intent.putExtra("timestamp", System.currentTimeMillis());
+                getApplicationContext().sendBroadcast(intent);
+
                 return Result.success();
             } else {
-                Log.e(TAG, "Failed to upload batch to RabbitMQ, will retry later");
+                Log.e(TAG, "Failed to upload batch, will retry later");
                 return Result.retry();
             }
 

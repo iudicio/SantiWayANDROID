@@ -8,25 +8,25 @@ import android.database.sqlite.SQLiteOpenHelper;
 public class AppSettingsDbHelper extends SQLiteOpenHelper {
 
     public static final String DATABASE_NAME = "app_settings.db";
-    public static final int DATABASE_VERSION = 3;
+    public static final int DATABASE_VERSION = 4; // Увеличили версию
 
     // Названия таблиц
     public static final String TABLE_APP_CONFIG = "app_config";
-    public static final String TABLE_SCANNERS_CONFIG = "scanner_config";
+    public static final String TABLE_SCANNERS_CONFIG = "scanners_config";
 
-    // Столбцы APP_SETTINGS
+    // Столбцы APP_CONFIG
     public static final String COLUMN_ID = "id";
     public static final String COLUMN_API_KEY = "api_key";
-    public static final String COLUMN_IS_SCANNING = "is_scanning";
     public static final String COLUMN_GEO_PROTOCOL = "geo_protocol";
+    public static final String COLUMN_IS_SCANNING = "is_scanning";
+    public static final String COLUMN_DEVICE_NAME = "device_name";
 
-    // Столбцы для scanners
+    // Столбцы SCANNERS_CONFIG
     public static final String COLUMN_SCANNER_ID = "scanner_id";
     public static final String COLUMN_SCANNER_NAME = "scanner_name";
     public static final String COLUMN_SCAN_INTERVAL = "scan_interval";
     public static final String COLUMN_SIGNAL_STRENGTH = "signal_strength";
     public static final String COLUMN_SCANNER_ENABLED = "scanner_enabled";
-    public static final String COLUMN_DEVICE_NAME = "device_name";
 
     public AppSettingsDbHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -34,7 +34,7 @@ public class AppSettingsDbHelper extends SQLiteOpenHelper {
 
     @Override
     public void onCreate(SQLiteDatabase db) {
-        createAppSettingsTable(db);
+        createAppConfigTable(db);
         createScannersConfigTable(db);
         insertDefaultSettings(db);
     }
@@ -46,24 +46,24 @@ public class AppSettingsDbHelper extends SQLiteOpenHelper {
         onCreate(db);
     }
 
-    private void createAppSettingsTable(SQLiteDatabase db) {
+    private void createAppConfigTable(SQLiteDatabase db) {
         String createTableQuery = "CREATE TABLE " + TABLE_APP_CONFIG + " (" +
-                COLUMN_ID + " INTEGER PRIMARY KEY DEFAULT 1 CHECK(" + COLUMN_ID + " = 1)," +
-                COLUMN_API_KEY + " TEXT," +
-                COLUMN_GEO_PROTOCOL + " TEXT NOT NULL DEFAULT 'GSM'," +
-                COLUMN_IS_SCANNING + " INTEGER NOT NULL DEFAULT 0" +
-                COLUMN_DEVICE_NAME + " TEXT NOT NULL DEFAULT 'Telephone', " +
+                COLUMN_ID + " INTEGER PRIMARY KEY DEFAULT 1 CHECK(" + COLUMN_ID + " = 1), " +
+                COLUMN_API_KEY + " TEXT, " +
+                COLUMN_GEO_PROTOCOL + " TEXT NOT NULL DEFAULT 'GSM', " +
+                COLUMN_IS_SCANNING + " INTEGER NOT NULL DEFAULT 0, " +
+                COLUMN_DEVICE_NAME + " TEXT NOT NULL DEFAULT 'Telephone'" +
                 ")";
         db.execSQL(createTableQuery);
     }
 
     private void createScannersConfigTable(SQLiteDatabase db) {
-        String createTableQuery = "CREATE TABLE " + TABLE_APP_CONFIG + " (" +
-                COLUMN_ID + " INTEGER PRIMARY KEY DEFAULT 1 CHECK(" + COLUMN_ID + " = 1)," +
-                COLUMN_API_KEY + " TEXT," +
-                COLUMN_GEO_PROTOCOL + " TEXT NOT NULL DEFAULT 'GSM'," +
-                COLUMN_IS_SCANNING + " INTEGER NOT NULL DEFAULT 0," +
-                COLUMN_DEVICE_NAME + " TEXT NOT NULL DEFAULT 'Telephone'" +
+        String createTableQuery = "CREATE TABLE " + TABLE_SCANNERS_CONFIG + " (" +
+                COLUMN_SCANNER_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COLUMN_SCANNER_NAME + " TEXT NOT NULL UNIQUE, " +
+                COLUMN_SCAN_INTERVAL + " REAL NOT NULL DEFAULT 5.0, " +
+                COLUMN_SIGNAL_STRENGTH + " REAL NOT NULL DEFAULT -80.0, " + // Сила сигнала по умолчанию
+                COLUMN_SCANNER_ENABLED + " INTEGER NOT NULL DEFAULT 1" +
                 ")";
         db.execSQL(createTableQuery);
     }
@@ -77,21 +77,20 @@ public class AppSettingsDbHelper extends SQLiteOpenHelper {
         appValues.put(COLUMN_DEVICE_NAME, "Telephone");
         db.insert(TABLE_APP_CONFIG, null, appValues);
 
-        // Добавление сканеров
-        String[] scanners = {"wifi", "bluetooth", "cell"};
-        for (String name : scanners) {
+        // Добавление сканеров с настройками по умолчанию
+        String[][] scanners = {
+                {"wifi", "5.0", "-100.0", "1"},
+                {"bluetooth", "10.0", "-70.0", "1"},
+                {"cell", "15.0", "-90.0", "1"}
+        };
+
+        for (String[] scanner : scanners) {
             ContentValues scannerValues = new ContentValues();
-            scannerValues.put(COLUMN_SCANNER_NAME, name);
+            scannerValues.put(COLUMN_SCANNER_NAME, scanner[0]);
+            scannerValues.put(COLUMN_SCAN_INTERVAL, Float.parseFloat(scanner[1]));
+            scannerValues.put(COLUMN_SIGNAL_STRENGTH, Float.parseFloat(scanner[2]));
+            scannerValues.put(COLUMN_SCANNER_ENABLED, Integer.parseInt(scanner[3]));
             db.insert(TABLE_SCANNERS_CONFIG, null, scannerValues);
         }
-    }
-
-    // Вспомогательные методы для работы с базой данных
-    public SQLiteDatabase getReadableDatabase() {
-        return super.getReadableDatabase();
-    }
-
-    public SQLiteDatabase getWritableDatabase() {
-        return super.getWritableDatabase();
     }
 }
