@@ -146,7 +146,8 @@
                     android:text="00:00:00:00:00:00"
                     android:textSize="12sp"
                     android:textColor="@android:color/white"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    android:textAllCaps="true"/>
             </LinearLayout>
 
             <!-- Название устройства -->
