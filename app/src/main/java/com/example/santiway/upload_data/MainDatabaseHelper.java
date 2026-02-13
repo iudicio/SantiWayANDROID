@@ -109,11 +109,9 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        if (oldVersion < 6) {
-            // Добавляем поле is_uploaded в существующие таблицы
-            // Вместо вызова getAllTables() работаем напрямую с переданной db
+        if (oldVersion < 7) {
+            // Добавляем индекс для быстрого поиска неотправленных записей
             try {
-                // Получаем список таблиц напрямую через SQL запрос
                 Cursor cursor = db.rawQuery(
                         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%'",
                         null
@@ -124,9 +122,10 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                         while (cursor.moveToNext()) {
                             String tableName = cursor.getString(0);
                             try {
-                                db.execSQL("ALTER TABLE \"" + tableName + "\" ADD COLUMN is_uploaded INTEGER DEFAULT 0");
+                                // Добавляем составной индекс для оптимизации
+                                db.execSQL("CREATE INDEX IF NOT EXISTS idx_" + tableName + "_uploaded_timestamp ON \"" + tableName + "\" (is_uploaded, timestamp)");
                             } catch (Exception e) {
-                                Log.e(TAG, "Error adding is_uploaded column to table " + tableName + ": " + e.getMessage());
+                                Log.e(TAG, "Error creating index for table " + tableName + ": " + e.getMessage());
                             }
                         }
                     } finally {

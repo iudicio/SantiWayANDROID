@@ -1,9 +1,17 @@
 package com.example.santiway.upload_data;
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.os.Build;
 import android.util.Log;
+import com.example.santiway.R;
+
+import androidx.core.app.NotificationCompat;
 
 import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.example.santiway.host_database.AppSettingsRepository;
@@ -34,6 +42,7 @@ public class DeviceUploadManager {
     private static final String TAG = "DeviceUploadManager";
     private static final String PREFS_NAME = "DeviceUploadPrefs";
     private static final String KEY_DEVICE_ID = "device_id";
+    private static final String KEY_LAST_UPLOAD_TIME = "last_upload_time";
     private static final int BATCH_SIZE = 200;
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
@@ -92,22 +101,38 @@ public class DeviceUploadManager {
         }
     }
 
+    // метод для получения времени последней отправки
+    public static long getLastUploadTime(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        return prefs.getLong(KEY_LAST_UPLOAD_TIME, 0);
+    }
+
+    // метод для сохранения времени последней отправки
+    private void saveLastUploadTime() {
+        long currentTime = System.currentTimeMillis();
+        prefs.edit().putLong(KEY_LAST_UPLOAD_TIME, currentTime).apply();
+        Log.d(TAG, "Last upload time saved: " + currentTime);
+    }
+
     public List<ApiDevice> getPendingDevicesBatch() {
         List<ApiDevice> devices = new ArrayList<>();
         List<String> tables = databaseHelper.getAllTables();
 
         for (String table : tables) {
             if (devices.size() >= BATCH_SIZE) break;
+            // Добавляем условие is_uploaded = 0
             List<ApiDevice> tableDevices = getDevicesFromTable(table, BATCH_SIZE - devices.size());
             devices.addAll(tableDevices);
         }
 
+        Log.d(TAG, "Found " + devices.size() + " pending devices to upload");
         return devices;
     }
 
     private List<ApiDevice> getDevicesFromTable(String tableName, int limit) {
         List<ApiDevice> devices = new ArrayList<>();
-        String query = "SELECT * FROM \"" + tableName + "\" WHERE is_uploaded = 0 ORDER BY timestamp DESC LIMIT " + limit;
+        // ИЗМЕНЕНО: ORDER BY timestamp ASC (старые записи первыми)
+        String query = "SELECT * FROM \"" + tableName + "\" WHERE is_uploaded = 0 ORDER BY timestamp ASC LIMIT " + limit;
 
         try (Cursor cursor = databaseHelper.getReadableDatabase().rawQuery(query, null)) {
             if (cursor != null && cursor.moveToFirst()) {
@@ -211,9 +236,6 @@ public class DeviceUploadManager {
             return false;
         }
 
-        // Детальное логирование данных
-        logDeviceDetails(devices);
-
         for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
             try {
                 Log.d(TAG, "Upload attempt " + attempt);
@@ -224,61 +246,33 @@ public class DeviceUploadManager {
                     return false;
                 }
 
-                // Формируем заголовки
                 String authHeader = "Api-Key " + apiKey;
                 String contentTypeHeader = "application/json";
-
-                Log.d(TAG, "Auth Header: " + authHeader);
-                Log.d(TAG, "Content-Type: " + contentTypeHeader);
-                Log.d(TAG, "Sending request to: " + ApiConfig.getDevicesUrl());
-
-                // Логируем тело запроса
-                String requestBody = devicesToJsonString(devices);
-                Log.d(TAG, "Request body (first 1000 chars): " +
-                        (requestBody != null ? requestBody.substring(0, Math.min(requestBody.length(), 1000)) : "null"));
 
                 Call<ApiResponse> call = apiService.uploadDevices(authHeader, contentTypeHeader, devices);
                 Response<ApiResponse> response = call.execute();
 
                 Log.d(TAG, "Response code: " + response.code());
-                Log.d(TAG, "Response message: " + response.message());
 
                 if (response.isSuccessful()) {
                     ApiResponse apiResponse = response.body();
                     Log.i(TAG, "✅ SUCCESS: Uploaded " + devices.size() + " devices");
-                    if (apiResponse != null) {
-                        Log.d(TAG, "Response body: " + apiResponse.toString());
-                    }
+
+                    // УСПЕХ - отмечаем устройства как отправленные
+                    markDevicesAsUploaded(devices);
+
                     return true;
                 } else {
-                    // Детальный анализ ошибки
                     String errorBody = response.errorBody() != null ? response.errorBody().string() : "No error body";
-                    Log.w(TAG, "Upload failed with status: " + response.code() + " - " + response.message());
-                    Log.w(TAG, "Error response: " + errorBody);
-
-                    // Анализ распространенных ошибок
-                    analyzeCommonErrors(response.code(), errorBody);
+                    Log.w(TAG, "Upload failed with status: " + response.code());
 
                     if (attempt < MAX_RETRY_ATTEMPTS) {
                         Thread.sleep(2000 * attempt);
                     }
                 }
 
-            } catch (SocketException e) {
-                Log.e(TAG, "SocketException (attempt " + attempt + "): " + e.getMessage());
-                Log.e(TAG, "This usually means the server accepted connection but reset it immediately");
-                Log.e(TAG, "Possible causes: wrong endpoint, authentication issues, or server-side problems");
-
-                if (attempt < MAX_RETRY_ATTEMPTS) {
-                    try {
-                        Thread.sleep(2000 * attempt);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    }
-                }
             } catch (Exception e) {
-                Log.e(TAG, "Error uploading batch (attempt " + attempt + "): " + e.getMessage(), e);
+                Log.e(TAG, "Error uploading batch (attempt " + attempt + "): " + e.getMessage());
                 if (attempt < MAX_RETRY_ATTEMPTS) {
                     try {
                         Thread.sleep(2000 * attempt);
@@ -358,10 +352,125 @@ public class DeviceUploadManager {
     }
 
     public void markDevicesAsUploaded(List<ApiDevice> devices) {
+        if (devices == null || devices.isEmpty()) {
+            Log.d(TAG, "No devices to mark as uploaded");
+            return;
+        }
+
         Log.d(TAG, "Marking " + devices.size() + " devices as uploaded in database");
+
+        SQLiteDatabase db = databaseHelper.getWritableDatabase();
+        try {
+            db.beginTransaction();
+
+            for (ApiDevice device : devices) {
+                String deviceId = device.getDevice_id();
+                String detectedAt = device.getDetected_at();
+                String folderName = device.getFolder_name();
+
+                // ИЗМЕНЕНО: отмечаем конкретную запись по device_id, folder_name и detected_at
+                // чтобы отметить только отправленные, а не все одинаковые MAC-адреса
+                ContentValues values = new ContentValues();
+                values.put("is_uploaded", 1);
+
+                String whereClause;
+                String[] whereArgs;
+
+                if (deviceId != null && deviceId.contains(":")) {
+                    // Wi-Fi или Bluetooth - отмечаем по точной дате и времени
+                    whereClause = "bssid = ? AND folder_name = ? AND timestamp = ?";
+                    whereArgs = new String[]{
+                            deviceId,
+                            folderName,
+                            String.valueOf(timestampFromIsoDate(detectedAt))
+                    };
+                } else {
+                    // Cell tower - отмечаем по cell_id и timestamp
+                    whereClause = "cell_id = ? AND folder_name = ? AND timestamp = ?";
+                    whereArgs = new String[]{
+                            deviceId,
+                            folderName,
+                            String.valueOf(timestampFromIsoDate(detectedAt))
+                    };
+                }
+
+                int updated = db.update("\"" + folderName + "\"", values, whereClause, whereArgs);
+                if (updated == 0) {
+                    Log.w(TAG, "Could not mark device as uploaded: " + deviceId + " @ " + detectedAt);
+                }
+            }
+
+            db.setTransactionSuccessful();
+            Log.d(TAG, "Successfully marked " + devices.size() + " devices as uploaded");
+
+            // Сохраняем время последней успешной отправки
+            saveLastUploadTime();
+
+            // ОТПРАВЛЯЕМ УВЕДОМЛЕНИЕ ОБ УСПЕШНОЙ ОТПРАВКЕ
+            sendUploadSuccessNotification(context, devices.size());
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error marking devices as uploaded: " + e.getMessage(), e);
+        } finally {
+            try {
+                db.endTransaction();
+            } catch (Exception e) {
+                Log.e(TAG, "Error ending transaction: " + e.getMessage());
+            }
+            db.close();
+        }
+    }
+
+    private long timestampFromIsoDate(String isoDate) {
+        try {
+            SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault());
+            isoFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+            Date date = isoFormat.parse(isoDate);
+            return date != null ? date.getTime() : 0;
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing ISO date: " + e.getMessage());
+            return 0;
+        }
+    }
+
+    // НОВЫЙ МЕТОД: отправка уведомления об успешной отправке
+    private void sendUploadSuccessNotification(Context context, int count) {
+        String channelId = "upload_notifications";
+        NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+
+        // Создаем канал для Android 8+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    channelId,
+                    "Отправка данных",
+                    NotificationManager.IMPORTANCE_DEFAULT
+            );
+            channel.setDescription("Уведомления об отправке данных на сервер");
+            if (notificationManager != null) {
+                notificationManager.createNotificationChannel(channel);
+            }
+        }
+
+        // Форматируем время
+        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss dd.MM.yyyy", Locale.getDefault());
+        String currentTime = sdf.format(new Date());
+
+        // Создаем уведомление
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId)
+                .setSmallIcon(R.drawable.ic_pause)
+                .setContentTitle("📤 Данные отправлены")
+                .setContentText("Отправлено " + count + " устройств в " + currentTime)
+                .setStyle(new NotificationCompat.BigTextStyle()
+                        .bigText("Отправлено " + count + " устройств\nВремя: " + currentTime))
+                .setAutoCancel(true)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT);
+
+        if (notificationManager != null) {
+            notificationManager.notify((int) System.currentTimeMillis(), builder.build());
+        }
     }
 
     public void cleanup() {
-        // Не нужно закрывать соединения как в RabbitMQ
+        // Не нужно закрывать соединения
     }
 }

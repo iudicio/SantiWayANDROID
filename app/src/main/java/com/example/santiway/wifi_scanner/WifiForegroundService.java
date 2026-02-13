@@ -47,6 +47,7 @@ public class WifiForegroundService extends Service {
     private double currentLongitude = 0.0;
     private double currentAltitude = 0.0;
     private float currentAccuracy = 0.0f;
+    private float minSignalStrength = -100.0f; // Значение по умолчанию
 
     @Override
     public void onCreate() {
@@ -86,6 +87,10 @@ public class WifiForegroundService extends Service {
                     currentAltitude = intent.getDoubleExtra("altitude", 0.0);
                 }
                 Log.d(TAG, "Location received: " + currentLatitude + ", " + currentLongitude);
+                if (intent.hasExtra("minSignalStrength")) {
+                    minSignalStrength = intent.getFloatExtra("minSignalStrength", -100.0f);
+                    Log.d(TAG, "Min signal strength set to: " + minSignalStrength);
+                }
             }
 
             // Получить имя таблицы из intent
@@ -276,8 +281,15 @@ public class WifiForegroundService extends Service {
 
     private void processScanResults(List<ScanResult> scanResults) {
         int savedCount = 0;
+        int filteredCount = 0;
 
         for (ScanResult result : scanResults) {
+            // Фильтруем по силе сигнала
+            if (result.level < minSignalStrength) {
+                filteredCount++;
+                continue; // Пропускаем устройства со слабым сигналом
+            }
+
             // Filter out hidden networks and invalid results
             if (result.SSID != null && !result.SSID.isEmpty() && result.BSSID != null) {
                 if (saveToDatabase(result)) {
@@ -369,7 +381,7 @@ public class WifiForegroundService extends Service {
         if (manager != null) {
             Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                     .setContentTitle("Wi-Fi Scanner")
-                    .setContentText("Найдено: " + totalNetworks + " сетей, сохранено: " + savedNetworks)
+                    .setContentText("Сохранено: " + savedNetworks + " сетей, порог: " + (int)minSignalStrength + " dBm")
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
                     .setPriority(NotificationCompat.PRIORITY_LOW)
                     .setOngoing(true)

@@ -13,6 +13,7 @@ public class AppSettingsRepository {
     private static final String KEY_GEO_PROTOCOL = "geo_protocol";
     private static final String KEY_IS_SCANNING = "is_scanning";
     private static final String KEY_DEVICE_NAME = "device_name";
+    private static final String KEY_MIN_SIGNAL_PREFIX = "_min_signal";
 
     public AppSettingsRepository(Context context) {
         this.sharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -62,7 +63,7 @@ public class AppSettingsRepository {
     public ScannerSettings getScannerSettings(String scannerName) {
         boolean enabled = sharedPreferences.getBoolean(scannerName + "_enabled", true);
         float interval = sharedPreferences.getFloat(scannerName + "_interval", 5.0f);
-        float signalStrength = sharedPreferences.getFloat(scannerName + "_signal_strength", -80.0f);
+        float signalStrength = sharedPreferences.getFloat(scannerName + "_signal_strength", -100.0f);
 
         return new ScannerSettings(scannerName, enabled, interval, signalStrength);
     }
