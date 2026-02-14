@@ -97,33 +97,44 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
 
         if (clearButton != null) {
             clearButton.setOnClickListener(v -> {
-                // Получаем имя текущей папки
+                // 1. Получаем имя текущей папки (таблицы)
                 int selectedTabPos = tabLayout.getSelectedTabPosition();
                 if (selectedTabPos == -1) return;
                 String currentFolder = tabLayout.getTabAt(selectedTabPos).getText().toString();
 
-                // Создаем стильное подтверждение
+                // 2. Создаем диалог подтверждения
                 AlertDialog dialog = new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
                         .setTitle("Очистка")
                         .setMessage("Удалить все записи из " + currentFolder + "?")
                         .setPositiveButton("УДАЛИТЬ", (d, which) -> {
-                            // Сама очистка
+
+                            // --- ЛОГИКА ОЧИСТКИ ---
+
+                            // А. Удаляем данные из базы данных
                             MainDatabaseHelper dbHelper = new MainDatabaseHelper(this);
                             dbHelper.clearTableData(currentFolder);
 
-                            Toast.makeText(this, "Данные удалены", Toast.LENGTH_SHORT).show();
+                            // Б. Очищаем экран (через адаптер)
+                            // Метод clearData() внутри вызывает notifyDataSetChanged()
+                            if (adapter != null) {
+                                adapter.clearData();
+                            }
 
-                            // Обнови список (если у тебя есть метод загрузки)
-                            // loadDataForTable(currentFolder);
+                            // В. Сбрасываем пагинацию
+                            // Это важно, чтобы при добавлении новых данных загрузка началась с 0
+                            currentOffset = 0;
+                            hasMoreData = false;
+
+                            Toast.makeText(this, "Данные в " + currentFolder + " удалены", Toast.LENGTH_SHORT).show();
                         })
                         .setNegativeButton("ОТМЕНА", null)
                         .create();
 
                 dialog.show();
 
-                // Стилизация кнопок диалога под твой дизайн после показа
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.parseColor("#FF6B6B")); // Красный для удаления
-                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.parseColor("#3DDC84")); // Зеленый для отмены
+                // 3. Стилизация кнопок (после вызова .show())
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.parseColor("#FF6B6B"));
+                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.parseColor("#3DDC84"));
             });
         }
         LinearLayout renameButton = findViewById(R.id.action_rename);

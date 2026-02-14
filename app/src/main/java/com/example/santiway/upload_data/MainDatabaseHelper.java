@@ -29,6 +29,8 @@ import com.example.santiway.bluetooth_scanner.BluetoothDevice;
 import com.example.santiway.DeviceListActivity;
 
 public class MainDatabaseHelper extends SQLiteOpenHelper {
+    private static long lastGlobalSoundTime = 0;
+    private static final long SOUND_INTERVAL = 3600000;
 
     private static final String TAG = "MainDatabaseHelper";
     private static final String DATABASE_NAME = "UnifiedScanner.db";
@@ -242,26 +244,30 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 if ("Target".equals(calculatedStatus)) {
                     NotificationDatabaseHelper notifDb = new NotificationDatabaseHelper(mContext);
 
-                    // Проверка на уникальность (чтобы не спамить звуком каждую секунду)
-                    if (notifDb.isUniqueAlert(uniqueId)) {
-                        String deviceName = values.getAsString("name");
-                        String type = values.getAsString("type");
+                    String deviceName = values.getAsString("name");
+                    String type = values.getAsString("type");
 
-                        // Сохраняем в локальную базу данных для вкладки
-                        NotificationData alert = new NotificationData(
-                                java.util.UUID.randomUUID().toString(),
-                                "Target: " + type,
-                                "Устройство " + (deviceName != null ? deviceName : uniqueId) + " в движении!",
-                                new java.util.Date(),
-                                NotificationData.NotificationType.ALARM,
-                                null, null, curLat, curLon
-                        );
-                        notifDb.addNotification(alert, uniqueId);
+                    // А) ЗАПИСЬ В БАЗУ — Делаем ВСЕГДА для каждого из 300 устройств.
+                    // Так во вкладке "Уведомления" у тебя будет 300 записей.
+                    NotificationData alert = new NotificationData(
+                            java.util.UUID.randomUUID().toString(),
+                            "Target: " + (type != null ? type : "Unknown"),
+                            "Устройство " + (deviceName != null ? deviceName : uniqueId) + " в движении!",
+                            new java.util.Date(),
+                            NotificationData.NotificationType.ALARM,
+                            null, null, curLat, curLon
+                    );
+                    notifDb.addNotification(alert, uniqueId);
 
-                        // 4. ЗАПУСКАЕМ ЗВУК И ВИБРАЦИЮ (Системный Push)
+                    // Б) ЗВУК И ВИБРАЦИЯ — Только если прошла минута с последнего "писка"
+                    long currentTime = System.currentTimeMillis();
+                    if (currentTime - lastGlobalSoundTime > SOUND_INTERVAL) {
+                        lastGlobalSoundTime = currentTime; // Запоминаем время этого звука
+
+                        // Отправляем ОДНО системное уведомление со звуком
                         sendSystemNotification(
-                                "Обнаружен ТАРГЕТ (" + type + ")",
-                                "Объект " + (deviceName != null ? deviceName : uniqueId) + " перемещается!"
+                                "Внимание: Обнаружены цели!",
+                                "Несколько устройств в движении. Проверьте список."
                         );
                     }
                 }
