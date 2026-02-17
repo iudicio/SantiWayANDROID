@@ -85,7 +85,7 @@
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/ic_device"
-            app:tint="@android:color/white"
+            app:tint="#3DDC84"
             android:contentDescription="Safe Icon"/>
         <TextView
             android:layout_width="wrap_content"
