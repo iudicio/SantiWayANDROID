@@ -54,10 +54,15 @@ import com.example.santiway.FolderDeletionBottomSheet.FolderDeletionListener;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener, CreateFolderDialogFragment.CreateFolderListener, FolderDeletionListener {
     private TextView timeLabelTextView;
+    private static final String TAG = "MainActivity";
     private BroadcastReceiver folderSwitchedReceiver;
     private DrawerLayout drawerLayout;
     private Toolbar toolbar;
@@ -78,6 +83,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private Handler timerHandler = new Handler();
     private long startTime = 0L;
     private long timeInMilliseconds = 0L;
+    private TextView lastUploadDateTextView;
 
     private Runnable timerRunnable = new Runnable() {
         @Override
@@ -147,6 +153,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         cellularStatusTextView = findViewById(R.id.cellular_status);
         coordinatesTextView = findViewById(R.id.coordinates_text);
         timeLabelTextView = findViewById(R.id.time_label);
+        lastUploadDateTextView = findViewById(R.id.last_upload_date);
 
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
@@ -179,6 +186,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         ApiConfig.initialize(this);
         uploadManager = new DeviceUploadManager(this);
         startUploadService();
+        updateLastUploadDateDisplay();
+        registerUploadUpdateReceiver();
 
         LinearLayout notificationsButton = findViewById(R.id.footer_notifications);
         if (notificationsButton != null) {
@@ -346,14 +355,25 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         new Thread(() -> {
             DeviceUploadManager uploadManager = new DeviceUploadManager(this);
             List<ApiDevice> remainingDevices = uploadManager.getPendingDevicesBatch();
-            if (!remainingDevices.isEmpty()) {
-                boolean success = uploadManager.uploadBatch(remainingDevices);
-                runOnUiThread(() -> {
-                    if (success) {
-                        Toast.makeText(this, "Отправлено " + remainingDevices.size() + " устройств", Toast.LENGTH_SHORT).show();
-                    }
-                });
+
+            while (!remainingDevices.isEmpty()) {
+                // ИСПРАВЛЕНИЕ: добавляем второй параметр - имя таблицы
+                boolean success = uploadManager.uploadBatch(remainingDevices, currentScanFolder);
+
+                if (success) {
+                    // Отправляем broadcast об успешной отправке
+                    Intent intent = new Intent("com.example.santiway.UPLOAD_COMPLETED");
+                    intent.putExtra("device_count", remainingDevices.size());
+                    intent.putExtra("timestamp", System.currentTimeMillis());
+                    sendBroadcast(intent);
+
+                    Log.d(TAG, "Uploaded batch of " + remainingDevices.size() + " devices on stop");
+                }
+
+                // Получаем следующую партию
+                remainingDevices = uploadManager.getPendingDevicesBatch();
             }
+
             uploadManager.cleanup();
         }).start();
     }
@@ -735,6 +755,48 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             startForegroundService(serviceIntent);
         } else {
             startService(serviceIntent);
+        }
+    }
+
+    // НОВЫЙ МЕТОД: обновление отображения даты последней отправки
+    private void updateLastUploadDateDisplay() {
+        long lastUploadTime = DeviceUploadManager.getLastUploadTime(this);
+        if (lastUploadDateTextView != null) {
+            if (lastUploadTime > 0) {
+                SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss dd.MM.yyyy", Locale.getDefault());
+                String formattedDate = sdf.format(new Date(lastUploadTime));
+                lastUploadDateTextView.setText(formattedDate);
+            } else {
+                lastUploadDateTextView.setText("--:--:-- --.--.----");
+            }
+        }
+    }
+
+    // НОВЫЙ МЕТОД: регистрация BroadcastReceiver для обновлений
+    private void registerUploadUpdateReceiver() {
+        BroadcastReceiver uploadUpdateReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if ("com.example.santiway.UPLOAD_COMPLETED".equals(intent.getAction())) {
+                    int count = intent.getIntExtra("device_count", 0);
+                    long timestamp = intent.getLongExtra("timestamp", System.currentTimeMillis());
+
+                    // Обновляем UI
+                    runOnUiThread(() -> {
+                        updateLastUploadDateDisplay();
+                        Toast.makeText(MainActivity.this,
+                                "✅ Отправлено " + count + " устройств",
+                                Toast.LENGTH_SHORT).show();
+                    });
+                }
+            }
+        };
+
+        IntentFilter filter = new IntentFilter("com.example.santiway.UPLOAD_COMPLETED");
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(uploadUpdateReceiver, filter, RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(uploadUpdateReceiver, filter);
         }
     }
 }
