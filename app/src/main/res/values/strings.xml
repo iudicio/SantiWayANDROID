@@ -64,7 +64,7 @@
     <string name="permission_not_granted_message">Not all permissions were granted.</string>
     <string name="all_permissions_granted_message">All permissions granted.</string>
 
-    <string name="default_api_key"></string>
-    <string name="default_server_ip">109.71.247.188</string>
+    <string name="default_api_key">839c75ed-0886-4567-ab8b-8eede1f9a65d</string>
+    <string name="default_server_ip">192.168.110.49</string>
 
 </resources>

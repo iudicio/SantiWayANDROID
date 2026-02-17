@@ -86,18 +86,22 @@ public class DeviceUploadService extends Service {
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build();
 
-        // Используйте 15 минут как минимальный интервал для PeriodicWorkRequest
-        PeriodicWorkRequest uploadWork =
-                new PeriodicWorkRequest.Builder(DeviceUploadWorker.class, 15, TimeUnit.MINUTES)
-                        .setConstraints(constraints)
-                        .build();
+        // Меняем на 15 минут (минимальный интервал для PeriodicWorkRequest)
+        // Но будем проверять чаще через FlexInterval
+        PeriodicWorkRequest uploadWork = new PeriodicWorkRequest.Builder(
+                DeviceUploadWorker.class,
+                15, TimeUnit.MINUTES,  // период
+                5, TimeUnit.MINUTES)   // flex интервал (окно выполнения)
+                .setConstraints(constraints)
+                .setInitialDelay(1, TimeUnit.MINUTES)
+                .build();
 
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
                 UPLOAD_WORK_NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
+                ExistingPeriodicWorkPolicy.UPDATE,  // UPDATE вместо KEEP для обновления
                 uploadWork);
 
-        Log.d(TAG, "Periodic upload work scheduled every 15 minutes");
+        Log.d(TAG, "Periodic upload work scheduled every 15 minutes (flex 5min)");
     }
 
     @Nullable
