@@ -32,7 +32,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
     private static final String TAG = "MainDatabaseHelper";
     private static final String DATABASE_NAME = "UnifiedScanner.db";
-    private static final int DATABASE_VERSION = 7; // УВЕЛИЧЕНО
+    private static final int DATABASE_VERSION = 8; // УВЕЛИЧЕНО
     private final Context mContext;
 
     public MainDatabaseHelper(Context context) {
@@ -45,9 +45,9 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         // Создание единой таблицы для всех данных
         String createUnifiedTable = "CREATE TABLE \"unified_data\" (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                "type TEXT NOT NULL," + // 'Wi-Fi' или 'Cell'
-                "name TEXT," + // SSID или Operator name
-                "bssid TEXT," + // BSSID для Wi-Fi
+                "type TEXT NOT NULL," +
+                "name TEXT," +
+                "bssid TEXT," +
                 "signal_strength INTEGER," +
                 "frequency INTEGER," +
                 "capabilities TEXT," +
@@ -71,7 +71,8 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 "location_accuracy REAL," +
                 "timestamp LONG," +
                 "status TEXT DEFAULT 'ignore'," +
-                "is_uploaded INTEGER DEFAULT 0" +
+                "is_uploaded INTEGER DEFAULT 0," +
+                "folder_name TEXT DEFAULT ''" + // Добавляем колонку для папок
                 ");";
         db.execSQL(createUnifiedTable);
     }
@@ -110,8 +111,11 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         if (oldVersion < 7) {
-            // Добавляем индекс для быстрого поиска неотправленных записей
+            // ... существующий код ...
+        }
+        if (oldVersion < 8) { // Новая версия
             try {
+                // Добавляем колонку folder_name во все существующие таблицы
                 Cursor cursor = db.rawQuery(
                         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%'",
                         null
@@ -122,10 +126,24 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                         while (cursor.moveToNext()) {
                             String tableName = cursor.getString(0);
                             try {
-                                // Добавляем составной индекс для оптимизации
-                                db.execSQL("CREATE INDEX IF NOT EXISTS idx_" + tableName + "_uploaded_timestamp ON \"" + tableName + "\" (is_uploaded, timestamp)");
+                                // Проверяем существование колонки
+                                Cursor pragma = db.rawQuery("PRAGMA table_info(\"" + tableName + "\")", null);
+                                boolean hasColumn = false;
+                                int nameIndex = pragma.getColumnIndex("name");
+                                while (pragma.moveToNext()) {
+                                    if (nameIndex >= 0 && "folder_name".equals(pragma.getString(nameIndex))) {
+                                        hasColumn = true;
+                                        break;
+                                    }
+                                }
+                                pragma.close();
+
+                                if (!hasColumn) {
+                                    db.execSQL("ALTER TABLE \"" + tableName + "\" ADD COLUMN folder_name TEXT DEFAULT ''");
+                                    Log.d(TAG, "Added folder_name to table: " + tableName);
+                                }
                             } catch (Exception e) {
-                                Log.e(TAG, "Error creating index for table " + tableName + ": " + e.getMessage());
+                                Log.e(TAG, "Error updating table " + tableName + ": " + e.getMessage());
                             }
                         }
                     } finally {
@@ -135,12 +153,6 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             } catch (Exception e) {
                 Log.e(TAG, "Error during database upgrade: " + e.getMessage());
             }
-        }
-        if (oldVersion < 5) {
-            // Удаляем старые таблицы, если они существуют, и создаем новую
-            db.execSQL("DROP TABLE IF EXISTS \"wifi_data\"");
-            db.execSQL("DROP TABLE IF EXISTS \"cell_data\"");
-            onCreate(db);
         }
     }
     public long addBluetoothDevice(BluetoothDevice device, String tableName) {
@@ -158,6 +170,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         values.put("location_accuracy", device.getLocationAccuracy());
         values.put("timestamp", device.getTimestamp());
         values.put("status", "scanned"); // Статус
+        values.put("folder_name", "");
 
         // Логика поиска/обновления: ищем по MAC-адресу и типу "Bluetooth"
         String selection = "bssid = ? AND type = ?";
@@ -181,6 +194,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         values.put("location_accuracy", device.getLocationAccuracy());
         values.put("timestamp", device.getTimestamp());
         values.put("status", "ignore");
+        values.put("folder_name", "");
 
         String selection = "bssid = ?";
         String[] selectionArgs = {device.getBssid()};
@@ -211,6 +225,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         values.put("location_accuracy", tower.getLocationAccuracy());
         values.put("timestamp", tower.getTimestamp());
         values.put("status", "ignore");
+        values.put("folder_name", "");
 
         String selection = "cell_id = ? AND network_type = ?";
         String[] selectionArgs = {String.valueOf(tower.getCellId()), tower.getNetworkType()};
@@ -472,40 +487,81 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         SQLiteDatabase db = this.getWritableDatabase();
         try {
             String safeName = "\"" + tableName + "\"";
-            String createTableQuery = "CREATE TABLE IF NOT EXISTS " + safeName + " (" +
-                    "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                    "type TEXT NOT NULL," +
-                    "name TEXT," +
-                    "bssid TEXT," +
-                    "signal_strength INTEGER," +
-                    "frequency INTEGER," +
-                    "capabilities TEXT," +
-                    "vendor TEXT," +
-                    "cell_id INTEGER," +
-                    "lac INTEGER," +
-                    "mcc INTEGER," +
-                    "mnc INTEGER," +
-                    "psc INTEGER," +
-                    "pci INTEGER," +
-                    "tac INTEGER," +
-                    "earfcn INTEGER," +
-                    "arfcn INTEGER," +
-                    "signal_quality INTEGER," +
-                    "network_type TEXT," +
-                    "is_registered INTEGER," +
-                    "is_neighbor INTEGER," +
-                    "latitude REAL," +
-                    "longitude REAL," +
-                    "altitude REAL," +
-                    "location_accuracy REAL," +
-                    "timestamp INTEGER," +
-                    "status TEXT DEFAULT 'ignore'," +
-                    "is_uploaded INTEGER DEFAULT 0)"; // Добавляем поле is_uploaded
-            db.execSQL(createTableQuery);
+
+            // Проверяем существование таблицы
+            Cursor cursor = db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                    new String[]{tableName});
+            boolean tableExists = cursor != null && cursor.getCount() > 0;
+            if (cursor != null) cursor.close();
+
+            if (!tableExists) {
+                // Создаем новую таблицу
+                String createTableQuery = "CREATE TABLE " + safeName + " (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                        "type TEXT NOT NULL," +
+                        "name TEXT," +
+                        "bssid TEXT," +
+                        "signal_strength INTEGER," +
+                        "frequency INTEGER," +
+                        "capabilities TEXT," +
+                        "vendor TEXT," +
+                        "cell_id INTEGER," +
+                        "lac INTEGER," +
+                        "mcc INTEGER," +
+                        "mnc INTEGER," +
+                        "psc INTEGER," +
+                        "pci INTEGER," +
+                        "tac INTEGER," +
+                        "earfcn INTEGER," +
+                        "arfcn INTEGER," +
+                        "signal_quality INTEGER," +
+                        "network_type TEXT," +
+                        "is_registered INTEGER," +
+                        "is_neighbor INTEGER," +
+                        "latitude REAL," +
+                        "longitude REAL," +
+                        "altitude REAL," +
+                        "location_accuracy REAL," +
+                        "timestamp INTEGER," +
+                        "status TEXT DEFAULT 'ignore'," +
+                        "is_uploaded INTEGER DEFAULT 0," +
+                        "folder_name TEXT DEFAULT '')"; // Добавляем колонку
+                db.execSQL(createTableQuery);
+            } else {
+                // Проверяем и добавляем недостающие колонки
+                addMissingColumns(db, tableName);
+            }
         } catch (Exception e) {
             Log.e(TAG, "Error creating table " + tableName + ": " + e.getMessage());
         } finally {
             db.close();
+        }
+    }
+
+    private void addMissingColumns(SQLiteDatabase db, String tableName) {
+        try {
+            // Проверяем наличие колонки folder_name
+            Cursor cursor = db.rawQuery("PRAGMA table_info(\"" + tableName + "\")", null);
+            boolean hasFolderColumn = false;
+
+            if (cursor != null) {
+                int nameIndex = cursor.getColumnIndex("name");
+                while (cursor.moveToNext()) {
+                    if (nameIndex >= 0 && "folder_name".equals(cursor.getString(nameIndex))) {
+                        hasFolderColumn = true;
+                        break;
+                    }
+                }
+                cursor.close();
+            }
+
+            // Добавляем колонку если её нет
+            if (!hasFolderColumn) {
+                db.execSQL("ALTER TABLE \"" + tableName + "\" ADD COLUMN folder_name TEXT DEFAULT ''");
+                Log.d(TAG, "Added folder_name column to table: " + tableName);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error adding missing columns to table " + tableName + ": " + e.getMessage());
         }
     }
 

@@ -357,7 +357,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             List<ApiDevice> remainingDevices = uploadManager.getPendingDevicesBatch();
 
             while (!remainingDevices.isEmpty()) {
-                boolean success = uploadManager.uploadBatch(remainingDevices);
+                // ИСПРАВЛЕНИЕ: добавляем второй параметр - имя таблицы
+                boolean success = uploadManager.uploadBatch(remainingDevices, currentScanFolder);
+
                 if (success) {
                     // Отправляем broadcast об успешной отправке
                     Intent intent = new Intent("com.example.santiway.UPLOAD_COMPLETED");
