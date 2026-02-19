@@ -1,13 +1,15 @@
 package com.example.santiway.cell_scanner;
 
+import java.util.Locale;
+
 public class CellTower {
-    private int cellId;
+    private long cellId;
     private int lac; // Location Area Code
     private int mcc; // Mobile Country Code
     private int mnc; // Mobile Network Code
     private int psc; // Primary Scrambling Code (для UMTS)
     private int pci; // Physical Cell ID (для LTE)
-    private int tac; // Tracking Area Code (для LTE)
+    private long tac; // Tracking Area Code (для LTE)
     private int earfcn; // E-UTRA Absolute Radio Frequency Channel Number (для LTE)
     private int arfcn; // Absolute Radio Frequency Channel Number (для GSM/UMTS)
     private int signalStrength;
@@ -25,11 +27,11 @@ public class CellTower {
     public CellTower() {
     }
 
-    public int getCellId() {
+    public long getCellId() {
         return cellId;
     }
 
-    public void setCellId(int cellId) {
+    public void setCellId(long cellId) {
         this.cellId = cellId;
     }
 
@@ -73,11 +75,11 @@ public class CellTower {
         this.pci = pci;
     }
 
-    public int getTac() {
+    public long getTac() {
         return tac;
     }
 
-    public void setTac(int tac) {
+    public void setTac(long tac) {
         this.tac = tac;
     }
 
@@ -185,9 +187,18 @@ public class CellTower {
         this.timestamp = timestamp;
     }
 
+    // Уникальный идентификатор с учетом всех параметров
     public String getUniqueId() {
-        return mcc + "-" + mnc + "-" + lac + "-" + cellId;
+        if (mcc > 0 && mnc > 0) {
+            if ("LTE".equals(networkType) || "5G".equals(networkType)) {
+                return String.format(Locale.US, "%d_%d_%d_%d", mcc, mnc, tac, cellId);
+            } else {
+                return String.format(Locale.US, "%d_%d_%d_%d", mcc, mnc, lac, cellId);
+            }
+        }
+        return String.valueOf(cellId);
     }
+
 
     public String getDescription() {
         return "Cell ID: " + cellId + 

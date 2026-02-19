@@ -115,7 +115,7 @@ public class ApiConfig {
     private static String buildBaseUrl(String serverIp) {
         if (serverIp == null || serverIp.trim().isEmpty()) {
             Log.e(TAG, "Server IP is null or empty, using fallback");
-            return "http://192.168.1.67/"; // fallback
+            return "http://192.168.110.49/"; // fallback
         }
 
         String result = serverIp.trim();

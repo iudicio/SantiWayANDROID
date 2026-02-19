@@ -150,25 +150,36 @@ public class CellScanner {
     }
     
     private boolean isValidTower(CellTower tower) {
-        if (tower.getCellId() <= 0) {
+        // Проверяем Cell ID
+        if (tower.getCellId() <= 0 || tower.getCellId() == 2147483647) {
+            Log.d(TAG, "Invalid Cell ID: " + tower.getCellId());
             return false;
         }
-        
-        // Проверка MCC/MNC для GSM/UMTS/LTE
-        if (tower.getMcc() <= 0 || tower.getMnc() < 0) {
+
+        // Проверяем MCC (должен быть 3 цифры)
+        if (tower.getMcc() < 100 || tower.getMcc() > 999) {
+            Log.d(TAG, "Invalid MCC: " + tower.getMcc());
             return false;
         }
-        
-        // Проверка LAC для GSM/UMTS
-        if (("GSM".equals(tower.getNetworkType()) || "UMTS".equals(tower.getNetworkType())) 
-            && tower.getLac() <= 0) {
+
+        // Проверяем MNC (обычно 2-3 цифры)
+        if (tower.getMnc() < 0 || tower.getMnc() > 999) {
+            Log.d(TAG, "Invalid MNC: " + tower.getMnc());
             return false;
         }
-        
-        // Проверка TAC для LTE/5G
-        if (("LTE".equals(tower.getNetworkType()) || "5G".equals(tower.getNetworkType())) 
-            && tower.getTac() <= 0) {
-            return false;
+
+        // Для LTE проверяем TAC
+        if ("LTE".equals(tower.getNetworkType()) || "5G".equals(tower.getNetworkType())) {
+            if (tower.getTac() <= 0 || tower.getTac() == 2147483647) {
+                Log.d(TAG, "Invalid TAC: " + tower.getTac());
+                return false;
+            }
+        } else {
+            // Для GSM/UMTS проверяем LAC
+            if (tower.getLac() <= 0 || tower.getLac() == 2147483647) {
+                Log.d(TAG, "Invalid LAC: " + tower.getLac());
+                return false;
+            }
         }
         
         return true;

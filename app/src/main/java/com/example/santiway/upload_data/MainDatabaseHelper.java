@@ -24,7 +24,12 @@ import com.example.santiway.R;
 import com.example.santiway.cell_scanner.CellTower;
 import com.example.santiway.wifi_scanner.WifiDevice;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
+import java.text.SimpleDateFormat;
+
 import com.example.santiway.bluetooth_scanner.BluetoothDevice;
 import com.example.santiway.DeviceListActivity;
 
@@ -161,7 +166,11 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         ContentValues values = new ContentValues();
         values.put("type", "Bluetooth"); // Тип устройства
         values.put("name", device.getDeviceName());
-        values.put("bssid", device.getMacAddress()); // Используем bssid для MAC-адреса Bluetooth
+        String macAddress = device.getMacAddress();
+        if (macAddress != null) {
+            macAddress = macAddress.toUpperCase(Locale.US);
+        }
+        values.put("bssid", macAddress);
         values.put("signal_strength", device.getSignalStrength());
         values.put("vendor", device.getVendor());
 
@@ -185,7 +194,11 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         ContentValues values = new ContentValues();
         values.put("type", "Wi-Fi");
         values.put("name", device.getSsid());
-        values.put("bssid", device.getBssid());
+        String bssid = device.getBssid();
+        if (bssid != null) {
+            bssid = bssid.toUpperCase(Locale.US);
+        }
+        values.put("bssid", bssid);
         values.put("signal_strength", device.getSignalStrength());
         values.put("frequency", device.getFrequency());
         values.put("capabilities", device.getCapabilities());
@@ -235,73 +248,188 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     }
 
     private long addOrUpdateUnifiedDevice(String tableName, ContentValues values, String selection, String[] selectionArgs, long newTimestamp) {
-        SQLiteDatabase db = this.getWritableDatabase();
-        long result = -1;
+        SQLiteDatabase db = null;
         Cursor cursor = null;
+        long result = -1;
 
         try {
-            // 1. Определяем уникальный ID устройства (MAC-адрес или Cell ID вышки)
-            String uniqueId = values.getAsString("bssid");
-            if (uniqueId == null && values.containsKey("cell_id")) {
-                uniqueId = String.valueOf(values.getAsInteger("cell_id"));
-            }
+            db = this.getWritableDatabase();
 
-            if (uniqueId != null) {
-                double curLat = values.getAsDouble("latitude");
-                double curLon = values.getAsDouble("longitude");
+            // Определяем уникальный ID устройства
+            String uniqueId = null;
+            String bssid = values.getAsString("bssid");
 
-                // 2. Рассчитываем статус (ваша логика движения)
-                String calculatedStatus = evaluateTargetStatus(uniqueId, curLat, curLon, newTimestamp, tableName);
-                values.put("status", calculatedStatus);
+            if (bssid != null && !bssid.isEmpty()) {
+                uniqueId = bssid.toUpperCase(Locale.US);
+            } else {
+                // Для сотовых вышек используем составной ключ
+                Long cellId = values.getAsLong("cell_id");
+                Integer mcc = values.getAsInteger("mcc");
+                Integer mnc = values.getAsInteger("mnc");
+                Long tac = values.getAsLong("tac");
+                Integer lac = values.getAsInteger("lac");
+                String networkType = values.getAsString("network_type");
 
-                // 3. Если статус стал "Target", обрабатываем уведомление
-                if ("Target".equals(calculatedStatus)) {
-                    NotificationDatabaseHelper notifDb = new NotificationDatabaseHelper(mContext);
-
-                    String deviceName = values.getAsString("name");
-                    String type = values.getAsString("type");
-
-                    // А) ЗАПИСЬ В БАЗУ — Делаем ВСЕГДА для каждого из 300 устройств.
-                    // Так во вкладке "Уведомления" у тебя будет 300 записей.
-                    NotificationData alert = new NotificationData(
-                            java.util.UUID.randomUUID().toString(),
-                            "Target: " + (type != null ? type : "Unknown"),
-                            "Устройство " + (deviceName != null ? deviceName : uniqueId) + " в движении!",
-                            new java.util.Date(),
-                            NotificationData.NotificationType.ALARM,
-                            null, null, curLat, curLon
-                    );
-                    notifDb.addNotification(alert, uniqueId);
-
-                    // Б) ЗВУК И ВИБРАЦИЯ — Только если прошла минута с последнего "писка"
-                    long currentTime = System.currentTimeMillis();
-                    if (currentTime - lastGlobalSoundTime > SOUND_INTERVAL) {
-                        lastGlobalSoundTime = currentTime; // Запоминаем время этого звука
-
-                        // Отправляем ОДНО системное уведомление со звуком
-                        sendSystemNotification(
-                                "Внимание: Обнаружены цели!",
-                                "Несколько устройств в движении. Проверьте список."
-                        );
+                if (cellId != null && cellId > 0 && cellId != 2147483647) {
+                    if ("LTE".equals(networkType) || "5G".equals(networkType)) {
+                        // Для LTE/5G: MCC_MNC_TAC_CI
+                        uniqueId = String.format(Locale.US, "%d_%d_%d_%d",
+                                mcc != null ? mcc : 0,
+                                mnc != null ? mnc : 0,
+                                tac != null ? tac : 0,
+                                cellId);
+                    } else {
+                        // Для GSM/UMTS: MCC_MNC_LAC_CI
+                        uniqueId = String.format(Locale.US, "%d_%d_%d_%d",
+                                mcc != null ? mcc : 0,
+                                mnc != null ? mnc : 0,
+                                lac != null ? lac : 0,
+                                cellId);
                     }
                 }
             }
 
-            // 5. Работа с основной базой данных (Update или Insert)
-            db.beginTransaction();
-            cursor = db.query("\"" + tableName + "\"", new String[]{"id", "timestamp", "status"}, selection, selectionArgs, null, null, null);
+            if (uniqueId == null || uniqueId.isEmpty()) {
+                Log.d(TAG, "Skipping device without unique identifier");
+                return -1;
+            }
 
+            // 2. ЖЕСТКАЯ ДЕДУПЛИКАЦИЯ: проверяем точное совпадение за последние 2 секунды
+            String checkQuery;
+            String[] checkArgs;
+
+            if (bssid != null) {
+                checkQuery = "SELECT COUNT(*) FROM \"" + tableName + "\" " +
+                        "WHERE bssid = ? AND ABS(timestamp - ?) <= 2000";
+                checkArgs = new String[]{uniqueId, String.valueOf(newTimestamp)};
+            } else {
+                // Для сотовых вышек ищем по составному ключу
+                checkQuery = "SELECT COUNT(*) FROM \"" + tableName + "\" " +
+                        "WHERE type = 'Cell' AND " +
+                        "cell_id = ? AND mcc = ? AND mnc = ? AND " +
+                        "ABS(timestamp - ?) <= 2000";
+
+                Long cellId = values.getAsLong("cell_id");
+                Integer mcc = values.getAsInteger("mcc");
+                Integer mnc = values.getAsInteger("mnc");
+
+                checkArgs = new String[]{
+                        String.valueOf(cellId),
+                        String.valueOf(mcc),
+                        String.valueOf(mnc),
+                        String.valueOf(newTimestamp)
+                };
+            }
+
+            cursor = db.rawQuery(checkQuery, checkArgs);
+            if (cursor != null && cursor.moveToFirst()) {
+                int count = cursor.getInt(0);
+                if (count > 0) {
+                    String timeStr = new SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                            .format(new Date(newTimestamp));
+                    Log.d(TAG, "⚠️ DUPLICATE BLOCKED: " + uniqueId + " at " + timeStr);
+                    return -1;
+                }
+            }
+
+            if (cursor != null) {
+                cursor.close();
+                cursor = null;
+            }
+
+            // 4. Получаем координаты
+            Double curLat = values.getAsDouble("latitude");
+            Double curLon = values.getAsDouble("longitude");
+            Double curAlt = values.getAsDouble("altitude");
+            Float curAcc = values.getAsFloat("location_accuracy");
+
+            // 5. Если есть координаты, рассчитываем статус
+            if (curLat != null && curLon != null) {
+                try {
+                    String calculatedStatus = evaluateTargetStatus(uniqueId, curLat, curLon, newTimestamp, tableName);
+                    values.put("status", calculatedStatus);
+                    Log.d(TAG, "Status for " + uniqueId + ": " + calculatedStatus);
+
+                    // 6. Если статус "Target", создаем уведомление
+                    if ("Target".equals(calculatedStatus)) {
+                        createTargetNotification(values, uniqueId, curLat, curLon);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error calculating status: " + e.getMessage());
+                }
+            }
+
+            // 7. Добавляем запись в основную таблицу
+            db.beginTransaction();
             result = db.insert("\"" + tableName + "\"", null, values);
+
+            if (result != -1) {
+                addToUniqueDevices(db, values);
+            }
+
             db.setTransactionSuccessful();
+
         } catch (Exception e) {
-            android.util.Log.e("STATUS_CHECK", "Ошибка в addOrUpdateUnifiedDevice: " + e.getMessage());
+            Log.e(TAG, "Error: " + e.getMessage());
         } finally {
             if (cursor != null) cursor.close();
             if (db != null && db.isOpen()) {
-                db.endTransaction();
+                try {
+                    db.endTransaction();
+                } catch (Exception e) {
+                    Log.e(TAG, "Error ending transaction: " + e.getMessage());
+                }
+                db.close();
             }
         }
         return result;
+    }
+
+    /**
+     * Создает уведомление для Target устройств
+     */
+    private void createTargetNotification(ContentValues values, String uniqueId, double lat, double lon) {
+        try {
+            String type = values.getAsString("type");
+            String name = values.getAsString("name");
+
+            if (name == null || name.isEmpty()) {
+                name = "Unknown";
+            }
+
+            NotificationDatabaseHelper notifDb = new NotificationDatabaseHelper(mContext);
+
+            String title = "Target: " + type;
+            String message = String.format(Locale.getDefault(),
+                    "Устройство %s (%s) в движении!\nКоординаты: %.6f, %.6f",
+                    name, uniqueId, lat, lon);
+
+            NotificationData alert = new NotificationData(
+                    UUID.randomUUID().toString(),
+                    title,
+                    message,
+                    new Date(),
+                    NotificationData.NotificationType.ALARM,
+                    null, null, lat, lon
+            );
+
+            notifDb.addNotification(alert, uniqueId);
+
+            // Глобальное уведомление (не чаще раза в час)
+            long currentTime = System.currentTimeMillis();
+            if (currentTime - lastGlobalSoundTime > SOUND_INTERVAL) {
+                lastGlobalSoundTime = currentTime;
+                sendSystemNotification(
+                        "Внимание: Обнаружены цели!",
+                        "Новые движущиеся устройства. Проверьте список."
+                );
+            }
+
+            Log.d(TAG, "🔔 Target notification created for: " + uniqueId);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error creating notification: " + e.getMessage());
+        }
     }
     public void clearTableData(String tableName) {
         SQLiteDatabase db = this.getWritableDatabase();
@@ -368,27 +496,26 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = null;
         try {
-            // 1. Добавляем 'status' в SQL запрос
-            String sql = "SELECT type, name, bssid, latitude, longitude, timestamp, status " +
+            // УБИРАЕМ фильтр по типу или добавляем Cell
+            String sql = "SELECT type, name, bssid, cell_id, latitude, longitude, timestamp, status " +
                     "FROM \"" + tableName + "\" " +
-                    "WHERE type IN ('Wi-Fi', 'Bluetooth') " +
-                    "ORDER BY timestamp DESC " +
+                    "ORDER BY timestamp DESC " +  // Убрали WHERE type IN (...)
                     "LIMIT ? OFFSET ?";
 
             cursor = db.rawQuery(sql, new String[]{String.valueOf(limit), String.valueOf(offset)});
 
             if (cursor != null && cursor.moveToFirst()) {
                 do {
-                    String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
                     String type = cursor.getString(cursor.getColumnIndexOrThrow("type"));
+                    String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
                     String mac = cursor.getString(cursor.getColumnIndexOrThrow("bssid"));
+                    int cellId = cursor.getInt(cursor.getColumnIndexOrThrow("cell_id"));
                     double lat = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
                     double lon = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
                     long ts = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
 
-                    // 2. ЧИТАЕМ СТАТУС ИЗ БАЗЫ (а не пишем его вручную)
                     int statusIdx = cursor.getColumnIndex("status");
-                    String currentStatus = "scanned"; // значение по умолчанию
+                    String currentStatus = "scanned";
                     if (statusIdx != -1) {
                         String dbStatus = cursor.getString(statusIdx);
                         if (dbStatus != null && !dbStatus.isEmpty()) {
@@ -399,14 +526,17 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                     String loc = String.format("Lat: %.4f, Lon: %.4f", lat, lon);
                     String time = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date(ts));
 
-                    // 3. ПЕРЕДАЕМ ПЕРЕМЕННУЮ currentStatus
-                    deviceList.add(new DeviceListActivity.Device(name, type, loc, time, mac, currentStatus));
+                    // Для Cell устройств используем cell_id как идентификатор
+                    String deviceId = ("Cell".equals(type)) ? String.valueOf(cellId) : mac;
+
+                    deviceList.add(new DeviceListActivity.Device(name, type, loc, time, deviceId, currentStatus));
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
             Log.e(TAG, "Pagination error: " + e.getMessage());
         } finally {
             if (cursor != null) cursor.close();
+            db.close(); // Добавляем закрытие БД
         }
         return deviceList;
     }
@@ -862,5 +992,95 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             this.timestamp = time;
             this.mac = mac;
         }
+    }
+
+    /**
+     * Добавляет устройство в таблицу уникальных устройств, используя существующее соединение с БД
+     */
+    public void addToUniqueDevices(SQLiteDatabase db, ContentValues deviceData) {
+        try {
+            UniqueDevicesHelper helper = new UniqueDevicesHelper(mContext);
+            // Добавляем или обновляем устройство, используя переданное соединение
+            helper.addOrUpdateDevice(db, deviceData);
+        } catch (Exception e) {
+            Log.e(TAG, "Ошибка добавления в уникальные устройства: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Добавляет устройство в таблицу уникальных устройств (создает новое соединение)
+     * Используйте этот метод только вне транзакций!
+     */
+    public void addToUniqueDevices(ContentValues deviceData) {
+        SQLiteDatabase db = null;
+        try {
+            db = this.getWritableDatabase();
+            db.beginTransaction();
+
+            addToUniqueDevices(db, deviceData);
+
+            db.setTransactionSuccessful();
+        } catch (Exception e) {
+            Log.e(TAG, "Ошибка добавления в уникальные устройства: " + e.getMessage());
+        } finally {
+            if (db != null && db.isOpen()) {
+                try {
+                    db.endTransaction();
+                } catch (Exception e) {
+                    Log.e(TAG, "Error ending transaction: " + e.getMessage());
+                }
+                db.close();
+            }
+        }
+    }
+
+    /**
+     * Получает helper для работы с уникальными устройствами
+     */
+    public UniqueDevicesHelper getUniqueDevicesHelper() {
+        return new UniqueDevicesHelper(mContext);
+    }
+
+    /**
+     * Получает последнюю запись устройства из unified_data
+     */
+    public ContentValues getLatestDeviceData(String uniqueId, String type) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        ContentValues values = null;
+
+        try {
+            String column = uniqueId.contains(":") ? "bssid" : "cell_id";
+            String query = "SELECT * FROM \"unified_data\" WHERE " + column + " = ? " +
+                    "ORDER BY timestamp DESC LIMIT 1";
+
+            cursor = db.rawQuery(query, new String[]{uniqueId});
+
+            if (cursor != null && cursor.moveToFirst()) {
+                values = new ContentValues();
+                String[] columns = cursor.getColumnNames();
+                for (String col : columns) {
+                    int index = cursor.getColumnIndex(col);
+                    switch (cursor.getType(index)) {
+                        case Cursor.FIELD_TYPE_STRING:
+                            values.put(col, cursor.getString(index));
+                            break;
+                        case Cursor.FIELD_TYPE_INTEGER:
+                            values.put(col, cursor.getLong(index));
+                            break;
+                        case Cursor.FIELD_TYPE_FLOAT:
+                            values.put(col, cursor.getDouble(index));
+                            break;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting latest device data: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            db.close();
+        }
+
+        return values;
     }
 }

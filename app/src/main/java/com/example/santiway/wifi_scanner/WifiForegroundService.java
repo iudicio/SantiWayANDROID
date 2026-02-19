@@ -26,8 +26,10 @@ import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 
+import java.util.HashSet;
 import java.util.List;
 import java.lang.IllegalArgumentException;
+import java.util.Set;
 
 
 public class WifiForegroundService extends Service {
@@ -48,6 +50,7 @@ public class WifiForegroundService extends Service {
     private double currentAltitude = 0.0;
     private float currentAccuracy = 0.0f;
     private float minSignalStrength = -100.0f; // Значение по умолчанию
+    private Set<String> processedInCurrentScan = new HashSet<>();
 
     @Override
     public void onCreate() {
@@ -282,6 +285,7 @@ public class WifiForegroundService extends Service {
     private void processScanResults(List<ScanResult> scanResults) {
         int savedCount = 0;
         int filteredCount = 0;
+        processedInCurrentScan.clear();
 
         for (ScanResult result : scanResults) {
             // Фильтруем по силе сигнала
@@ -290,8 +294,15 @@ public class WifiForegroundService extends Service {
                 continue; // Пропускаем устройства со слабым сигналом
             }
 
-            // Filter out hidden networks and invalid results
             if (result.SSID != null && !result.SSID.isEmpty() && result.BSSID != null) {
+                // Проверяем дубликаты в текущем сканировании
+                String key = result.BSSID + "_" + (System.currentTimeMillis() / 1000);
+                if (processedInCurrentScan.contains(key)) {
+                    Log.d(TAG, "⏱️ Duplicate WiFi in current scan: " + result.BSSID);
+                    continue;
+                }
+                processedInCurrentScan.add(key);
+
                 if (saveToDatabase(result)) {
                     savedCount++;
                 }

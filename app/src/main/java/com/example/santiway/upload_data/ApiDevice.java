@@ -13,6 +13,10 @@ public class ApiDevice {
     private String detected_at;
     private String folder_name;
     private String system_folder_name;
+    private Integer mcc;
+    private Integer mnc;
+    private Long tac;
+    private Integer lac;
 
     // Конструктор
     public ApiDevice() {}
@@ -53,4 +57,15 @@ public class ApiDevice {
 
     public String getSystem_folder_name() { return system_folder_name; }
     public void setSystem_folder_name(String system_folder_name) { this.system_folder_name = system_folder_name; }
+    public Integer getMcc() { return mcc; }
+    public void setMcc(Integer mcc) { this.mcc = mcc; }
+
+    public Integer getMnc() { return mnc; }
+    public void setMnc(Integer mnc) { this.mnc = mnc; }
+
+    public Long getTac() { return tac; }
+    public void setTac(Long tac) { this.tac = tac; }
+
+    public Integer getLac() { return lac; }
+    public void setLac(Integer lac) { this.lac = lac; }
 }
