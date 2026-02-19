@@ -28,11 +28,11 @@ public class BluetoothDevice {
     }
 
     public String getMacAddress() {
-        return macAddress;
+        return macAddress.toUpperCase();
     }
 
     public void setMacAddress(String macAddress) {
-        this.macAddress = macAddress;
+        this.macAddress = macAddress.toUpperCase();
     }
 
     public int getSignalStrength() {

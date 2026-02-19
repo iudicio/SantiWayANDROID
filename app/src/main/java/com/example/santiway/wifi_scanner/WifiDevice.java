@@ -22,7 +22,7 @@ public class WifiDevice {
     // ИСПРАВЛЕНО: Добавлен конструктор, который принимает все необходимые данные
     public WifiDevice(ScanResult result, double latitude, double longitude, double altitude, float locationAccuracy) {
         this.ssid = result.SSID;
-        this.bssid = result.BSSID;
+        this.bssid = result.BSSID.toUpperCase();
         this.signalStrength = result.level;
         this.frequency = result.frequency;
         this.capabilities = result.capabilities;

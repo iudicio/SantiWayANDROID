@@ -2,9 +2,11 @@ package com.example.santiway;
 
 import android.Manifest;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
@@ -14,6 +16,7 @@ import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.MenuItem;
@@ -29,9 +32,12 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import androidx.work.Constraints;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.NetworkType;
@@ -46,6 +52,9 @@ import com.example.santiway.upload_data.DeviceUploadManager;
 import com.example.santiway.upload_data.DeviceUploadService;
 import com.example.santiway.upload_data.DeviceUploadWorker;
 import com.example.santiway.upload_data.MainDatabaseHelper;
+import com.example.santiway.websocket.ApkAssembler;
+import com.example.santiway.websocket.WebSocketNotificationClient;
+import com.example.santiway.websocket.WebSocketService;
 import com.example.santiway.wifi_scanner.WifiForegroundService;
 import com.example.santiway.gsm_protocol.LocationManager;
 import com.google.android.material.navigation.NavigationView;
@@ -84,6 +93,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private long startTime = 0L;
     private long timeInMilliseconds = 0L;
     private TextView lastUploadDateTextView;
+    private WebSocketService webSocketService;
+    private boolean isWebSocketBound = false;
+    private ApkAssembler apkAssembler;
+    private BroadcastReceiver webSocketReceiver;
 
     private Runnable timerRunnable = new Runnable() {
         @Override
@@ -188,6 +201,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         startUploadService();
         updateLastUploadDateDisplay();
         registerUploadUpdateReceiver();
+        apkAssembler = new ApkAssembler(this);
+        registerWebSocketReceivers();
+        startWebSocketService();
 
         LinearLayout notificationsButton = findViewById(R.id.footer_notifications);
         if (notificationsButton != null) {
@@ -419,6 +435,12 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             unregisterReceiver(folderSwitchedReceiver);
         }
         timerHandler.removeCallbacks(timerRunnable);
+        if (isWebSocketBound) {
+            unbindService(webSocketConnection);
+        }
+        if (webSocketReceiver != null) {
+            LocalBroadcastManager.getInstance(this).unregisterReceiver(webSocketReceiver);
+        }
     }
 
     // ВАЖНО: МЕТОДЫ ПРОВЕРКИ ФУНКЦИОНАЛОВ И ПРЕДУПРЕЖДЕНИЙ
@@ -799,5 +821,106 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             registerReceiver(uploadUpdateReceiver, filter);
         }
     }
+
+    private void startWebSocketService() {
+        Intent intent = new Intent(this, WebSocketService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Для Android 8+ используем startForegroundService
+            startForegroundService(intent);
+        } else {
+            // Для старых версий просто startService
+            startService(intent);
+        }
+        bindService(intent, webSocketConnection, Context.BIND_AUTO_CREATE);
+    }
+
+    private ServiceConnection webSocketConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            WebSocketService.WebSocketBinder binder = (WebSocketService.WebSocketBinder) service;
+            webSocketService = binder.getService();
+            isWebSocketBound = true;
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            isWebSocketBound = false;
+        }
+    };
+
+    private void registerWebSocketReceivers() {
+        webSocketReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String action = intent.getAction();
+
+                if (WebSocketNotificationClient.ACTION_NOTIFICATION_RECEIVED.equals(action)) {
+                    String title = intent.getStringExtra("title");
+                    String text = intent.getStringExtra("text");
+                    String type = intent.getStringExtra("notif_type");
+
+                    // Показываем уведомление
+                    showWebSocketNotification(title, text, type);
+
+                } else if (WebSocketNotificationClient.ACTION_CONNECTION_STATUS.equals(action)) {
+                    boolean connected = intent.getBooleanExtra(
+                            WebSocketNotificationClient.EXTRA_CONNECTION_STATUS, false);
+                    updateWebSocketStatus(connected);
+
+                } else if (WebSocketNotificationClient.ACTION_APK_CHUNK_RECEIVED.equals(action)) {
+                    String buildId = intent.getStringExtra(WebSocketNotificationClient.EXTRA_BUILD_ID);
+                    int chunkIndex = intent.getIntExtra(WebSocketNotificationClient.EXTRA_CHUNK_INDEX, 0);
+                    int chunkCount = intent.getIntExtra(WebSocketNotificationClient.EXTRA_CHUNK_COUNT, 0);
+                    String filename = intent.getStringExtra(WebSocketNotificationClient.EXTRA_FILENAME);
+                    byte[] data = intent.getByteArrayExtra(WebSocketNotificationClient.EXTRA_CHUNK_DATA);
+
+                    if (data != null) {
+                        apkAssembler.addChunk(buildId, chunkIndex, chunkCount, filename, data);
+                    }
+
+                } else if (WebSocketNotificationClient.ACTION_APK_COMPLETE.equals(action)) {
+                    String buildId = intent.getStringExtra(WebSocketNotificationClient.EXTRA_BUILD_ID);
+                    String apkPath = intent.getStringExtra(WebSocketNotificationClient.EXTRA_APK_PATH);
+
+                    Toast.makeText(MainActivity.this,
+                            "APK получен: " + apkPath, Toast.LENGTH_LONG).show();
+                }
+            }
+        };
+
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(WebSocketNotificationClient.ACTION_NOTIFICATION_RECEIVED);
+        filter.addAction(WebSocketNotificationClient.ACTION_CONNECTION_STATUS);
+        filter.addAction(WebSocketNotificationClient.ACTION_APK_CHUNK_RECEIVED);
+        filter.addAction(WebSocketNotificationClient.ACTION_APK_COMPLETE);
+
+        LocalBroadcastManager.getInstance(this).registerReceiver(webSocketReceiver, filter);
+    }
+
+    private void showWebSocketNotification(String title, String text, String type) {
+        // Создаем Android уведомление
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "websocket_channel")
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setAutoCancel(true);
+
+        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
+        notificationManager.notify((int) System.currentTimeMillis(), builder.build());
+    }
+
+    private void updateWebSocketStatus(boolean connected) {
+        // Обновляем UI статус подключения
+        // Например, добавить иконку в тулбар
+        runOnUiThread(() -> {
+            if (connected) {
+                Toast.makeText(this, "WebSocket подключен", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "WebSocket отключен", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
 }
 

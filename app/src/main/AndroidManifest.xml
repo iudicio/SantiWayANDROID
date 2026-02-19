@@ -137,8 +137,11 @@
             android:name=".upload_data.DeviceUploadService"
             android:exported="false"
             android:foregroundServiceType="dataSync">
-
         </service>
+
+        <!--Сервис WebSocket подключения -->
+        <service android:name=".websocket.WebSocketService"
+            android:exported="false" />
     </application>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
