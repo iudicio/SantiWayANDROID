@@ -83,12 +83,33 @@ public class NotificationDatabaseHelper extends SQLiteOpenHelper {
 
     public boolean isUniqueAlert(String deviceId) {
         SQLiteDatabase db = this.getReadableDatabase();
-        long hourAgo = System.currentTimeMillis() - 3600000;
-        Cursor c = db.query(TABLE_NAME, null, COL_DEVICE_ID + " = ? AND " + COL_TIMESTAMP + " > ?",
-                new String[]{deviceId, String.valueOf(hourAgo)}, null, null, null);
-        boolean unique = c.getCount() == 0;
-        c.close();
-        return unique;
+
+        // Ищем самое последнее уведомление для данного устройства
+        // Сортируем по timestamp в обратном порядке и берем 1 запись
+        Cursor c = db.query(TABLE_NAME,
+                new String[]{COL_TIMESTAMP},
+                COL_DEVICE_ID + " = ?",
+                new String[]{deviceId},
+                null, null,
+                COL_TIMESTAMP + " DESC",
+                "1");
+
+        if (c != null && c.moveToFirst()) {
+            long lastTimestamp = c.getLong(c.getColumnIndexOrThrow(COL_TIMESTAMP));
+            c.close();
+
+            long currentTime = System.currentTimeMillis();
+            long oneHourInMillis = 3600000;
+
+            // Если с момента последнего уведомления прошло БОЛЬШЕ часа,
+            // значит устройство "новое" (или вернулось), возвращаем true (нужно уведомление)
+            return (currentTime - lastTimestamp) > oneHourInMillis;
+        }
+
+        if (c != null) c.close();
+
+        // Если уведомлений для этого устройства вообще не было в базе - возвращаем true
+        return true;
     }
 
     public void deleteNotification(String id) {
