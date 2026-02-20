@@ -89,43 +89,45 @@ public class DeviceUploadManager {
      * ПОЛУЧАЕТ ДАННЫЕ ДЛЯ ОТПРАВКИ ИЗ unified_data
      * Важно: получаем записи с is_uploaded = 0
      */
-    public List<ApiDevice> getPendingDevicesBatch() {
-        List<ApiDevice> devices = new ArrayList<>();
+    public List<PendingUpload> getPendingUploadsBatch() {
+        List<PendingUpload> items = new ArrayList<>();
         SQLiteDatabase db = null;
         Cursor cursor = null;
 
         try {
             db = databaseHelper.getReadableDatabase();
 
-            // ВАЖНО: выбираем ТОЛЬКО is_uploaded = 0
-            String query = "SELECT * FROM \"unified_data\" " +
-                    "WHERE is_uploaded = 0 " +
-                    "ORDER BY timestamp ASC LIMIT " + BATCH_SIZE;
+            String query =
+                    "SELECT id, * FROM \"unified_data\" " +
+                            "WHERE is_uploaded = 0 " +
+                            "ORDER BY timestamp ASC LIMIT " + BATCH_SIZE;
 
             cursor = db.rawQuery(query, null);
 
             if (cursor != null && cursor.moveToFirst()) {
+                int idCol = cursor.getColumnIndexOrThrow("id");
+
                 do {
+                    long rowId = cursor.getLong(idCol);
                     ApiDevice device = cursorToApiDevice(cursor);
                     if (device != null) {
-                        devices.add(device);
-
-                        // Для отладки
-                        Log.d(TAG, "Pending device: " + device.getDevice_id() +
-                                " at " + device.getDetected_at());
+                        items.add(new PendingUpload(rowId, device));
+                        Log.d(TAG, "Pending rowId=" + rowId + " device=" + device.getDevice_id()
+                                + " at " + device.getDetected_at());
                     }
                 } while (cursor.moveToNext());
             }
 
-            Log.d(TAG, "Found " + devices.size() + " pending devices to upload from unified_data");
+            Log.d(TAG, "Found " + items.size() + " pending uploads");
         } catch (Exception e) {
-            Log.e(TAG, "Error getting pending devices: " + e.getMessage(), e);
+            Log.e(TAG, "Error getting pending uploads: " + e.getMessage(), e);
         } finally {
             if (cursor != null) cursor.close();
+            // db.close() обычно не обязательно, но оставлю как у тебя:
             if (db != null && db.isOpen()) db.close();
         }
 
-        return devices;
+        return items;
     }
 
     /**
@@ -211,11 +213,11 @@ public class DeviceUploadManager {
     /**
      * ОТПРАВКА БАТЧА ДАННЫХ НА СЕРВЕР
      */
-    public boolean uploadBatch(List<ApiDevice> devices) {
-        if (devices == null || devices.isEmpty()) return false;
+    public boolean uploadBatch(List<PendingUpload> items) {
+        if (items == null || items.isEmpty()) return false;
 
         Log.d(TAG, "=== UPLOAD BATCH START ===");
-        Log.d(TAG, "Devices count: " + devices.size());
+        Log.d(TAG, "Items count: " + items.size());
 
         String endpoint;
         if (baseUrl.contains("/api/")) {
@@ -230,13 +232,20 @@ public class DeviceUploadManager {
         int attempt = 0;
         long backoff = 1000;
 
+        List<Long> ids = new java.util.ArrayList<>(items.size());
+
         while (attempt < MAX_RETRY_ATTEMPTS) {
             attempt++;
             Log.d(TAG, "Upload attempt " + attempt);
 
             try {
                 JsonArray jsonArray = new JsonArray();
-                for (ApiDevice device : devices) {
+                ids.clear();
+
+                for (PendingUpload item : items) {
+                    ApiDevice device = item.device;
+                    ids.add(item.rowId);
+
                     JsonObject json = new JsonObject();
                     json.addProperty("device_id", device.getDevice_id());
                     json.addProperty("network_type", device.getNetwork_type());
@@ -268,18 +277,18 @@ public class DeviceUploadManager {
                 Log.d(TAG, "Response code: " + response.code());
 
                 if (response.isSuccessful()) {
-                    Log.i(TAG, "✅ SUCCESS: Uploaded " + devices.size() + " devices");
+                    Log.i(TAG, "✅ SUCCESS: Uploaded " + items.size() + " devices");
 
-                    // Помечаем отправленные устройства в unified_data
-                    markDevicesAsUploaded(devices);
+                    markRowsAsUploaded(ids);
 
                     saveLastUploadTime();
 
-                    // Отправляем broadcast об успешной отправке
-                    android.content.Intent intent = new android.content.Intent("com.example.santiway.UPLOAD_COMPLETED");
-                    intent.putExtra("device_count", devices.size());
+                    android.content.Intent intent =
+                            new android.content.Intent("com.example.santiway.UPLOAD_COMPLETED");
+                    intent.putExtra("device_count", items.size());
                     intent.putExtra("timestamp", System.currentTimeMillis());
-                    androidx.localbroadcastmanager.content.LocalBroadcastManager.getInstance(context).sendBroadcast(intent);
+                    androidx.localbroadcastmanager.content.LocalBroadcastManager
+                            .getInstance(context).sendBroadcast(intent);
 
                     return true;
                 } else {
@@ -315,86 +324,36 @@ public class DeviceUploadManager {
      * ПОМЕЧАЕТ ОТПРАВЛЕННЫЕ УСТРОЙСТВА В unified_data
      * Важно: помечаем по связке device_id + timestamp
      */
-    private void markDevicesAsUploaded(List<ApiDevice> devices) {
-        if (devices == null || devices.isEmpty()) return;
+    private void markRowsAsUploaded(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return;
 
         SQLiteDatabase db = null;
-        int successCount = 0;
-        int totalDevices = devices.size();
-
         try {
             db = databaseHelper.getWritableDatabase();
             db.beginTransaction();
 
-            for (ApiDevice device : devices) {
-                try {
-                    String deviceId = device.getDevice_id();
-                    String detectedAt = device.getDetected_at();
+            for (int start = 0; start < ids.size(); start += BATCH_SIZE) {
+                int end = Math.min(start + BATCH_SIZE, ids.size());
+                List<Long> batch = ids.subList(start, end);
 
-                    // Конвертируем ISO время в timestamp
-                    long timestamp = isoToTimestamp(detectedAt);
-
-                    // Для отладки - покажем, что ищем
-                    Log.d(TAG, "Looking for device: " + deviceId + " at timestamp: " + timestamp + " (" + detectedAt + ")");
-
-                    ContentValues values = new ContentValues();
-                    values.put("is_uploaded", 1);
-
-                    int updated = 0;
-
-                    if (deviceId != null && !deviceId.isEmpty()) {
-                        if (deviceId.contains(":")) { // MAC-адрес
-                            // Ищем с учетом возможной разницы в 1-2 секунды
-                            updated = db.update(
-                                    "\"unified_data\"",
-                                    values,
-                                    "bssid = ? AND ABS(timestamp - ?) <= 2000 AND is_uploaded = 0",
-                                    new String[]{deviceId, String.valueOf(timestamp)}
-                            );
-
-                            Log.d(TAG, "MAC update for " + deviceId + " @ " + timestamp + " -> rows: " + updated);
-
-                        } else { // cell_id
-                            // Для Cell ID тоже учитываем погрешность
-                            updated = db.update(
-                                    "\"unified_data\"",
-                                    values,
-                                    "cell_id = ? AND ABS(timestamp - ?) <= 2000 AND is_uploaded = 0",
-                                    new String[]{deviceId, String.valueOf(timestamp)}
-                            );
-
-                            Log.d(TAG, "CELL update for " + deviceId + " @ " + timestamp + " -> rows: " + updated);
-                        }
-                    }
-
-                    if (updated > 0) {
-                        successCount++;
-                        Log.d(TAG, "✓ Marked device: " + deviceId + " at " + detectedAt);
-                    } else {
-                        Log.w(TAG, "✗ Could not mark device: " + deviceId + " at " + detectedAt);
-
-                        // ДОПОЛНИТЕЛЬНО: Проверим, есть ли такая запись в БД
-                        checkIfRecordExists(db, deviceId, timestamp);
-                    }
-
-                } catch (Exception e) {
-                    Log.e(TAG, "Error marking device: " + e.getMessage());
+                StringBuilder ph = new StringBuilder();
+                String[] args = new String[batch.size()];
+                for (int i = 0; i < batch.size(); i++) {
+                    if (i > 0) ph.append(",");
+                    ph.append("?");
+                    args[i] = String.valueOf(batch.get(i));
                 }
+
+                ContentValues v = new ContentValues();
+                v.put("is_uploaded", 1);
+
+                db.update("\"unified_data\"", v, "id IN (" + ph + ")", args);
             }
 
             db.setTransactionSuccessful();
-            Log.i(TAG, String.format("✅ Marked %d out of %d devices as uploaded",
-                    successCount, totalDevices));
-
-        } catch (Exception e) {
-            Log.e(TAG, "Fatal error in markDevicesAsUploaded: " + e.getMessage(), e);
         } finally {
             if (db != null) {
-                try {
-                    db.endTransaction();
-                } catch (Exception e) {
-                    Log.e(TAG, "Error ending transaction: " + e.getMessage());
-                }
+                db.endTransaction();
                 db.close();
             }
         }
@@ -497,4 +456,15 @@ public class DeviceUploadManager {
     public void cleanup() {
         // Ничего не делаем
     }
+
+    public static class PendingUpload {
+        public final long rowId;
+        public final ApiDevice device;
+
+        public PendingUpload(long rowId, ApiDevice device) {
+            this.rowId = rowId;
+            this.device = device;
+        }
+    }
 }
+

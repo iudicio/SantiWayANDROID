@@ -66,17 +66,17 @@ public class DeviceUploadService extends Service {
                     return;
                 }
 
-                List<ApiDevice> devices = uploadManager.getPendingDevicesBatch();
-                Log.d(TAG, "Found " + devices.size() + " devices to upload");
+                List<DeviceUploadManager.PendingUpload> items = uploadManager.getPendingUploadsBatch();
+                Log.d(TAG, "Found " + items.size() + " devices to upload");
 
-                if (!devices.isEmpty()) {
-                    boolean success = uploadManager.uploadBatch(devices);
+                if (!items.isEmpty()) {
+                    boolean success = uploadManager.uploadBatch(items);
 
                     if (success) {
-                        Log.i(TAG, "✅ Successfully uploaded " + devices.size() + " devices");
+                        Log.i(TAG, "✅ Successfully uploaded " + items.size() + " devices");
 
                         Intent intent = new Intent("com.example.santiway.UPLOAD_COMPLETED");
-                        intent.putExtra("device_count", devices.size());
+                        intent.putExtra("device_count", items.size());
                         intent.putExtra("timestamp", System.currentTimeMillis());
                         sendBroadcast(intent);
                     }

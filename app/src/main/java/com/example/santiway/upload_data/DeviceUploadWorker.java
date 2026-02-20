@@ -25,18 +25,18 @@ public class DeviceUploadWorker extends Worker {
             DeviceUploadManager uploadManager = new DeviceUploadManager(getApplicationContext());
 
             // Получаем данные для отправки
-            List<ApiDevice> devices = uploadManager.getPendingDevicesBatch();
+            List<DeviceUploadManager.PendingUpload> items = uploadManager.getPendingUploadsBatch();
 
-            if (devices.isEmpty()) {
+            if (items.isEmpty()) {
                 Log.d(TAG, "No devices to upload");
                 return Result.success();
             }
 
             // Отправляем на сервер
-            boolean success = uploadManager.uploadBatch(devices);
+            boolean success = uploadManager.uploadBatch(items);
 
             if (success) {
-                Log.i(TAG, "Successfully uploaded " + devices.size() + " devices");
+                Log.i(TAG, "Successfully uploaded " + items.size() + " devices");
                 return Result.success();
             } else {
                 Log.e(TAG, "Failed to upload devices");

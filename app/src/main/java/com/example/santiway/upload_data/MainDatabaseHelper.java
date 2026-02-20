@@ -79,7 +79,9 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 "timestamp LONG," +
                 "status TEXT DEFAULT 'ignore'," +
                 "is_uploaded INTEGER DEFAULT 0," +
-                "folder_name TEXT DEFAULT ''" + // Добавляем колонку для папок
+                "folder_name TEXT DEFAULT ''," +
+                "UNIQUE(bssid, timestamp)," +      // Уникальность для WiFi/Bluetooth по MAC + время
+                "UNIQUE(cell_id, timestamp)" +      // Уникальность для сотовых вышек по cell_id + время
                 ");";
         db.execSQL(createUnifiedTable);
     }
@@ -110,19 +112,13 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             }
         } catch (Exception e) {
             Log.e(TAG, "Error deleting old records: " + e.getMessage());
-        } finally {
-            db.close();
         }
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        if (oldVersion < 7) {
-            // ... существующий код ...
-        }
-        if (oldVersion < 8) { // Новая версия
+        if (oldVersion < 8) {
             try {
-                // Добавляем колонку folder_name во все существующие таблицы
                 Cursor cursor = db.rawQuery(
                         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%'",
                         null
@@ -375,11 +371,12 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             if (cursor != null) cursor.close();
             if (db != null && db.isOpen()) {
                 try {
-                    db.endTransaction();
+                    if (db.inTransaction()) {
+                        db.endTransaction();
+                    }
                 } catch (Exception e) {
                     Log.e(TAG, "Error ending transaction: " + e.getMessage());
                 }
-                db.close();
             }
         }
         return result;
@@ -450,8 +447,6 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             db.execSQL(query);
         } catch (Exception e) {
             Log.e("DB_RENAME", "Error: " + e.getMessage());
-        } finally {
-            db.close();
         }
     }
 
@@ -486,7 +481,6 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             Log.e(TAG, "Error getting data from table " + tableName + ": " + e.getMessage());
         } finally {
             if (cursor != null) cursor.close();
-            db.close();
         }
         return deviceList;
     }
@@ -536,7 +530,6 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             Log.e(TAG, "Pagination error: " + e.getMessage());
         } finally {
             if (cursor != null) cursor.close();
-            db.close(); // Добавляем закрытие БД
         }
         return deviceList;
     }
@@ -570,7 +563,6 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         } catch (Exception e) {
             Log.e(TAG, "Error updating device status: " + e.getMessage());
         } finally {
-            db.close();
         }
 
         return rowsAffected;
@@ -601,7 +593,6 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             } catch (Exception e) {
                 Log.e(TAG, "Error ending transaction: " + e.getMessage());
             }
-            db.close();
         }
         return rowsAffected;
     }
@@ -618,7 +609,6 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             e.printStackTrace();
             return false;
         } finally {
-            db.close();
         }
     }
 
@@ -640,7 +630,6 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             Log.e(TAG, "Error getting all tables: " + e.getMessage());
         } finally {
             if (cursor != null) cursor.close();
-            db.close();
         }
         return tables;
     }
@@ -695,7 +684,6 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         } catch (Exception e) {
             Log.e(TAG, "Error creating table " + tableName + ": " + e.getMessage());
         } finally {
-            db.close();
         }
     }
 
@@ -1029,7 +1017,6 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 } catch (Exception e) {
                     Log.e(TAG, "Error ending transaction: " + e.getMessage());
                 }
-                db.close();
             }
         }
     }
@@ -1078,7 +1065,6 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             Log.e(TAG, "Error getting latest device data: " + e.getMessage());
         } finally {
             if (cursor != null) cursor.close();
-            db.close();
         }
 
         return values;
