@@ -35,7 +35,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-
+import java.util.Set;
 
 
 public class BluetoothForegroundService extends Service {
@@ -81,6 +81,7 @@ public class BluetoothForegroundService extends Service {
         OUI_MAP.put("66:AB:65", "HP");
     }
     private String currentTableName = "default_table"; // имя таблицы для сохранения
+    private Set<String> processedInCurrentCycle = new HashSet<>();
 
     @Override
     public void onCreate() {
@@ -179,10 +180,18 @@ public class BluetoothForegroundService extends Service {
             name = device.getName();
         }
 
-        // Проверка на дубликат
-        if (seenAddresses.contains(address)) return;
-        seenAddresses.add(address);
+        // Улучшенная проверка на дубликаты в текущем цикле
+        String currentTimeKey = address + "_" + (System.currentTimeMillis() / 1000); // ключ с точностью до секунды
+        if (processedInCurrentCycle.contains(currentTimeKey)) {
+            Log.d(TAG, "⏱️ Duplicate in current cycle: " + address + " - skipping");
+            return;
+        }
+        processedInCurrentCycle.add(currentTimeKey);
 
+        // Ограничиваем размер множества
+        if (processedInCurrentCycle.size() > 1000) {
+            processedInCurrentCycle.clear();
+        }
 
         // Создание модели устройства
         com.example.santiway.bluetooth_scanner.BluetoothDevice myDev = new com.example.santiway.bluetooth_scanner.BluetoothDevice();
@@ -385,6 +394,7 @@ public class BluetoothForegroundService extends Service {
     }
 
     private void startAllScanning() {
+        processedInCurrentCycle.clear();
         // Проверяем статус Bluetooth перед сканированием
         if (btAdapter == null || !btAdapter.isEnabled()) {
             Log.w(TAG, "Bluetooth отключен во время сканирования, останавливаем сервис");

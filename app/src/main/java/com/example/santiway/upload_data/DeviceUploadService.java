@@ -6,53 +6,85 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
-import androidx.work.Constraints;
-import androidx.work.ExistingPeriodicWorkPolicy;
-import androidx.work.NetworkType;
-import androidx.work.PeriodicWorkRequest;
-import androidx.work.WorkManager;
 
-import com.example.santiway.R;  // Импортируйте ваш R
+import com.example.santiway.R;
 
-import java.util.concurrent.TimeUnit;
+import java.util.List;
 
 public class DeviceUploadService extends Service {
     private static final String TAG = "DeviceUploadService";
-    private static final String UPLOAD_WORK_NAME = "DeviceUploadWork";
     private static final int NOTIFICATION_ID = 1001;
     private static final String CHANNEL_ID = "upload_channel_id";
+    private static final long UPLOAD_INTERVAL = 60000; // 1 минута
+
+    private Handler handler;
+    private Runnable uploadRunnable;
+    private DeviceUploadManager uploadManager;
 
     @Override
     public void onCreate() {
         super.onCreate();
         Log.d(TAG, "DeviceUploadService created");
 
-        // Создаем канал уведомлений для Android 8+
+        uploadManager = new DeviceUploadManager(this);
         createNotificationChannel();
 
-        // Создаем и показываем уведомление
         Notification notification = createNotification();
-        startForeground(NOTIFICATION_ID, notification);  // ВАЖНО: этот вызов
+        startForeground(NOTIFICATION_ID, notification);
 
         startPeriodicUpload();
     }
 
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d(TAG, "DeviceUploadService started");
+    private void startPeriodicUpload() {
+        handler = new Handler(Looper.getMainLooper());
+        uploadRunnable = new Runnable() {
+            @Override
+            public void run() {
+                performUpload();
+                handler.postDelayed(this, UPLOAD_INTERVAL);
+            }
+        };
+        handler.post(uploadRunnable);
+    }
 
-        // ВАЖНО: Если сервис перезапускается, нужно снова вызвать startForeground
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification notification = createNotification();
-            startForeground(NOTIFICATION_ID, notification);
-        }
+    private void performUpload() {
+        Log.d(TAG, "Checking for devices to upload...");
 
-        return START_STICKY;
+        new Thread(() -> {
+            try {
+                int pendingCount = uploadManager.getPendingDevicesCount();
+                Log.d(TAG, "Pending devices: " + pendingCount);
+
+                if (pendingCount == 0) {
+                    return;
+                }
+
+                List<DeviceUploadManager.PendingUpload> items = uploadManager.getPendingUploadsBatch();
+                Log.d(TAG, "Found " + items.size() + " devices to upload");
+
+                if (!items.isEmpty()) {
+                    boolean success = uploadManager.uploadBatch(items);
+
+                    if (success) {
+                        Log.i(TAG, "✅ Successfully uploaded " + items.size() + " devices");
+
+                        Intent intent = new Intent("com.example.santiway.UPLOAD_COMPLETED");
+                        intent.putExtra("device_count", items.size());
+                        intent.putExtra("timestamp", System.currentTimeMillis());
+                        sendBroadcast(intent);
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error in upload: " + e.getMessage(), e);
+            }
+        }).start();
     }
 
     private void createNotificationChannel() {
@@ -81,27 +113,10 @@ public class DeviceUploadService extends Service {
                 .build();
     }
 
-    private void startPeriodicUpload() {
-        Constraints constraints = new Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build();
-
-        // Меняем на 15 минут (минимальный интервал для PeriodicWorkRequest)
-        // Но будем проверять чаще через FlexInterval
-        PeriodicWorkRequest uploadWork = new PeriodicWorkRequest.Builder(
-                DeviceUploadWorker.class,
-                15, TimeUnit.MINUTES,  // период
-                5, TimeUnit.MINUTES)   // flex интервал (окно выполнения)
-                .setConstraints(constraints)
-                .setInitialDelay(1, TimeUnit.MINUTES)
-                .build();
-
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-                UPLOAD_WORK_NAME,
-                ExistingPeriodicWorkPolicy.UPDATE,  // UPDATE вместо KEEP для обновления
-                uploadWork);
-
-        Log.d(TAG, "Periodic upload work scheduled every 15 minutes (flex 5min)");
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d(TAG, "onStartCommand");
+        return START_STICKY;
     }
 
     @Nullable
@@ -114,7 +129,11 @@ public class DeviceUploadService extends Service {
     public void onDestroy() {
         super.onDestroy();
         Log.d(TAG, "DeviceUploadService destroyed");
-        stopForeground(true);  // Удаляем уведомление при остановке сервиса
+
+        if (handler != null && uploadRunnable != null) {
+            handler.removeCallbacks(uploadRunnable);
+        }
+
+        stopForeground(true);
     }
 }
-

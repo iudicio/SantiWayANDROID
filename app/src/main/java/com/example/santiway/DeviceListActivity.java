@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.santiway.activity_map.ActivityMapActivity;
 import com.example.santiway.upload_data.MainDatabaseHelper;
+import com.example.santiway.upload_data.UniqueDevicesHelper;
 import com.google.android.material.tabs.TabLayout;
 import java.util.ArrayList;
 import java.util.List;
@@ -371,35 +372,44 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
             adapter.showLoading(true);
         }
 
-        // УСТАНАВЛИВАЕМ ТЕКУЩУЮ ТАБЛИЦУ В АДАПТЕР!
         adapter.setCurrentTableName(tableName);
-
         isLoading = true;
 
-        // Загрузка данных в фоне
         new Thread(() -> {
-            List<Device> deviceList = databaseHelper.getAllDataFromTableWithPagination(
-                    tableName,
-                    currentOffset,
-                    PAGE_SIZE
-            );
+            List<Device> deviceList;
 
-            // Обновляем UI в главном потоке
+            // ДЛЯ УНИКАЛЬНЫХ УСТРОЙСТВ используем отдельную логику
+            if ("unique_devices".equals(tableName)) {
+                // Получаем из UniqueDevicesHelper
+                UniqueDevicesHelper uniqueHelper = new UniqueDevicesHelper(DeviceListActivity.this);
+                deviceList = uniqueHelper.getAllDevices();
+                // Для уникальных устройств пагинация не нужна
+                hasMoreData = false;
+            } else {
+                // Для обычных таблиц используем пагинацию
+                deviceList = databaseHelper.getAllDataFromTableWithPagination(
+                        tableName,
+                        currentOffset,
+                        PAGE_SIZE
+                );
+
+                if (deviceList.size() < PAGE_SIZE) {
+                    hasMoreData = false;
+                }
+                currentOffset += deviceList.size();
+            }
+
+            final List<Device> finalDeviceList = deviceList;
+
             runOnUiThread(() -> {
                 adapter.hideLoading();
 
                 if (isFirstLoad) {
-                    adapter.updateData(deviceList);
+                    adapter.updateData(finalDeviceList);
                 } else {
-                    adapter.addData(deviceList);
+                    adapter.addData(finalDeviceList);
                 }
 
-                // Проверяем, есть ли ещё данные
-                if (deviceList.size() < PAGE_SIZE) {
-                    hasMoreData = false;
-                }
-
-                currentOffset += deviceList.size();
                 isLoading = false;
             });
         }).start();

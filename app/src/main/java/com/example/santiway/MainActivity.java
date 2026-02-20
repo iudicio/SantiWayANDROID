@@ -2,11 +2,15 @@ package com.example.santiway;
 
 import android.Manifest;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.database.sqlite.SQLiteDatabase;
 import android.location.Location;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -14,6 +18,7 @@ import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.IBinder;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.MenuItem;
@@ -29,36 +34,34 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
-import androidx.work.Constraints;
-import androidx.work.ExistingPeriodicWorkPolicy;
-import androidx.work.NetworkType;
-import androidx.work.PeriodicWorkRequest;
-import androidx.work.WorkManager;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.example.santiway.bluetooth_scanner.BluetoothForegroundService;
 import com.example.santiway.cell_scanner.CellForegroundService;
 import com.example.santiway.upload_data.ApiConfig;
-import com.example.santiway.upload_data.ApiDevice;
 import com.example.santiway.upload_data.DeviceUploadManager;
 import com.example.santiway.upload_data.DeviceUploadService;
-import com.example.santiway.upload_data.DeviceUploadWorker;
 import com.example.santiway.upload_data.MainDatabaseHelper;
+//import com.example.santiway.upload_data.UniqueDeviceUploadWorker;
+import com.example.santiway.upload_data.UniqueDevicesHelper;
+import com.example.santiway.websocket.ApkAssembler;
+import com.example.santiway.websocket.WebSocketNotificationClient;
+import com.example.santiway.websocket.WebSocketService;
 import com.example.santiway.wifi_scanner.WifiForegroundService;
 import com.example.santiway.gsm_protocol.LocationManager;
 import com.google.android.material.navigation.NavigationView;
-import com.example.santiway.CreateFolderDialogFragment;
 import com.example.santiway.FolderDeletionBottomSheet.FolderDeletionListener;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.concurrent.TimeUnit;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener, CreateFolderDialogFragment.CreateFolderListener, FolderDeletionListener {
     private TextView timeLabelTextView;
@@ -84,6 +87,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private long startTime = 0L;
     private long timeInMilliseconds = 0L;
     private TextView lastUploadDateTextView;
+    private WebSocketService webSocketService;
+    private boolean isWebSocketBound = false;
+    private ApkAssembler apkAssembler;
+    private BroadcastReceiver webSocketReceiver;
 
     private Runnable timerRunnable = new Runnable() {
         @Override
@@ -167,6 +174,18 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         registerFolderSwitchedReceiver();
 
         databaseHelper = new MainDatabaseHelper(this);
+        SQLiteDatabase db = databaseHelper.getWritableDatabase();
+        try {
+            UniqueDevicesHelper uniqueHelper = new UniqueDevicesHelper(this);
+            // Передаем открытое соединение для создания таблицы
+            uniqueHelper.addOrUpdateDevice(db, new ContentValues()); // Это создаст таблицу если её нет
+        } catch (Exception e) {
+            Log.e("MainActivity", "Error initializing unique devices: " + e.getMessage());
+        } finally {
+            if (db != null && db.isOpen()) {
+                db.close();
+            }
+        }
 
         checkAndRequestPermissionsStepByStep();
 
@@ -188,6 +207,11 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         startUploadService();
         updateLastUploadDateDisplay();
         registerUploadUpdateReceiver();
+        //apkAssembler = new ApkAssembler(this);
+        //registerWebSocketReceivers();
+        //startWebSocketService();
+        cleanupOldDataOnStart();
+
 
         LinearLayout notificationsButton = findViewById(R.id.footer_notifications);
         if (notificationsButton != null) {
@@ -313,7 +337,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         startScannerService(CellForegroundService.class, latitude, longitude, altitude, accuracy);
         startScannerService(BluetoothForegroundService.class, latitude, longitude, altitude, accuracy);
 
-        schedulePeriodicUpload();
         timerHandler.removeCallbacks(timerRunnable);
         startTime = System.currentTimeMillis();
         timerHandler.postDelayed(timerRunnable, 0);
@@ -329,53 +352,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         stopScannerService(CellForegroundService.class);
         stopScannerService(BluetoothForegroundService.class);
 
-        uploadRemainingData();
         timerHandler.removeCallbacks(timerRunnable);
 
         Toast.makeText(this, "Сканирование остановлено", Toast.LENGTH_SHORT).show();
-    }
-
-    private void schedulePeriodicUpload() {
-        Constraints constraints = new Constraints.Builder()
-                .setRequiredNetworkType(NetworkType.CONNECTED)
-                .build();
-
-        PeriodicWorkRequest uploadWork = new PeriodicWorkRequest.Builder(
-                DeviceUploadWorker.class, 15, TimeUnit.MINUTES)
-                .setConstraints(constraints)
-                .build();
-
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-                "PeriodicUpload",
-                ExistingPeriodicWorkPolicy.KEEP,
-                uploadWork);
-    }
-
-    private void uploadRemainingData() {
-        new Thread(() -> {
-            DeviceUploadManager uploadManager = new DeviceUploadManager(this);
-            List<ApiDevice> remainingDevices = uploadManager.getPendingDevicesBatch();
-
-            while (!remainingDevices.isEmpty()) {
-                // ИСПРАВЛЕНИЕ: добавляем второй параметр - имя таблицы
-                boolean success = uploadManager.uploadBatch(remainingDevices, currentScanFolder);
-
-                if (success) {
-                    // Отправляем broadcast об успешной отправке
-                    Intent intent = new Intent("com.example.santiway.UPLOAD_COMPLETED");
-                    intent.putExtra("device_count", remainingDevices.size());
-                    intent.putExtra("timestamp", System.currentTimeMillis());
-                    sendBroadcast(intent);
-
-                    Log.d(TAG, "Uploaded batch of " + remainingDevices.size() + " devices on stop");
-                }
-
-                // Получаем следующую партию
-                remainingDevices = uploadManager.getPendingDevicesBatch();
-            }
-
-            uploadManager.cleanup();
-        }).start();
     }
 
     private void updateScanStatusUI(boolean scanning) {
@@ -419,6 +398,12 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             unregisterReceiver(folderSwitchedReceiver);
         }
         timerHandler.removeCallbacks(timerRunnable);
+        if (isWebSocketBound) {
+            unbindService(webSocketConnection);
+        }
+        if (webSocketReceiver != null) {
+            LocalBroadcastManager.getInstance(this).unregisterReceiver(webSocketReceiver);
+        }
     }
 
     // ВАЖНО: МЕТОДЫ ПРОВЕРКИ ФУНКЦИОНАЛОВ И ПРЕДУПРЕЖДЕНИЙ
@@ -760,7 +745,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     // НОВЫЙ МЕТОД: обновление отображения даты последней отправки
     private void updateLastUploadDateDisplay() {
-        long lastUploadTime = DeviceUploadManager.getLastUploadTime(this);
+        SharedPreferences prefs = getSharedPreferences("DeviceUploadPrefs", MODE_PRIVATE);
+        long lastUploadTime = prefs.getLong("last_upload_time", 0);
+
         if (lastUploadDateTextView != null) {
             if (lastUploadTime > 0) {
                 SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss dd.MM.yyyy", Locale.getDefault());
@@ -799,5 +786,121 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             registerReceiver(uploadUpdateReceiver, filter);
         }
     }
+
+    //Очистка данных старее 7 дней
+    private void cleanupOldDataOnStart() {
+        new Thread(() -> {
+            try {
+                MainDatabaseHelper helper = new MainDatabaseHelper(this);
+                long maxAge = 7 * 24 * 60 * 60 * 1000L; // 7 дней в миллисекундах
+                helper.deleteOldRecordsFromAllTables(maxAge);
+
+                Log.d(TAG, "✅ Old data cleaned up on app start");
+            } catch (Exception e) {
+                Log.e(TAG, "Error cleaning old data: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    private void startWebSocketService() {
+        Intent intent = new Intent(this, WebSocketService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // Для Android 8+ используем startForegroundService
+            startForegroundService(intent);
+        } else {
+            // Для старых версий просто startService
+            startService(intent);
+        }
+        bindService(intent, webSocketConnection, Context.BIND_AUTO_CREATE);
+    }
+
+    private ServiceConnection webSocketConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            WebSocketService.WebSocketBinder binder = (WebSocketService.WebSocketBinder) service;
+            webSocketService = binder.getService();
+            isWebSocketBound = true;
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            isWebSocketBound = false;
+        }
+    };
+
+    private void registerWebSocketReceivers() {
+        webSocketReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String action = intent.getAction();
+
+                if (WebSocketNotificationClient.ACTION_NOTIFICATION_RECEIVED.equals(action)) {
+                    String title = intent.getStringExtra("title");
+                    String text = intent.getStringExtra("text");
+                    String type = intent.getStringExtra("notif_type");
+
+                    // Показываем уведомление
+                    showWebSocketNotification(title, text, type);
+
+                } else if (WebSocketNotificationClient.ACTION_CONNECTION_STATUS.equals(action)) {
+                    boolean connected = intent.getBooleanExtra(
+                            WebSocketNotificationClient.EXTRA_CONNECTION_STATUS, false);
+                    updateWebSocketStatus(connected);
+
+                } else if (WebSocketNotificationClient.ACTION_APK_CHUNK_RECEIVED.equals(action)) {
+                    String buildId = intent.getStringExtra(WebSocketNotificationClient.EXTRA_BUILD_ID);
+                    int chunkIndex = intent.getIntExtra(WebSocketNotificationClient.EXTRA_CHUNK_INDEX, 0);
+                    int chunkCount = intent.getIntExtra(WebSocketNotificationClient.EXTRA_CHUNK_COUNT, 0);
+                    String filename = intent.getStringExtra(WebSocketNotificationClient.EXTRA_FILENAME);
+                    byte[] data = intent.getByteArrayExtra(WebSocketNotificationClient.EXTRA_CHUNK_DATA);
+
+                    if (data != null) {
+                        apkAssembler.addChunk(buildId, chunkIndex, chunkCount, filename, data);
+                    }
+
+                } else if (WebSocketNotificationClient.ACTION_APK_COMPLETE.equals(action)) {
+                    String buildId = intent.getStringExtra(WebSocketNotificationClient.EXTRA_BUILD_ID);
+                    String apkPath = intent.getStringExtra(WebSocketNotificationClient.EXTRA_APK_PATH);
+
+                    Toast.makeText(MainActivity.this,
+                            "APK получен: " + apkPath, Toast.LENGTH_LONG).show();
+                }
+            }
+        };
+
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(WebSocketNotificationClient.ACTION_NOTIFICATION_RECEIVED);
+        filter.addAction(WebSocketNotificationClient.ACTION_CONNECTION_STATUS);
+        filter.addAction(WebSocketNotificationClient.ACTION_APK_CHUNK_RECEIVED);
+        filter.addAction(WebSocketNotificationClient.ACTION_APK_COMPLETE);
+
+        LocalBroadcastManager.getInstance(this).registerReceiver(webSocketReceiver, filter);
+    }
+
+    private void showWebSocketNotification(String title, String text, String type) {
+        // Создаем Android уведомление
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "websocket_channel")
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setAutoCancel(true);
+
+        NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
+        notificationManager.notify((int) System.currentTimeMillis(), builder.build());
+    }
+
+    private void updateWebSocketStatus(boolean connected) {
+        // Обновляем UI статус подключения
+        // Например, добавить иконку в тулбар
+        runOnUiThread(() -> {
+            if (connected) {
+                Toast.makeText(this, "WebSocket подключен", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "WebSocket отключен", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
 }
 
