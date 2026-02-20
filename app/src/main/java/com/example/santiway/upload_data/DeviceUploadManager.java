@@ -30,7 +30,7 @@ public class DeviceUploadManager {
     private static final String PREFS_NAME = "DeviceUploadPrefs";
     private static final String KEY_DEVICE_ID = "device_id";
     private static final String KEY_LAST_UPLOAD_TIME = "last_upload_time";
-    private static final int BATCH_SIZE = 20;
+    private static final int BATCH_SIZE = 100;
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     private Context context;

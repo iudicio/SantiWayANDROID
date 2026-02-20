@@ -171,10 +171,17 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         values.put("vendor", device.getVendor());
 
         // Общие поля геолокации и времени
-        values.put("latitude", device.getLatitude());
-        values.put("longitude", device.getLongitude());
-        values.put("altitude", device.getAltitude());
-        values.put("location_accuracy", device.getLocationAccuracy());
+        double lat = device.getLatitude();
+        double lon = device.getLongitude();
+        boolean hasValidLocation = !(lat == 0.0 && lon == 0.0);
+        if (hasValidLocation) {
+            values.put("latitude", lat);
+            values.put("longitude", lon);
+            values.put("altitude", device.getAltitude());
+            values.put("location_accuracy", device.getLocationAccuracy());
+        } else {
+            // не кладём latitude/longitude -> в БД будут NULL (если колонки допускают NULL)
+        }
         values.put("timestamp", device.getTimestamp());
         values.put("status", "scanned"); // Статус
         values.put("folder_name", "");
@@ -199,10 +206,18 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         values.put("frequency", device.getFrequency());
         values.put("capabilities", device.getCapabilities());
         values.put("vendor", device.getVendor());
-        values.put("latitude", device.getLatitude());
-        values.put("longitude", device.getLongitude());
-        values.put("altitude", device.getAltitude());
-        values.put("location_accuracy", device.getLocationAccuracy());
+        // Общие поля геолокации и времени
+        double lat = device.getLatitude();
+        double lon = device.getLongitude();
+        boolean hasValidLocation = !(lat == 0.0 && lon == 0.0);
+        if (hasValidLocation) {
+            values.put("latitude", lat);
+            values.put("longitude", lon);
+            values.put("altitude", device.getAltitude());
+            values.put("location_accuracy", device.getLocationAccuracy());
+        } else {
+            // не кладём latitude/longitude -> в БД будут NULL (если колонки допускают NULL)
+        }
         values.put("timestamp", device.getTimestamp());
         values.put("status", "ignore");
         values.put("folder_name", "");
@@ -230,10 +245,18 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         values.put("network_type", tower.getNetworkType());
         values.put("is_registered", tower.isRegistered() ? 1 : 0);
         values.put("is_neighbor", tower.isNeighbor() ? 1 : 0);
-        values.put("latitude", tower.getLatitude());
-        values.put("longitude", tower.getLongitude());
-        values.put("altitude", tower.getAltitude());
-        values.put("location_accuracy", tower.getLocationAccuracy());
+        // Общие поля геолокации и времени
+        double lat = tower.getLatitude();
+        double lon = tower.getLongitude();
+        boolean hasValidLocation = !(lat == 0.0 && lon == 0.0);
+        if (hasValidLocation) {
+            values.put("latitude", lat);
+            values.put("longitude", lon);
+            values.put("altitude", tower.getAltitude());
+            values.put("location_accuracy", tower.getLocationAccuracy());
+        } else {
+            // не кладём latitude/longitude -> в БД будут NULL (если колонки допускают NULL)
+        }
         values.put("timestamp", tower.getTimestamp());
         values.put("status", "ignore");
         values.put("folder_name", "");
