@@ -8,37 +8,48 @@ import android.util.Log;
 
 import com.example.santiway.R;
 
-public class ApiConfig {
+/**
+ * Central place for API configuration.
+ *
+ * Supports server address as:
+ *  - domain: device-analysis.ru
+ *  - full URL: https://device-analysis.ru
+ *  - IP(+port): 192.168.0.10:8000
+ */
+public final class ApiConfig {
     private static final String TAG = "ApiConfig";
 
+    /** Always ends with "/" (e.g. "https://device-analysis.ru/") */
     private static String apiBaseUrl;
+
     private static String apiKey;
     private static String phoneMac;
 
+    private ApiConfig() {}
+
     /**
-     * Инициализация конфигурации API только из strings.xml
+     * Init config from strings.xml (default_server_ip can contain BOTH IP or domain).
      */
     public static void initialize(Context context) {
-        // Получаем значения только из strings.xml
-        String defaultApiKey = context.getString(R.string.default_api_key);
-        String defaultServerIp = context.getString(R.string.default_server_ip);
-
-        // --- Инициализация IP сервера ---
-        String serverIp = defaultServerIp;
-        Log.d(TAG, "Using server IP from strings.xml: " + serverIp);
-
-        // Формируем базовый URL
-        apiBaseUrl = buildBaseUrl(serverIp);
-
-        // --- Инициализация API Key ---
-        apiKey = defaultApiKey;
-        if (apiKey != null && !apiKey.trim().isEmpty()) {
-            Log.d(TAG, "Using API key from strings.xml");
-        } else {
+        // --- API key ---
+        apiKey = safeTrim(context.getString(R.string.default_api_key));
+        if (apiKey == null) {
             Log.e(TAG, "API Key is not configured in strings.xml");
+        } else {
+            Log.d(TAG, "Using API key from strings.xml");
         }
 
-        // --- Инициализация MAC адреса телефона (НОВЫЙ МЕТОД) ---
+        // --- Server address (IP or domain) ---
+        // NOTE: resource name kept for backward compatibility.
+        String defaultServerAddress = safeTrim(context.getString(R.string.domen_server));
+        if (defaultServerAddress == null) {
+            Log.e(TAG, "Server address is not configured in strings.xml, using fallback");
+            defaultServerAddress = "192.168.110.49";
+        }
+        setServerAddress(defaultServerAddress);
+        Log.d(TAG, "Using server address from strings.xml: " + defaultServerAddress);
+
+        // --- Device ID / MAC (best effort) ---
         phoneMac = getSimpleMacAddress(context);
         Log.d(TAG, "Phone MAC: " + phoneMac);
 
@@ -48,11 +59,126 @@ public class ApiConfig {
     }
 
     /**
-     * НОВЫЙ МЕТОД: Получение MAC-адреса устройства простым способом
+     * Set server address at runtime (for local testing).
+     *
+     * Examples:
+     *  - "device-analysis.ru"
+     *  - "https://device-analysis.ru"
+     *  - "192.168.0.5:8000"
+     */
+    public static void setServerAddress(String address) {
+        apiBaseUrl = normalizeBaseUrl(address);
+        Log.d(TAG, "API base URL set to: " + apiBaseUrl);
+    }
+
+    /**
+     * Returns base url (always ends with "/").
+     * Make sure initialize(context) was called in Application.onCreate().
+     */
+    public static String getApiBaseUrl() {
+        return apiBaseUrl;
+    }
+
+    /**
+     * Backward compatible method: returns base URL and initializes lazily if needed.
+     */
+    public static String getBaseUrl(Context context) {
+        if (apiBaseUrl == null && context != null) {
+            initialize(context);
+        }
+        return apiBaseUrl;
+    }
+
+    /**
+     * Full URL for devices endpoint.
+     */
+    public static String getDevicesUrl() {
+        return joinUrl(getApiBaseUrl(), "api/devices/");
+    }
+
+    /**
+     * Get API key (initialized in initialize()).
+     */
+    public static String getApiKey() {
+        return apiKey;
+    }
+
+    /**
+     * Backward compatible method: reads API key from strings.xml if not initialized.
+     */
+    public static String getApiKey(Context context) {
+        if (apiKey == null && context != null) {
+            apiKey = safeTrim(context.getString(R.string.default_api_key));
+        }
+        if (apiKey == null) {
+            Log.e(TAG, "API Key is not configured in strings.xml");
+        }
+        return apiKey;
+    }
+
+    /**
+     * Get device MAC/ID (best effort).
+     */
+    public static String getPhoneMac(Context context) {
+        if (phoneMac == null && context != null) {
+            phoneMac = getSimpleMacAddress(context);
+        }
+        return phoneMac;
+    }
+
+    // -------------------------
+    // Helpers
+    // -------------------------
+
+    private static String safeTrim(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    /**
+     * Normalizes user input into base URL:
+     *  - adds http:// if scheme missing
+     *  - removes trailing slashes
+     *  - removes explicit :80
+     *  - ensures exactly one trailing "/"
+     */
+    private static String normalizeBaseUrl(String address) {
+        String a = safeTrim(address);
+        // If scheme not specified, default to http (good for local IP testing).
+        if (!a.startsWith("http://") && !a.startsWith("https://")) {
+            a = "http://" + a;
+        }
+
+        // Remove trailing slashes
+        while (a.endsWith("/")) {
+            a = a.substring(0, a.length() - 1);
+        }
+
+        // Remove explicit :80
+        a = a.replaceFirst(":80$", "");
+
+        return a + "/";
+    }
+
+    private static String joinUrl(String baseUrl, String path) {
+        String base = safeTrim(baseUrl);
+        if (base == null) return null;
+
+        String p = safeTrim(path);
+        if (p == null) return base;
+
+        // base already ends with "/"
+        while (p.startsWith("/")) p = p.substring(1);
+        return base + p;
+    }
+
+    /**
+     * Best-effort MAC/ID for device identification.
+     * NOTE: On Android 6+ real Wi-Fi MAC is often restricted and may return 02:00:00:00:00:00.
      */
     private static String getSimpleMacAddress(Context context) {
         try {
-            // Пытаемся получить MAC через WiFi
             WifiManager wifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
             if (wifiManager == null) {
                 Log.w(TAG, "WifiManager is null");
@@ -68,16 +194,12 @@ public class ApiConfig {
             String mac = wifiInfo.getMacAddress();
             Log.d(TAG, "Raw MAC from WifiInfo: " + mac);
 
-            // Проверяем, что MAC валидный (не заглушка)
             if (mac != null && !mac.isEmpty() && !"02:00:00:00:00:00".equals(mac)) {
-                // Приводим к верхнему регистру для единообразия
-                String upperMac = mac.toUpperCase();
-                Log.d(TAG, "Valid MAC address found: " + upperMac);
-                return upperMac;
-            } else {
-                Log.w(TAG, "Invalid MAC address (probably emulator or restricted): " + mac);
-                return getFallbackId(context);
+                return mac.toUpperCase();
             }
+
+            Log.w(TAG, "Invalid MAC address (restricted/emulator): " + mac);
+            return getFallbackId(context);
 
         } catch (SecurityException e) {
             Log.e(TAG, "Security exception getting MAC: " + e.getMessage());
@@ -89,123 +211,21 @@ public class ApiConfig {
     }
 
     /**
-     * Запасной вариант - Android ID
+     * Fallback device identifier - Android ID (best effort).
      */
     private static String getFallbackId(Context context) {
         try {
-            String androidId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
+            String androidId = Settings.Secure.getString(
+                    context.getContentResolver(),
+                    Settings.Secure.ANDROID_ID
+            );
             if (androidId != null && !androidId.isEmpty()) {
-                String fallback = "android-" + androidId;
-                Log.d(TAG, "Using fallback Android ID: " + fallback);
-                return fallback;
+                return "android-" + androidId;
             }
         } catch (Exception e) {
             Log.e(TAG, "Error getting Android ID: " + e.getMessage());
         }
 
-        // Последний запасной вариант
-        String lastResort = "android-" + System.currentTimeMillis();
-        Log.d(TAG, "Using last resort ID: " + lastResort);
-        return lastResort;
+        return "android-" + System.currentTimeMillis();
     }
-
-    /**
-     * Строит базовый URL для порта 80 (без явного указания порта)
-     */
-    private static String buildBaseUrl(String serverIp) {
-        if (serverIp == null || serverIp.trim().isEmpty()) {
-            Log.e(TAG, "Server IP is null or empty, using fallback");
-            return "http://192.168.110.49/"; // fallback
-        }
-
-        String result = serverIp.trim();
-
-        // Если IP без http, добавляем схему (только http)
-        if (!result.startsWith("http://") && !result.startsWith("https://")) {
-            result = "http://" + result;
-        }
-
-        // Для порта 80 убираем явное указание порта из URL
-        result = result.replaceFirst(":80/", "/");
-        result = result.replaceFirst(":80$", "");
-
-        // Если нет завершающего "/", добавляем
-        if (!result.endsWith("/")) {
-            result = result + "/";
-        }
-
-        Log.d(TAG, "Built base URL: " + result);
-        return result;
-    }
-
-    /**
-     * Получить базовый URL API
-     */
-    public static String getApiBaseUrl() {
-        return apiBaseUrl;
-    }
-
-    /**
-     * Получить базовый URL (аналог getApiBaseUrl для обратной совместимости)
-     */
-    public static String getBaseUrl(Context context) {
-        if (apiBaseUrl == null && context != null) {
-            initialize(context);
-        }
-        return apiBaseUrl;
-    }
-
-    /**
-     * Получить полный URL для списка устройств
-     */
-    public static String getDevicesUrl() {
-        String base = getApiBaseUrl();
-        if (base.endsWith("/")) {
-            if (base.contains("/api/")) {
-                return base + "devices/";  // base уже содержит api/
-            } else {
-                return base + "api/devices/";  // base не содержит api/
-            }
-        } else {
-            if (base.contains("/api")) {
-                return base + "/devices/";
-            } else {
-                return base + "/api/devices/";
-            }
-        }
-    }
-
-    /**
-     * Получить API ключ (глобально) - только из strings.xml
-     */
-    public static String getApiKey(Context context) {
-        String apiKey = context.getString(R.string.default_api_key);
-        if (apiKey == null || apiKey.trim().isEmpty()) {
-            Log.e(TAG, "API Key is not configured in strings.xml");
-            return null;
-        }
-        return apiKey.trim();
-    }
-
-    /**
-     * Получить API ключ (из статической переменной)
-     */
-    public static String getApiKey() {
-        return apiKey;
-    }
-
-    /**
-     * Получить MAC-адрес телефона (использует новый метод)
-     */
-    public static String getPhoneMac(Context context) {
-        if (phoneMac == null && context != null) {
-            phoneMac = getSimpleMacAddress(context);
-        }
-        return phoneMac;
-    }
-
-    // Старый метод больше не нужен, можно удалить или оставить для совместимости
-    // private static String getDeviceMacAddress(Context context) {
-    //     return getSimpleMacAddress(context);
-    // }
 }

@@ -5,16 +5,16 @@
         <item
             android:id="@+id/nav_make_safe"
             android:icon="@drawable/ic_mark"
-            android:title="Make Safe" />
+            android:title="Безопасно" />
 
         <item
             android:id="@+id/nav_clear_status"
             android:icon="@drawable/ic_cloud"
-            android:title="Settings" />
+            android:title="Настройки" />
         <item
             android:id="@+id/nav_clear_triggers"
             android:icon="@drawable/ic_cloud"
-            android:title="Clear triggers" />
+            android:title="Очистить триггеры" />
 \
     </group>
 </menu>

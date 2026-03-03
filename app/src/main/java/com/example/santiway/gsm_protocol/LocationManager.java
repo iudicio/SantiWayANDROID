@@ -15,9 +15,13 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.Priority;
+import com.google.android.gms.tasks.Tasks;
+
+import java.util.concurrent.TimeUnit;
 
 public class LocationManager {
     private static final String TAG = "LocationManager";
+    private static LocationManager instance;
 
     private Context context;
     private FusedLocationProviderClient fusedLocationClient;
@@ -25,9 +29,16 @@ public class LocationManager {
     private Location currentLocation;
 
     // Интервалы обновления
-    private static final long UPDATE_INTERVAL = 15000; // 15 секунд ✅
+    private static final long UPDATE_INTERVAL = 15000; // 15 секунд
 
-    public LocationManager(Context context) {
+    public static synchronized LocationManager getInstance(Context context) {
+        if (instance == null) {
+            instance = new LocationManager(context.getApplicationContext());
+        }
+        return instance;
+    }
+
+    private LocationManager(Context context) {
         this.context = context;
         this.fusedLocationClient = LocationServices.getFusedLocationProviderClient(context);
         setupLocationCallback();
@@ -74,6 +85,9 @@ public class LocationManager {
                     Looper.getMainLooper()
             );
             Log.d(TAG, "Location updates started (interval: " + UPDATE_INTERVAL + "ms)");
+
+            // Сразу запрашиваем последнюю известную локацию
+            getLastKnownLocation();
         } catch (SecurityException e) {
             Log.e(TAG, "SecurityException: Permission revoked during runtime: " + e.getMessage());
             if (onLocationUpdateListener != null) {
@@ -100,7 +114,45 @@ public class LocationManager {
                 .build();
     }
 
-    //Проверяем что хотя бы одно разрешение есть
+    // НОВЫЙ МЕТОД: принудительное получение координат (синхронное)
+    public Location getFreshLocation() {
+        if (!hasLocationPermission()) {
+            Log.w(TAG, "Cannot get fresh location: permissions not granted");
+            return null;
+        }
+
+        try {
+            // Пытаемся получить последнюю известную локацию
+            Location lastLocation = Tasks.await(
+                    fusedLocationClient.getLastLocation(),
+                    5, TimeUnit.SECONDS
+            );
+
+            if (lastLocation != null) {
+                long timeDiff = System.currentTimeMillis() - lastLocation.getTime();
+                // Если локация свежая (менее 30 секунд), возвращаем её
+                if (timeDiff < 30000) {
+                    updateLocation(lastLocation);
+                    return lastLocation;
+                }
+            }
+
+            // Если нет свежей локации, запрашиваем однократное обновление
+            return Tasks.await(
+                    fusedLocationClient.getCurrentLocation(
+                            Priority.PRIORITY_HIGH_ACCURACY,
+                            null
+                    ),
+                    5, TimeUnit.SECONDS
+            );
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting fresh location: " + e.getMessage());
+            return null;
+        }
+    }
+
+    // Проверка что хотя бы одно разрешение есть
     private boolean hasLocationPermission() {
         return ActivityCompat.checkSelfPermission(context,
                 Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
@@ -137,7 +189,7 @@ public class LocationManager {
     }
 
     public boolean hasValidLocation() {
-        return currentLocation != null;
+        return currentLocation != null && currentLocation.getAccuracy() < 100.0f; // точность лучше 100 метров
     }
 
     public boolean isGpsAvailable() {
@@ -151,7 +203,7 @@ public class LocationManager {
     public boolean isLocationFresh() {
         if (currentLocation == null) return false;
         long timeDiff = System.currentTimeMillis() - currentLocation.getTime();
-        return timeDiff < 300000;
+        return timeDiff < 300000; // 5 минут
     }
 
     public interface OnLocationUpdateListener {
@@ -206,5 +258,6 @@ public class LocationManager {
     public void cleanup() {
         stopLocationUpdates();
         onLocationUpdateListener = null;
+        instance = null;
     }
 }

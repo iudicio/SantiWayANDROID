@@ -5,6 +5,7 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
+import android.location.Location;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
@@ -29,6 +30,7 @@ import androidx.core.app.NotificationCompat;
 import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.example.santiway.host_database.AppSettingsRepository;
 import com.example.santiway.host_database.ScannerSettings;
+import com.example.santiway.gsm_protocol.LocationManager;
 
 
 import java.util.HashMap;
@@ -48,6 +50,7 @@ public class BluetoothForegroundService extends Service {
 
     // Сканеры и адаптеры Bluetooth
     private MainDatabaseHelper databaseHelper;
+    private LocationManager locationManager;
     private BluetoothAdapter btAdapter;
     private BluetoothLeScanner bleScanner;
     private BroadcastReceiver classicReceiver;
@@ -91,6 +94,10 @@ public class BluetoothForegroundService extends Service {
         handler = new Handler(Looper.getMainLooper());
         databaseHelper = new MainDatabaseHelper(this);
         appSettingsRepository = new AppSettingsRepository(this);
+        locationManager = LocationManager.getInstance(this);
+        if (checkPermissions()) {
+            locationManager.startLocationUpdates();
+        }
         updateScannerSettings();
 
         // Инициализация Bluetooth с обработкой исключений
@@ -181,7 +188,7 @@ public class BluetoothForegroundService extends Service {
         }
 
         // Улучшенная проверка на дубликаты в текущем цикле
-        String currentTimeKey = address + "_" + (System.currentTimeMillis() / 1000); // ключ с точностью до секунды
+        String currentTimeKey = address + "_" + (System.currentTimeMillis() / 1000);
         if (processedInCurrentCycle.contains(currentTimeKey)) {
             Log.d(TAG, "⏱️ Duplicate in current cycle: " + address + " - skipping");
             return;
@@ -201,7 +208,7 @@ public class BluetoothForegroundService extends Service {
         myDev.setVendor(getVendor(address));
         myDev.setTimestamp(System.currentTimeMillis());
 
-        // Добавление геопозиции (пока из intent)
+        // Добавление геопозиции из актуальных координат
         myDev.setLatitude(currentLatitude);
         myDev.setLongitude(currentLongitude);
         myDev.setAltitude(currentAltitude);
@@ -210,8 +217,14 @@ public class BluetoothForegroundService extends Service {
         // Сохранение в базу
         long rowId = databaseHelper.addBluetoothDevice(myDev, currentTableName);
 
+        // Предупреждение о нулевых координатах
+        if (currentLatitude == 0.0 && currentLongitude == 0.0) {
+            Log.w(TAG, "⚠️ Saving device with ZERO coordinates: " + address);
+        }
 
-        Log.d(TAG, (isBle ? "BLE" : "Classic") + " устройство сохранено: " + name + " [" + address + "] RSSI=" + rssi + " rowId=" + rowId);
+        Log.d(TAG, (isBle ? "BLE" : "Classic") + " устройство сохранено: " + name +
+                " [" + address + "] RSSI=" + rssi + " at [" + currentLatitude + ", " +
+                currentLongitude + "] rowId=" + rowId);
     }
 
     public static String getVendor(String macAddress) {
@@ -236,17 +249,7 @@ public class BluetoothForegroundService extends Service {
         }
 
         if (intent != null) {
-            // Получение координат из Intent
-            if (intent.hasExtra("latitude")) {
-                currentLatitude = intent.getDoubleExtra("latitude", 0.0);
-                currentLongitude = intent.getDoubleExtra("longitude", 0.0);
-                currentAccuracy = intent.getFloatExtra("accuracy", 0.0f);
-                if (intent.hasExtra("altitude")) {
-                    currentAltitude = intent.getDoubleExtra("altitude", 0.0);
-                }
-                Log.d(TAG, "Получена геопозиция: " + currentLatitude + ", " + currentLongitude);
-            }
-
+            // Удаляем получение координат из Intent - теперь используем LocationManager!
             // Получение имени таблицы
             if (intent.hasExtra("tableName")) {
                 currentTableName = intent.getStringExtra("tableName");
@@ -310,6 +313,8 @@ public class BluetoothForegroundService extends Service {
             stopSelf();
             return;
         }
+
+        locationManager.startLocationUpdates();
 
         isScanning = true;
         seenAddresses.clear();
@@ -401,6 +406,22 @@ public class BluetoothForegroundService extends Service {
             stopForegroundScanning();
             return;
         }
+        // ПРИНУДИТЕЛЬНО ОБНОВЛЯЕМ КООРДИНАТЫ ПЕРЕД КАЖДЫМ СКАНИРОВАНИЕМ
+        Location freshLocation = locationManager.getFreshLocation();
+        if (freshLocation != null) {
+            currentLatitude = freshLocation.getLatitude();
+            currentLongitude = freshLocation.getLongitude();
+            currentAltitude = freshLocation.hasAltitude() ? freshLocation.getAltitude() : 0.0;
+            currentAccuracy = freshLocation.getAccuracy();
+            Log.d(TAG, "📍 Fresh coordinates obtained: " + currentLatitude + ", " + currentLongitude);
+        } else {
+            Log.w(TAG, "⚠️ Could not get fresh coordinates, using last known or zeros");
+            currentLatitude = locationManager.getLatitude();
+            currentLongitude = locationManager.getLongitude();
+            currentAltitude = locationManager.getAltitude();
+            currentAccuracy = locationManager.getAccuracy();
+        }
+
 
         // BLE сканирование
         if (bleScanner != null) {

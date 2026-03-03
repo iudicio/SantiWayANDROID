@@ -56,9 +56,9 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="API Key:"
-            android:textColor="#CCCCCC"
-            android:layout_marginTop="16dp"/>
+            android:layout_marginTop="16dp"
+            android:text="API Ключ:"
+            android:textColor="#CCCCCC" />
 
         <TextView
             android:id="@+id/api_key_display"
@@ -78,9 +78,9 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Device name:"
-            android:textColor="#CCCCCC"
-            android:layout_marginTop="16dp"/>
+            android:layout_marginTop="16dp"
+            android:text="Название устройства:"
+            android:textColor="#CCCCCC" />
 
         <EditText
             android:id="@+id/device_scanner"

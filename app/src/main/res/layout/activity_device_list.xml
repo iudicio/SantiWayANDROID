@@ -14,7 +14,7 @@
         android:layout_marginTop="24dp"
         android:background="#0B1A2C" app:titleTextColor="@android:color/white"
         app:navigationIcon="@drawable/ic_cloud"
-        app:title="Device List" />
+        app:title="Список устройств" />
 
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tab_layout"

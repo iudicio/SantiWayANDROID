@@ -10,6 +10,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.location.Location;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
 import android.os.Build;
@@ -22,15 +23,12 @@ import android.widget.Toast;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
+import com.example.santiway.gsm_protocol.LocationManager;
 import com.example.santiway.upload_data.MainDatabaseHelper;
-import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationServices;
 
 import java.util.HashSet;
 import java.util.List;
-import java.lang.IllegalArgumentException;
 import java.util.Set;
-
 
 public class WifiForegroundService extends Service {
     private static final String TAG = "WifiForegroundService";
@@ -45,12 +43,11 @@ public class WifiForegroundService extends Service {
     private boolean isScanning = false;
     private long scanInterval = 15000;
     private String currentTableName = "unified_data";
-    private double currentLatitude = 0.0;
-    private double currentLongitude = 0.0;
-    private double currentAltitude = 0.0;
-    private float currentAccuracy = 0.0f;
-    private float minSignalStrength = -100.0f; // Значение по умолчанию
+    private float minSignalStrength = -100.0f;
     private Set<String> processedInCurrentScan = new HashSet<>();
+
+    // Используем LocationManager вместо хранения координат
+    private LocationManager locationManager;
 
     @Override
     public void onCreate() {
@@ -60,6 +57,14 @@ public class WifiForegroundService extends Service {
         wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         handler = new Handler(Looper.getMainLooper());
         databaseHelper = new MainDatabaseHelper(this);
+
+        // Получаем экземпляр LocationManager
+        locationManager = LocationManager.getInstance(this);
+
+        // Запускаем обновления геолокации
+        if (checkPermissions()) {
+            locationManager.startLocationUpdates();
+        }
 
         createNotificationChannel();
         setupWifiScanReceiver();
@@ -81,25 +86,15 @@ public class WifiForegroundService extends Service {
         }
 
         if (intent != null) {
-            // Получаем координаты из intent
-            if (intent.hasExtra("latitude")) {
-                currentLatitude = intent.getDoubleExtra("latitude", 0.0);
-                currentLongitude = intent.getDoubleExtra("longitude", 0.0);
-                currentAccuracy = intent.getFloatExtra("accuracy", 0.0f);
-                if (intent.hasExtra("altitude")) {
-                    currentAltitude = intent.getDoubleExtra("altitude", 0.0);
-                }
-                Log.d(TAG, "Location received: " + currentLatitude + ", " + currentLongitude);
-                if (intent.hasExtra("minSignalStrength")) {
-                    minSignalStrength = intent.getFloatExtra("minSignalStrength", -100.0f);
-                    Log.d(TAG, "Min signal strength set to: " + minSignalStrength);
-                }
-            }
-
             // Получить имя таблицы из intent
             if (intent.hasExtra("tableName")) {
                 currentTableName = intent.getStringExtra("tableName");
                 Log.d(TAG, "Table name set to: " + currentTableName);
+            }
+
+            if (intent.hasExtra("minSignalStrength")) {
+                minSignalStrength = intent.getFloatExtra("minSignalStrength", -100.0f);
+                Log.d(TAG, "Min signal strength set to: " + minSignalStrength);
             }
 
             String action = intent.getAction();
@@ -203,45 +198,19 @@ public class WifiForegroundService extends Service {
 
     private void startWifiScan() {
         if (wifiManager != null && wifiManager.isWifiEnabled()) {
-            updateCurrentLocation();
+            // Принудительно обновляем координаты перед сканированием
+            Location freshLocation = locationManager.getFreshLocation();
+            if (freshLocation != null) {
+                Log.d(TAG, "Fresh location obtained: " + freshLocation.getLatitude() +
+                        ", " + freshLocation.getLongitude());
+            } else {
+                Log.w(TAG, "Could not get fresh location, will use last known or zeros");
+            }
+
             boolean scanStarted = wifiManager.startScan();
             Log.d(TAG, "WiFi scan started: " + scanStarted + " for table: " + currentTableName);
         } else {
             Log.w(TAG, "Cannot start scan - WiFi not available or disabled");
-        }
-    }
-
-    private void updateCurrentLocation() {
-        // Если координаты нулевые, пытаемся получить их сейчас
-        if (currentLatitude == 0.0 && currentLongitude == 0.0) {
-            try {
-                // Используем FusedLocationProvider для быстрого получения координат
-                FusedLocationProviderClient fusedLocationClient =
-                        LocationServices.getFusedLocationProviderClient(this);
-
-                if (ActivityCompat.checkSelfPermission(this,
-                        Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-
-                    fusedLocationClient.getLastLocation()
-                            .addOnSuccessListener(location -> {
-                                if (location != null) {
-                                    currentLatitude = location.getLatitude();
-                                    currentLongitude = location.getLongitude();
-                                    currentAltitude = location.getAltitude();
-                                    currentAccuracy = location.getAccuracy();
-                                    Log.d(TAG, "Got fresh location: " +
-                                            currentLatitude + ", " + currentLongitude);
-                                } else {
-                                    Log.w(TAG, "Last location is null, using zero coordinates");
-                                }
-                            })
-                            .addOnFailureListener(e -> {
-                                Log.e(TAG, "Failed to get location: " + e.getMessage());
-                            });
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error getting location: " + e.getMessage());
-            }
         }
     }
 
@@ -287,6 +256,12 @@ public class WifiForegroundService extends Service {
         int filteredCount = 0;
         processedInCurrentScan.clear();
 
+        // Получаем текущие координаты из LocationManager
+        double latitude = locationManager.getLatitude();
+        double longitude = locationManager.getLongitude();
+        double altitude = locationManager.getAltitude();
+        float accuracy = locationManager.getAccuracy();
+
         for (ScanResult result : scanResults) {
             // Фильтруем по силе сигнала
             if (result.level < minSignalStrength) {
@@ -303,40 +278,43 @@ public class WifiForegroundService extends Service {
                 }
                 processedInCurrentScan.add(key);
 
-                if (saveToDatabase(result)) {
+                if (saveToDatabase(result, latitude, longitude, altitude, accuracy)) {
                     savedCount++;
                 }
             }
         }
 
-        Log.d(TAG, "Saved " + savedCount + " networks to table: " + currentTableName);
+        Log.d(TAG, "Saved " + savedCount + " networks to table: " + currentTableName +
+                " (filtered: " + filteredCount + ")");
         updateNotification(savedCount, scanResults.size());
     }
 
-    private boolean saveToDatabase(ScanResult result) {
+    private boolean saveToDatabase(ScanResult result, double latitude, double longitude,
+                                   double altitude, float accuracy) {
         try {
-
-            //Проверка на нулевые координаты
-            if (currentLatitude == 0.0 && currentLongitude == 0.0) {
-                Log.w(TAG, "WARNING: Saving device with zero coordinates!");
+            // ✅ НЕ сохраняем записи без координат
+            if (latitude == 0 && longitude == 0) {
+                Log.w(TAG, "Skipping save (zero coords): " + result.BSSID + " / " + result.SSID);
+                return false;
             }
             WifiDevice device = new WifiDevice();
-            device.setSsid(result.SSID != null ? result.SSID : "Unknown");
-            device.setBssid(result.BSSID != null ? result.BSSID : "Unknown");
+            device.setSsid(result.SSID != null ? result.SSID : "Неизвестен");
+            device.setBssid(result.BSSID != null ? result.BSSID : "Неизвестен");
             device.setSignalStrength(result.level);
             device.setFrequency(result.frequency);
-            device.setCapabilities(result.capabilities != null ? result.capabilities : "Unknown");
+            device.setCapabilities(result.capabilities != null ? result.capabilities : "Неизвестен");
             device.setVendor(getVendorFromBSSID(result.BSSID));
-            device.setLatitude(currentLatitude);
-            device.setLongitude(currentLongitude);
-            device.setAltitude(currentAltitude);
-            device.setLocationAccuracy(currentAccuracy);
+            device.setLatitude(latitude);
+            device.setLongitude(longitude);
+            device.setAltitude(altitude);
+            device.setLocationAccuracy(accuracy);
             device.setTimestamp(System.currentTimeMillis());
 
             long resultId = databaseHelper.addWifiDevice(device, currentTableName);
 
             if (resultId != -1) {
-                Log.d(TAG, "✓ Saved: " + device.getSsid() + " (" + device.getBssid() + ")");
+                Log.d(TAG, "✓ Saved: " + device.getSsid() + " (" + device.getBssid() +
+                        ") at [" + latitude + ", " + longitude + "]");
                 return true;
             } else {
                 Log.w(TAG, "✗ Failed to save: " + device.getSsid());
@@ -432,7 +410,6 @@ public class WifiForegroundService extends Service {
                 unregisterReceiver(wifiScanReceiver);
                 Log.d(TAG, "WiFi scan receiver unregistered");
             } catch (IllegalArgumentException e) {
-                // Ресивер не был зарегистрирован - это нормально
                 Log.d(TAG, "WiFi scan receiver already unregistered");
             } catch (Exception e) {
                 Log.e(TAG, "Error unregistering receiver: " + e.getMessage());
