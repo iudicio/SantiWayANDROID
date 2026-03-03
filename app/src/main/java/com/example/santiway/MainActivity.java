@@ -91,6 +91,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private boolean isWebSocketBound = false;
     private ApkAssembler apkAssembler;
     private BroadcastReceiver webSocketReceiver;
+    private BroadcastReceiver uploadUpdateReceiver;
 
     private Runnable timerRunnable = new Runnable() {
         @Override
@@ -272,7 +273,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     private void initializeLocationManager() {
         if (locationManager == null) {
-            locationManager = new LocationManager(this);
+            locationManager = LocationManager.getInstance(this);
             locationManager.setOnLocationUpdateListener(new LocationManager.OnLocationUpdateListener() {
                 @Override
                 public void onLocationUpdate(Location location) {
@@ -404,6 +405,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         if (webSocketReceiver != null) {
             LocalBroadcastManager.getInstance(this).unregisterReceiver(webSocketReceiver);
         }
+        unregisterUploadUpdateReceiver();
     }
 
     // ВАЖНО: МЕТОДЫ ПРОВЕРКИ ФУНКЦИОНАЛОВ И ПРЕДУПРЕЖДЕНИЙ
@@ -761,14 +763,14 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     // НОВЫЙ МЕТОД: регистрация BroadcastReceiver для обновлений
     private void registerUploadUpdateReceiver() {
-        BroadcastReceiver uploadUpdateReceiver = new BroadcastReceiver() {
+        if (uploadUpdateReceiver != null) return;
+
+        uploadUpdateReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 if ("com.example.santiway.UPLOAD_COMPLETED".equals(intent.getAction())) {
                     int count = intent.getIntExtra("device_count", 0);
-                    long timestamp = intent.getLongExtra("timestamp", System.currentTimeMillis());
 
-                    // Обновляем UI
                     runOnUiThread(() -> {
                         updateLastUploadDateDisplay();
                         Toast.makeText(MainActivity.this,
@@ -780,11 +782,13 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         };
 
         IntentFilter filter = new IntentFilter("com.example.santiway.UPLOAD_COMPLETED");
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(uploadUpdateReceiver, filter, RECEIVER_NOT_EXPORTED);
-        } else {
-            registerReceiver(uploadUpdateReceiver, filter);
-        }
+        LocalBroadcastManager.getInstance(this).registerReceiver(uploadUpdateReceiver, filter);
+    }
+
+    private void unregisterUploadUpdateReceiver() {
+        if (uploadUpdateReceiver == null) return;
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(uploadUpdateReceiver);
+        uploadUpdateReceiver = null;
     }
 
     //Очистка данных старее 7 дней

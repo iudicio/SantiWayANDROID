@@ -145,11 +145,6 @@ public final class ApiConfig {
      */
     private static String normalizeBaseUrl(String address) {
         String a = safeTrim(address);
-        if (a == null) {
-            Log.e(TAG, "Server address is empty, using fallback");
-            return "http://192.168.110.49/";
-        }
-
         // If scheme not specified, default to http (good for local IP testing).
         if (!a.startsWith("http://") && !a.startsWith("https://")) {
             a = "http://" + a;

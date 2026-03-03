@@ -42,27 +42,27 @@
                     android:id="@+id/device_name"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:text="Название устройства"
                     android:textColor="@android:color/white"
                     android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:text="Device Name" />
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/device_type"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:text="Тип"
                     android:textColor="#3DDC84"
-                    android:textSize="14sp"
-                    android:text="Type" />
+                    android:textSize="14sp" />
 
                 <TextView
                     android:id="@+id/device_location"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="#AAAAAA"
-                    android:textSize="14sp"
                     android:layout_marginTop="2dp"
-                    android:text="Location" />
+                    android:text="Местоположение"
+                    android:textColor="#AAAAAA"
+                    android:textSize="14sp" />
             </LinearLayout>
 
             <TextView
