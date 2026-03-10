@@ -166,19 +166,27 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
             // Логика индикатора статуса
             if (statusBar != null) {
                 statusBar.clearAnimation();
-                String status = (device.getStatus() != null) ? device.getStatus().trim().toUpperCase() : "SCANNED";
 
-                if (status.equals("SAFE")) {
+                String status = device.getStatus() != null
+                        ? device.getStatus().trim().toUpperCase()
+                        : "";
+
+                // По умолчанию всегда серый
+                statusBar.setBackgroundColor(Color.parseColor("#808080"));
+
+                if ("SAFE".equals(status)) {
                     statusBar.setBackgroundColor(Color.parseColor("#3DDC84"));
-                } else if (status.equals("ALARM")) {
-                    statusBar.setBackgroundColor(Color.parseColor("#64B5F6"));
-                } else {
+                } else if ("TARGET".equals(status)) {
                     statusBar.setBackgroundColor(Color.parseColor("#FF6B6B"));
+
                     AlphaAnimation pulse = new AlphaAnimation(1.0f, 0.3f);
                     pulse.setDuration(800);
                     pulse.setRepeatMode(Animation.REVERSE);
                     pulse.setRepeatCount(Animation.INFINITE);
                     statusBar.startAnimation(pulse);
+                } else if ("ALARM".equals(status)) {
+                    // если хочешь оставить отдельный цвет для ALARM
+                    statusBar.setBackgroundColor(Color.parseColor("#64B5F6"));
                 }
             }
 
