@@ -1,8 +1,11 @@
 package com.example.santiway.activity_map;
 
 import android.content.Intent;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -45,8 +48,9 @@ public class ActivityMapActivity extends AppCompatActivity {
     private String deviceMac;
     private String deviceName;
     private String deviceType = "Wi-Fi";
+    private static final String TAG = "ActivityMapActivity";
     private String tableName;
-    private String currentStatus = "scanned"; // scanned, Target, SAFE, CLEAR
+    private String currentStatus = "GREY";
     private long firstDetectionTime = 0;
     private long lastDetectionTime = 0;
     private int detectionCount = 0;
@@ -147,7 +151,7 @@ public class ActivityMapActivity extends AppCompatActivity {
             }
 
             // Получаем текущий статус устройства из БД
-            currentStatus = getDeviceStatusFromDB(dbHelper);
+            currentStatus = getDeviceStatus(tableName, deviceMac);
 
             // Собираем точки для карты в хронологическом порядке
             // Сортируем историю по времени для правильного отображения на карте
@@ -165,20 +169,32 @@ public class ActivityMapActivity extends AppCompatActivity {
         }
     }
 
-    private String getDeviceStatusFromDB(MainDatabaseHelper dbHelper) {
-        // Временная реализация - нужно добавить соответствующий метод в MainDatabaseHelper
-        // Проверяем историю, если есть движение - Target, иначе scanned
-        if (detectionCount > 1) {
-            // Простая проверка: если есть хотя бы две разные точки - предполагаем движение
-            if (deviceHistoryPoints.size() > 1) {
-                GeoPoint first = deviceHistoryPoints.get(deviceHistoryPoints.size() - 1);
-                GeoPoint last = deviceHistoryPoints.get(0);
-                if (first.distanceToAsDouble(last) > 10.0) { // больше 10 метров
-                    return "Target";
+    public String getDeviceStatus(String tableName, String mac) {
+        MainDatabaseHelper dbHelper = new MainDatabaseHelper(this);
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        Cursor cursor = null;
+
+        try {
+            cursor = db.rawQuery(
+                    "SELECT status FROM \"" + tableName + "\" WHERE bssid = ? ORDER BY timestamp DESC LIMIT 1",
+                    new String[]{mac}
+            );
+
+            if (cursor != null && cursor.moveToFirst()) {
+                int index = cursor.getColumnIndex("status");
+                if (index != -1) {
+                    String status = cursor.getString(index);
+                    return (status != null && !status.isEmpty()) ? status : "GREY";
                 }
             }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting device status: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            db.close();
         }
-        return "scanned";
+
+        return "GREY";
     }
 
     private void setupToolbar() {
@@ -200,33 +216,32 @@ public class ActivityMapActivity extends AppCompatActivity {
         updateButtonVisibility();
 
         // Обработчики нажатий
-        btnMakeTarget.setOnClickListener(v -> changeDeviceStatus("Target"));
+        btnMakeTarget.setOnClickListener(v -> changeDeviceStatus("TARGET"));
         btnMakeSafe.setOnClickListener(v -> changeDeviceStatus("SAFE"));
-        btnMakeClear.setOnClickListener(v -> changeDeviceStatus("scanned"));
+        btnMakeClear.setOnClickListener(v -> changeDeviceStatus("GREY"));
     }
 
     private void updateButtonVisibility() {
-        switch (currentStatus) {
-            case "Target":
-                statusHeader.setBackgroundColor(Color.parseColor("#FF3D3D")); // Красный
+        String status = currentStatus != null ? currentStatus.toUpperCase(Locale.US) : "GREY";
+
+        switch (status) {
+            case "TARGET":
+                statusHeader.setBackgroundColor(Color.parseColor("#FF3B30"));
                 btnMakeTarget.setVisibility(View.GONE);
-                btnMakeSafe.setVisibility(View.GONE);
+                btnMakeSafe.setVisibility(View.VISIBLE);
                 btnMakeClear.setVisibility(View.VISIBLE);
                 break;
+
             case "SAFE":
-                statusHeader.setBackgroundColor(Color.parseColor("#4CAF50")); // Зеленый
-                btnMakeTarget.setVisibility(View.GONE);
+                statusHeader.setBackgroundColor(Color.parseColor("#34C759"));
+                btnMakeTarget.setVisibility(View.VISIBLE);
                 btnMakeSafe.setVisibility(View.GONE);
                 btnMakeClear.setVisibility(View.VISIBLE);
                 break;
-            case "CLEAR":
-                statusHeader.setBackgroundColor(Color.parseColor("#2196F3")); // Синий
-                btnMakeTarget.setVisibility(View.GONE);
-                btnMakeSafe.setVisibility(View.GONE);
-                btnMakeClear.setVisibility(View.VISIBLE);
-                break;
-            default: // scanned
-                statusHeader.setBackgroundColor(Color.parseColor("#9E9E9E")); // Серый
+
+            case "GREY":
+            default:
+                statusHeader.setBackgroundColor(Color.parseColor("#808080"));
                 btnMakeTarget.setVisibility(View.VISIBLE);
                 btnMakeSafe.setVisibility(View.VISIBLE);
                 btnMakeClear.setVisibility(View.GONE);
@@ -246,14 +261,14 @@ public class ActivityMapActivity extends AppCompatActivity {
 
                 String message = "";
                 switch (newStatus) {
-                    case "Target":
-                        message = "Устройство помечено как Target";
+                    case "TARGET":
+                        message = "Устройство помечено как TARGET";
                         break;
                     case "SAFE":
-                        message = "Устройство помечено как Safe";
+                        message = "Устройство помечено как SAFE";
                         break;
                     default:
-                        message = "Статус сброшен";
+                        message = "Устройство переведено в GREY";
                         break;
                 }
 

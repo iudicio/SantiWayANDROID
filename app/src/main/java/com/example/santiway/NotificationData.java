@@ -27,7 +27,7 @@ public class NotificationData implements Serializable {
                 case SYSTEM:
                     return Color.parseColor("#3DDC84"); // Зеленый (как в вашем стиле)
                 case INFO:
-                    return Color.parseColor("#64B5F6"); // Синий
+                    return Color.parseColor("#808080"); // Серый
                 default:
                     return Color.parseColor("#FFFFFF");
             }
