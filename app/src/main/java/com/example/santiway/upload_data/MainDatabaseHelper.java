@@ -568,6 +568,77 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         return deviceList;
     }
 
+    public List<DeviceListActivity.Device> getAllDataFromTableWithPaginationAndSearch(
+            String tableName,
+            String searchQuery,
+            int offset,
+            int limit
+    ) {
+        List<DeviceListActivity.Device> deviceList = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+
+        try {
+            String likeQuery = "%" + searchQuery + "%";
+
+            String sql = "SELECT type, name, bssid, cell_id, latitude, longitude, timestamp, status " +
+                    "FROM \"" + tableName + "\" " +
+                    "WHERE UPPER(COALESCE(name, '')) LIKE UPPER(?) " +
+                    "   OR UPPER(COALESCE(bssid, '')) LIKE UPPER(?) " +
+                    "ORDER BY timestamp DESC " +
+                    "LIMIT ? OFFSET ?";
+
+            cursor = db.rawQuery(sql, new String[]{
+                    likeQuery,
+                    likeQuery,
+                    String.valueOf(limit),
+                    String.valueOf(offset)
+            });
+
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    String type = cursor.getString(cursor.getColumnIndexOrThrow("type"));
+                    String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
+                    String mac = cursor.getString(cursor.getColumnIndexOrThrow("bssid"));
+                    int cellId = cursor.getInt(cursor.getColumnIndexOrThrow("cell_id"));
+                    double lat = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
+                    double lon = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
+                    long ts = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
+
+                    int statusIdx = cursor.getColumnIndex("status");
+                    String currentStatus = "GREY";
+                    if (statusIdx != -1) {
+                        String dbStatus = cursor.getString(statusIdx);
+                        if (dbStatus != null && !dbStatus.isEmpty()) {
+                            currentStatus = dbStatus;
+                        }
+                    }
+
+                    String loc = String.format(Locale.getDefault(), "Lat: %.4f, Lon: %.4f", lat, lon);
+                    String time = new java.text.SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                            .format(new java.util.Date(ts));
+
+                    String deviceId = ("Cell".equals(type)) ? String.valueOf(cellId) : mac;
+
+                    deviceList.add(new DeviceListActivity.Device(
+                            name,
+                            type,
+                            loc,
+                            time,
+                            deviceId,
+                            currentStatus
+                    ));
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Search pagination error: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+
+        return deviceList;
+    }
+
     public int updateDeviceStatus(String tableName, String mac, String newStatus) {
         SQLiteDatabase db = this.getWritableDatabase();
         int rowsAffected = 0;
