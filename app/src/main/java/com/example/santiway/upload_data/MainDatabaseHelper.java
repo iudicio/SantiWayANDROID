@@ -183,7 +183,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             // не кладём latitude/longitude -> в БД будут NULL (если колонки допускают NULL)
         }
         values.put("timestamp", device.getTimestamp());
-        values.put("status", "scanned"); // Статус
+        values.put("status", "GREY"); // Статус
         values.put("folder_name", "");
 
         // Логика поиска/обновления: ищем по MAC-адресу и типу "Bluetooth"
@@ -219,7 +219,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             // не кладём latitude/longitude -> в БД будут NULL (если колонки допускают NULL)
         }
         values.put("timestamp", device.getTimestamp());
-        values.put("status", "ignore");
+        values.put("status", "GREY");
         values.put("folder_name", "");
 
         String selection = "bssid = ?";
@@ -258,7 +258,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             // не кладём latitude/longitude -> в БД будут NULL (если колонки допускают NULL)
         }
         values.put("timestamp", tower.getTimestamp());
-        values.put("status", "ignore");
+        values.put("status", "GREY");
         values.put("folder_name", "");
 
         String selection = "cell_id = ? AND network_type = ?";
@@ -362,20 +362,31 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             Double curAlt = values.getAsDouble("altitude");
             Float curAcc = values.getAsFloat("location_accuracy");
 
-            // 5. Если есть координаты, рассчитываем статус
-            if (curLat != null && curLon != null) {
+            // 5. Проверяем Target только для GREY-устройств
+            String lastStatus = "GREY";
+            ContentValues latestDevice = getLatestDeviceData(uniqueId, tableName);
+
+            if (latestDevice != null) {
+                String dbStatus = latestDevice.getAsString("status");
+                if (dbStatus != null && !dbStatus.isEmpty()) {
+                    lastStatus = dbStatus;
+                }
+            }
+
+            if (curLat != null && curLon != null && "GREY".equals(lastStatus)) {
                 try {
                     String calculatedStatus = evaluateTargetStatus(uniqueId, curLat, curLon, newTimestamp, tableName);
                     values.put("status", calculatedStatus);
                     Log.d(TAG, "Status for " + uniqueId + ": " + calculatedStatus);
 
-                    // 6. Если статус "Target", создаем уведомление
                     if ("Target".equals(calculatedStatus)) {
                         createTargetNotification(values, uniqueId, curLat, curLon);
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "Error calculating status: " + e.getMessage());
                 }
+            } else {
+                values.put("status", lastStatus);
             }
 
             // 7. Добавляем запись в основную таблицу
@@ -532,7 +543,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                     long ts = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
 
                     int statusIdx = cursor.getColumnIndex("status");
-                    String currentStatus = "scanned";
+                    String currentStatus = "GREY";
                     if (statusIdx != -1) {
                         String dbStatus = cursor.getString(statusIdx);
                         if (dbStatus != null && !dbStatus.isEmpty()) {
@@ -836,8 +847,16 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                     double curLat = cursor.getDouble(0);
                     double curLon = cursor.getDouble(1);
 
-                    // Суммируем расстояние между последовательными точками
-                    totalDistance += calculateDistance(prevLat, prevLon, curLat, curLon);
+                    double jumpMeters = calculateDistance(prevLat, prevLon, curLat, curLon);
+
+                    // Пропускаем слишком близкие точки
+                    if (jumpMeters < 10.0) {
+                        prevLat = curLat;
+                        prevLon = curLon;
+                        continue;
+                    }
+
+                    totalDistance += jumpMeters;
 
                     prevLat = curLat;
                     prevLon = curLon;
@@ -882,13 +901,11 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
     // 3. Проверка условий Target
     private String evaluateTargetStatus(String uniqueId, double curLat, double curLon, long curTime, String tableName) {
-        if (uniqueId == null || uniqueId.isEmpty()) return "scanned";
+        if (uniqueId == null || uniqueId.isEmpty()) return "GREY";
 
         SQLiteDatabase db = this.getReadableDatabase();
-        // Определяем колонку: MAC-адрес (с двоеточиями) или CellID
         String column = uniqueId.contains(":") ? "bssid" : "cell_id";
 
-        // Ищем последнюю известную точку устройства
         Cursor cursor = db.query("\"" + tableName + "\"",
                 new String[]{"latitude", "longitude", "timestamp"},
                 "CAST(" + column + " AS TEXT) = ?",
@@ -898,45 +915,79 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         double speedKmH = 0;
         double dist24h = 0;
 
-        if (cursor != null && cursor.moveToFirst()) {
-            double prevLat = cursor.getDouble(0);
-            double prevLon = cursor.getDouble(1);
-            long prevTime = cursor.getLong(2);
-            cursor.close();
+        try {
+            if (cursor != null && cursor.moveToFirst()) {
+                double prevLat = cursor.getDouble(0);
+                double prevLon = cursor.getDouble(1);
+                long prevTime = cursor.getLong(2);
 
-            // 1. Считаем дистанцию текущего "прыжка"
-            double currentJumpMeters = calculateDistance(prevLat, prevLon, curLat, curLon);
+                // 1. Считаем дистанцию текущего прыжка
+                double currentJumpMeters = calculateDistance(prevLat, prevLon, curLat, curLon);
 
-            // 2. Считаем скорость
-            double timeHours = (double) (curTime - prevTime) / 3600000.0;
-            if (timeHours > 0) {
-                speedKmH = (currentJumpMeters / 1000.0) / timeHours;
+                // Если между точками меньше 10 метров - пропускаем
+                if (currentJumpMeters < 10.0) {
+                    Log.d("MATH_CHECK", "ID: " + uniqueId + " - прыжок < 10 м, пропускаем точку");
+                    return "GREY";
+                }
+
+                // 2. Считаем скорость
+                double timeHours = (double) (curTime - prevTime) / 3600000.0;
+                if (timeHours > 0) {
+                    speedKmH = (currentJumpMeters / 1000.0) / timeHours;
+                }
+
+                // 3. Фильтры перед дальнейшим расчетом
+                if (currentJumpMeters > 1000.0 && speedKmH < 20.0) {
+                    Log.d("MATH_CHECK", String.format(
+                            Locale.US,
+                            "ID: %s - расстояние > 1 км и скорость < 20 км/ч, дальше не считаем",
+                            uniqueId
+                    ));
+                    return "GREY";
+                }
+
+                if (currentJumpMeters > 10000.0 && speedKmH > 20.0) {
+                    Log.d("MATH_CHECK", String.format(
+                            Locale.US,
+                            "ID: %s - расстояние > 10 км и скорость > 20 км/ч, дальше не считаем",
+                            uniqueId
+                    ));
+                    return "GREY";
+                }
+
+                // 4. Считаем накопленный путь за 24 часа
+                dist24h = getDistanceLast24h(uniqueId, tableName) + (currentJumpMeters / 1000.0);
+
+                Log.d("MATH_CHECK", String.format(
+                        Locale.US,
+                        "ID: %s | Прыжок: %.2f м | Скорость: %.2f км/ч | Итоговый путь: %.2f км",
+                        uniqueId, currentJumpMeters, speedKmH, dist24h
+                ));
+            } else {
+                Log.d("MATH_CHECK", "ID: " + uniqueId + " - первая встреча, статус GREY");
+                return "GREY";
             }
 
-            // 3. Считаем накопленный путь за 24ч и ПРИБАВЛЯЕМ текущий прыжок
-            // Это важно, так как в базе новой точки еще нет
-            dist24h = getDistanceLast24h(uniqueId, tableName) + (currentJumpMeters / 1000.0);
+            // 5. Основные условия target
+            if (speedKmH > 20.0 && dist24h > 10.0) {
+                Log.d("MATH_CHECK", "!!! TARGET DETECTED (High Speed) !!!");
+                return "TARGET";
+            }
 
-            Log.d("MATH_CHECK", String.format("ID: %s | Скорость: %.2f км/ч | Итоговый путь: %.2f км",
-                    uniqueId, speedKmH, dist24h));
-        } else {
-            // Если устройства еще нет в базе, это первый скан
-            Log.d("MATH_CHECK", "ID: " + uniqueId + " - первая встреча, статус scanned");
-            return "scanned";
+            if (speedKmH <= 20.0 && dist24h > 1.0) {
+                Log.d("MATH_CHECK", "!!! TARGET DETECTED (Movement) !!!");
+                return "TARGET";
+            }
+
+            return "GREY";
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error in evaluateTargetStatus: " + e.getMessage());
+            return "GREY";
+        } finally {
+            if (cursor != null) cursor.close();
+            db.close();
         }
-
-        // Условия из задания
-        if (speedKmH > 20 && dist24h > 10.0) {
-            Log.d("MATH_CHECK", "!!! TARGET DETECTED (High Speed) !!!");
-            return "Target";
-        }
-
-        if (speedKmH <= 20 && dist24h > 1.0) {
-            Log.d("MATH_CHECK", "!!! TARGET DETECTED (Movement) !!!");
-            return "Target";
-        }
-
-        return "scanned";
     }
     private void sendSystemNotification(String title, String message) {
         String channelId = "target_alerts";
@@ -963,7 +1014,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
         // 3. Собираем само уведомление
         NotificationCompat.Builder builder = new NotificationCompat.Builder(mContext, channelId)
-                .setSmallIcon(R.drawable.ic_cloud) // Замени на свою иконку!
+                .setSmallIcon(R.drawable.ic_cloud)
                 .setContentTitle(title)
                 .setContentText(message)
                 .setAutoCancel(true)
@@ -1054,14 +1105,14 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     /**
      * Получает последнюю запись устройства из unified_data
      */
-    public ContentValues getLatestDeviceData(String uniqueId, String type) {
+    public ContentValues getLatestDeviceData(String uniqueId, String tableName) {
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = null;
         ContentValues values = null;
 
         try {
             String column = uniqueId.contains(":") ? "bssid" : "cell_id";
-            String query = "SELECT * FROM \"unified_data\" WHERE " + column + " = ? " +
+            String query = "SELECT * FROM \"" + tableName + "\" WHERE " + column + " = ? " +
                     "ORDER BY timestamp DESC LIMIT 1";
 
             cursor = db.rawQuery(query, new String[]{uniqueId});

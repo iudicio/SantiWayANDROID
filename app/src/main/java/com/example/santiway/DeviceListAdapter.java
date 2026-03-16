@@ -169,24 +169,28 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
                 String status = device.getStatus() != null
                         ? device.getStatus().trim().toUpperCase()
-                        : "";
+                        : "GREY";
 
-                // По умолчанию всегда серый
-                statusBar.setBackgroundColor(Color.parseColor("#808080"));
+                switch (status) {
 
-                if ("SAFE".equals(status)) {
-                    statusBar.setBackgroundColor(Color.parseColor("#3DDC84"));
-                } else if ("TARGET".equals(status)) {
-                    statusBar.setBackgroundColor(Color.parseColor("#FF6B6B"));
+                    case "TARGET":
+                        statusBar.setBackgroundColor(Color.parseColor("#FF3B30")); // красный
 
-                    AlphaAnimation pulse = new AlphaAnimation(1.0f, 0.3f);
-                    pulse.setDuration(800);
-                    pulse.setRepeatMode(Animation.REVERSE);
-                    pulse.setRepeatCount(Animation.INFINITE);
-                    statusBar.startAnimation(pulse);
-                } else if ("ALARM".equals(status)) {
-                    // если хочешь оставить отдельный цвет для ALARM
-                    statusBar.setBackgroundColor(Color.parseColor("#64B5F6"));
+                        AlphaAnimation pulse = new AlphaAnimation(1.0f, 0.3f);
+                        pulse.setDuration(800);
+                        pulse.setRepeatMode(Animation.REVERSE);
+                        pulse.setRepeatCount(Animation.INFINITE);
+                        statusBar.startAnimation(pulse);
+                        break;
+
+                    case "SAFE":
+                        statusBar.setBackgroundColor(Color.parseColor("#34C759")); // зелёный
+                        break;
+
+                    case "GREY":
+                    default:
+                        statusBar.setBackgroundColor(Color.parseColor("#808080")); // серый
+                        break;
                 }
             }
 
