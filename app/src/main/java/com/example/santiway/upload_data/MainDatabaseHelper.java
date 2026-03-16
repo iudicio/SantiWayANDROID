@@ -1057,7 +1057,6 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             return "GREY";
         } finally {
             if (cursor != null) cursor.close();
-            db.close();
         }
     }
     private void sendSystemNotification(String title, String message) {
