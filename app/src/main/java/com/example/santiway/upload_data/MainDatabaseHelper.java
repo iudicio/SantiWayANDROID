@@ -379,7 +379,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                     values.put("status", calculatedStatus);
                     Log.d(TAG, "Status for " + uniqueId + ": " + calculatedStatus);
 
-                    if ("Target".equals(calculatedStatus)) {
+                    if ("TARGET".equals(calculatedStatus)) {
                         createTargetNotification(values, uniqueId, curLat, curLon);
                     }
                 } catch (Exception e) {
