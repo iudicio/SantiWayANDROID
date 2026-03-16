@@ -1,4 +1,6 @@
 package com.example.santiway;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.textfield.TextInputEditText;
 
 import android.app.AlertDialog;
 import android.content.Intent;
@@ -7,6 +9,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
 import android.view.MenuItem;
+import android.text.Editable;
+import android.text.TextWatcher;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
@@ -19,6 +24,7 @@ import com.example.santiway.upload_data.UniqueDevicesHelper;
 import com.google.android.material.tabs.TabLayout;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.view.ViewGroup;
@@ -42,6 +48,12 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
     private int currentOffset = 0;
     private final int PAGE_SIZE = 50; // Количество элементов на странице
     private String currentTable = "";
+    private MaterialButton btnFilterTarget, btnFilterSafe, btnFilterAll;
+
+    private final List<Device> allLoadedDevices = new ArrayList<>();
+    private String currentStatusFilter = "ALL";
+    private TextInputEditText etSearchDevice;
+    private String currentSearchQuery = "";
 
     // Хендлер для задержки
     private Handler handler = new Handler();
@@ -59,6 +71,10 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         toolbar = findViewById(R.id.toolbar);
         tabLayout = findViewById(R.id.tab_layout);
         devicesRecyclerView = findViewById(R.id.devices_recycler_view);
+        btnFilterTarget = findViewById(R.id.btn_filter_target);
+        btnFilterSafe = findViewById(R.id.btn_filter_safe);
+        btnFilterAll = findViewById(R.id.btn_filter_all);
+        etSearchDevice = findViewById(R.id.et_search_device);
 
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
@@ -206,14 +222,12 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         }
         LinearLayout safeButton = findViewById(R.id.action_safe);
         if (safeButton != null) {
-            safeButton.setOnClickListener(v -> {
-                int pos = tabLayout.getSelectedTabPosition();
-                if (pos != -1) {
-                    String folder = tabLayout.getTabAt(pos).getText().toString();
-                    int count = new MainDatabaseHelper(this).updateAllDeviceStatusForTable(folder, "SAFE");
-                    Toast.makeText(this, count + " устройств теперь SAFE", Toast.LENGTH_SHORT).show();
-                }
-            });
+            safeButton.setOnClickListener(v -> updateAllDevicesStatus("SAFE"));
+        }
+
+        LinearLayout targetButton = findViewById(R.id.action_alarm);
+        if (targetButton != null) {
+            targetButton.setOnClickListener(v -> updateAllDevicesStatus("TARGET"));
         }
 
         // Инициализация LayoutManager
@@ -247,6 +261,8 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
 
         // Динамическая загрузка вкладок из базы данных
         setupTabLayout();
+        setupFilterButtons();
+        setupSearch();
     }
 
     // Метод для открытия карты устройства
@@ -362,7 +378,10 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         currentOffset = 0;
         hasMoreData = true;
         isLoading = false;
+        allLoadedDevices.clear();
+        currentStatusFilter = "ALL";
         adapter.clearData();
+        updateFilterButtonsUI();
     }
 
     private void loadDevicesForTable(String tableName, boolean isFirstLoad) {
@@ -387,11 +406,20 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
                 hasMoreData = false;
             } else {
                 // Для обычных таблиц используем пагинацию
-                deviceList = databaseHelper.getAllDataFromTableWithPagination(
-                        tableName,
-                        currentOffset,
-                        PAGE_SIZE
-                );
+                if (currentSearchQuery == null || currentSearchQuery.isEmpty()) {
+                    deviceList = databaseHelper.getAllDataFromTableWithPagination(
+                            tableName,
+                            currentOffset,
+                            PAGE_SIZE
+                    );
+                } else {
+                    deviceList = databaseHelper.getAllDataFromTableWithPaginationAndSearch(
+                            tableName,
+                            currentSearchQuery,
+                            currentOffset,
+                            PAGE_SIZE
+                    );
+                }
 
                 if (deviceList.size() < PAGE_SIZE) {
                     hasMoreData = false;
@@ -405,12 +433,44 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
                 adapter.hideLoading();
 
                 if (isFirstLoad) {
-                    adapter.updateData(finalDeviceList);
-                } else {
-                    adapter.addData(finalDeviceList);
+                    allLoadedDevices.clear();
                 }
 
+                allLoadedDevices.addAll(finalDeviceList);
+                applyCurrentFilter();
+
                 isLoading = false;
+            });
+        }).start();
+    }
+
+    private void updateAllDevicesStatus(String status) {
+        int pos = tabLayout.getSelectedTabPosition();
+        if (pos == -1) {
+            Toast.makeText(this, "Вкладка не выбрана", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String folder = tabLayout.getTabAt(pos).getText().toString();
+
+        new Thread(() -> {
+            int count = new MainDatabaseHelper(DeviceListActivity.this)
+                    .updateAllDeviceStatusForTable(folder, status);
+
+            runOnUiThread(() -> {
+                Toast.makeText(
+                        DeviceListActivity.this,
+                        count + " устройств теперь " + status,
+                        Toast.LENGTH_SHORT
+                ).show();
+
+                // Обновляем локальный список, чтобы цвет сменился сразу
+                for (Device device : allLoadedDevices) {
+                    device.setStatus(status);
+                }
+
+                applyCurrentFilter();
+
             });
         }).start();
     }
@@ -425,6 +485,87 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
                 loadDevicesForTable(currentTable, false);
             }, 500);
         }
+    }
+
+    private void setupFilterButtons() {
+        if (btnFilterTarget != null) {
+            btnFilterTarget.setOnClickListener(v -> {
+                currentStatusFilter = "TARGET";
+                applyCurrentFilter();
+                updateFilterButtonsUI();
+            });
+        }
+
+        if (btnFilterSafe != null) {
+            btnFilterSafe.setOnClickListener(v -> {
+                currentStatusFilter = "SAFE";
+                applyCurrentFilter();
+                updateFilterButtonsUI();
+            });
+        }
+
+        if (btnFilterAll != null) {
+            btnFilterAll.setOnClickListener(v -> {
+                currentStatusFilter = "ALL";
+                applyCurrentFilter();
+                updateFilterButtonsUI();
+            });
+        }
+
+        updateFilterButtonsUI();
+    }
+
+    private void setupSearch() {
+        if (etSearchDevice == null) return;
+
+        etSearchDevice.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) { }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                handler.removeCallbacksAndMessages(null);
+
+                handler.postDelayed(() -> {
+                    currentSearchQuery = s.toString().trim();
+                    resetPagination();
+                    if (currentTable != null && !currentTable.isEmpty()) {
+                        loadDevicesForTable(currentTable, true);
+                    }
+                }, 300);
+            }
+        });
+    }
+
+    private void applyCurrentFilter() {
+        List<Device> filteredList = new ArrayList<>();
+
+        if ("ALL".equalsIgnoreCase(currentStatusFilter)) {
+            filteredList.addAll(allLoadedDevices);
+        } else {
+            for (Device device : allLoadedDevices) {
+                String status = device.getStatus() != null
+                        ? device.getStatus().trim().toUpperCase(Locale.ROOT)
+                        : "GREY";
+
+                if (status.equals(currentStatusFilter)) {
+                    filteredList.add(device);
+                }
+            }
+        }
+
+        adapter.updateData(filteredList);
+    }
+
+    private void updateFilterButtonsUI() {
+        if (btnFilterTarget == null || btnFilterSafe == null || btnFilterAll == null) return;
+
+        btnFilterTarget.setAlpha("TARGET".equals(currentStatusFilter) ? 1.0f : 0.5f);
+        btnFilterSafe.setAlpha("SAFE".equals(currentStatusFilter) ? 1.0f : 0.5f);
+        btnFilterAll.setAlpha("ALL".equals(currentStatusFilter) ? 1.0f : 0.5f);
     }
 
     @Override
