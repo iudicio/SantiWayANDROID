@@ -88,17 +88,17 @@
                 android:id="@+id/info_button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:backgroundTint="#3DDC84"
+                android:backgroundTint="#41AEE7"
                 android:minWidth="0dp"
+                android:minHeight="0dp"
                 android:paddingStart="12dp"
+                android:paddingTop="8dp"
                 android:paddingEnd="12dp"
+                android:paddingBottom="8dp"
                 android:text="Info"
                 android:textColor="@android:color/black"
                 android:textSize="12sp"
-                app:cornerRadius="8dp"
-                android:minHeight="0dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp"/>
+                app:cornerRadius="8dp" />
         </LinearLayout>
     </LinearLayout>
 </androidx.cardview.widget.CardView>

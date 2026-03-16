@@ -35,6 +35,7 @@ import com.example.santiway.R;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class ActivityMapOSM extends Fragment {
 
@@ -307,15 +308,16 @@ public class ActivityMapOSM extends Fragment {
     }
 
     private int getStatusColor(String status) {
-        switch (status) {
-            case "Target":
-                return Color.parseColor("#FF3D3D"); // Красный
+        if (status == null) status = "GREY";
+
+        switch (status.toUpperCase(Locale.US)) {
+            case "TARGET":
+                return Color.parseColor("#FF3B30");
             case "SAFE":
-                return Color.parseColor("#4CAF50"); // Зеленый
-            case "CLEAR":
-                return Color.parseColor("#2196F3"); // Синий
+                return Color.parseColor("#34C759");
+            case "GREY":
             default:
-                return Color.parseColor("#9E9E9E"); // Серый
+                return Color.parseColor("#808080");
         }
     }
 

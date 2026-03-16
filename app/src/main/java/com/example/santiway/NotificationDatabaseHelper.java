@@ -21,8 +21,8 @@ public class NotificationDatabaseHelper extends SQLiteOpenHelper {
     private static final String COL_TEXT = "text";
     private static final String COL_TIMESTAMP = "timestamp";
     private static final String COL_TYPE = "type";
-    private static final String COL_LAT = "latitude";  // Проверь, что тут "latitude"
-    private static final String COL_LON = "longitude"; // Проверь, что тут "longitude"
+    private static final String COL_LAT = "latitude";
+    private static final String COL_LON = "longitude";
 
     public NotificationDatabaseHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -72,8 +72,8 @@ public class NotificationDatabaseHelper extends SQLiteOpenHelper {
                         new Date(c.getLong(c.getColumnIndexOrThrow(COL_TIMESTAMP))),
                         NotificationData.NotificationType.valueOf(c.getString(c.getColumnIndexOrThrow(COL_TYPE))),
                         null, null,
-                        c.getDouble(c.getColumnIndexOrThrow(COL_LAT)), // Исправлено: теперь ищет "latitude"
-                        c.getDouble(c.getColumnIndexOrThrow(COL_LON))  // Исправлено: теперь ищет "longitude"
+                        c.getDouble(c.getColumnIndexOrThrow(COL_LAT)),
+                        c.getDouble(c.getColumnIndexOrThrow(COL_LON))
                 ));
             } while (c.moveToNext());
         }
