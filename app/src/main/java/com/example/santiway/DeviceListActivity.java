@@ -230,6 +230,11 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
             targetButton.setOnClickListener(v -> updateAllDevicesStatus("TARGET"));
         }
 
+        LinearLayout greyButton = findViewById(R.id.action_grey);
+        if (greyButton != null) {
+            greyButton.setOnClickListener(v -> updateAllDevicesStatus("GREY"));
+        }
+
         // Инициализация LayoutManager
         layoutManager = new LinearLayoutManager(this);
         devicesRecyclerView.setLayoutManager(layoutManager);
