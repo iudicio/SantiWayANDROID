@@ -175,18 +175,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         registerFolderSwitchedReceiver();
 
         databaseHelper = new MainDatabaseHelper(this);
-        SQLiteDatabase db = databaseHelper.getWritableDatabase();
-        try {
-            UniqueDevicesHelper uniqueHelper = new UniqueDevicesHelper(this);
-            // Передаем открытое соединение для создания таблицы
-            uniqueHelper.addOrUpdateDevice(db, new ContentValues()); // Это создаст таблицу если её нет
-        } catch (Exception e) {
-            Log.e("MainActivity", "Error initializing unique devices: " + e.getMessage());
-        } finally {
-            if (db != null && db.isOpen()) {
-                db.close();
-            }
-        }
 
         checkAndRequestPermissionsStepByStep();
 
