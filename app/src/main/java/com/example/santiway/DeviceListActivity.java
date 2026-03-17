@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -81,35 +82,6 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         getSupportActionBar().setTitle("Database Tables");
 
         databaseHelper = new MainDatabaseHelper(this);
-        // 1. Находим кнопку Alarm в макете DeviceListActivity
-        LinearLayout alarmButton = findViewById(R.id.action_alarm);
-
-        if (alarmButton != null) {
-            alarmButton.setOnClickListener(v -> {
-                // 2. Определяем, какая папка сейчас выбрана в TabLayout
-                int selectedTabPos = tabLayout.getSelectedTabPosition();
-                if (selectedTabPos != -1) {
-                    String currentFolder = tabLayout.getTabAt(selectedTabPos).getText().toString();
-
-                    // 3. Используем твой MainDatabaseHelper (без изменений метода)
-                    MainDatabaseHelper dbHelper = new MainDatabaseHelper(DeviceListActivity.this);
-                    int rowsAffected = dbHelper.updateAllDeviceStatusForTable(currentFolder, "ALARM");
-
-                    // 4. Показываем результат, чтобы убедиться, что всё сработало
-                    Toast.makeText(DeviceListActivity.this,
-                            "Обновлено устройств: " + rowsAffected + " в папке " + currentFolder,
-                            Toast.LENGTH_SHORT).show();
-
-                    // 5. Опционально: обнови список на экране, если нужно сразу увидеть изменения
-                    // refreshListData(currentFolder);
-                } else {
-                    Toast.makeText(DeviceListActivity.this, "Ошибка: вкладка не выбрана", Toast.LENGTH_SHORT).show();
-                }
-            });
-        } else {
-            // Если в Logcat будет эта ошибка, значит кнопка не найдена в XML
-            Log.e("ALARM_ERROR", "Кнопка action_alarm не найдена в DeviceListActivity");
-        }
         LinearLayout clearButton = findViewById(R.id.action_clear);
 
         if (clearButton != null) {
@@ -384,6 +356,10 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         updateFilterButtonsUI();
     }
 
+    private String getUniqueTableName(String folderName) {
+        return folderName + "_unique";
+    }
+
     private void loadDevicesForTable(String tableName, boolean isFirstLoad) {
         if (isFirstLoad) {
             currentOffset = 0;
@@ -395,50 +371,35 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         isLoading = true;
 
         new Thread(() -> {
-            List<Device> deviceList;
+            List<Device> deviceList = new ArrayList<>();
 
-            // ДЛЯ УНИКАЛЬНЫХ УСТРОЙСТВ используем отдельную логику
-            if ("unique_devices".equals(tableName)) {
-                // Получаем из UniqueDevicesHelper
-                UniqueDevicesHelper uniqueHelper = new UniqueDevicesHelper(DeviceListActivity.this);
-                deviceList = uniqueHelper.getAllDevices();
-                // Для уникальных устройств пагинация не нужна
-                hasMoreData = false;
-            } else {
-                // Для обычных таблиц используем пагинацию
+            try {
+                String uniqueTableName = getUniqueTableName(tableName);
+                UniqueDevicesHelper uniqueHelper =
+                        new UniqueDevicesHelper(DeviceListActivity.this, uniqueTableName);
+
                 if (currentSearchQuery == null || currentSearchQuery.isEmpty()) {
-                    deviceList = databaseHelper.getAllDataFromTableWithPagination(
-                            tableName,
-                            currentOffset,
-                            PAGE_SIZE
-                    );
+                    deviceList = uniqueHelper.getAllDevices();
                 } else {
-                    deviceList = databaseHelper.getAllDataFromTableWithPaginationAndSearch(
-                            tableName,
-                            currentSearchQuery,
-                            currentOffset,
-                            PAGE_SIZE
-                    );
+                    deviceList = uniqueHelper.getAllDevicesWithSearch(currentSearchQuery);
                 }
 
-                if (deviceList.size() < PAGE_SIZE) {
-                    hasMoreData = false;
-                }
-                currentOffset += deviceList.size();
+                hasMoreData = false; // для unique-таблицы пагинация не нужна
+            } catch (Exception e) {
+                Log.e("LOAD_DEVICES", "Ошибка загрузки устройств: " + e.getMessage(), e);
             }
 
-            final List<Device> finalDeviceList = deviceList;
-
+            List<Device> finalDeviceList = deviceList;
             runOnUiThread(() -> {
                 adapter.hideLoading();
 
                 if (isFirstLoad) {
                     allLoadedDevices.clear();
                 }
-
+                allLoadedDevices.clear();
                 allLoadedDevices.addAll(finalDeviceList);
-                applyCurrentFilter();
 
+                applyCurrentFilter();
                 isLoading = false;
             });
         }).start();
