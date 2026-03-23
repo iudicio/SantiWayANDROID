@@ -17,6 +17,7 @@ public class ApiDevice {
     private Integer mnc;
     private Long tac;
     private Integer lac;
+    private String device_name;
 
     // Конструктор
     public ApiDevice() {}
@@ -68,4 +69,7 @@ public class ApiDevice {
 
     public Integer getLac() { return lac; }
     public void setLac(Integer lac) { this.lac = lac; }
+
+    public String getDevice_name() { return device_name; }
+    public void setDevice_name(String device_name) { this.device_name = device_name; }
 }

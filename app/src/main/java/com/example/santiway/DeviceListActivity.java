@@ -89,7 +89,7 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
                 // 1. Получаем имя текущей папки (таблицы)
                 int selectedTabPos = tabLayout.getSelectedTabPosition();
                 if (selectedTabPos == -1) return;
-                String currentFolder = tabLayout.getTabAt(selectedTabPos).getText().toString();
+                String currentFolder = (String) tabLayout.getTabAt(selectedTabPos).getTag();
 
                 // 2. Создаем диалог подтверждения
                 AlertDialog dialog = new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
@@ -311,31 +311,35 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         }
     }
 
+    private String getDisplayTableName(String tableName) {
+        return "unified_data".equals(tableName) ? "Основная" : tableName;
+    }
+
     private void setupTabLayout() {
         tabLayout.removeAllTabs();
         List<String> tables = databaseHelper.getAllTables();
 
         for (String tableName : tables) {
-            tabLayout.addTab(tabLayout.newTab().setText(tableName));
+            TabLayout.Tab tab = tabLayout.newTab()
+                    .setText(getDisplayTableName(tableName));
+            tab.setTag(tableName); // реальное имя таблицы
+            tabLayout.addTab(tab);
         }
 
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
-                // Сброс состояния пагинации при смене вкладки
                 resetPagination();
-                currentTable = tab.getText().toString();
+                currentTable = (String) tab.getTag();
                 loadDevicesForTable(currentTable, true);
             }
 
             @Override
-            public void onTabUnselected(TabLayout.Tab tab) {
-                // Ничего не делаем
-            }
+            public void onTabUnselected(TabLayout.Tab tab) { }
 
             @Override
             public void onTabReselected(TabLayout.Tab tab) {
-                String tableName = tab.getText().toString();
+                String tableName = (String) tab.getTag();
                 if (!tableName.equals(currentTable)) {
                     resetPagination();
                     currentTable = tableName;
@@ -344,7 +348,6 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
             }
         });
 
-        // Загружаем данные для первой вкладки по умолчанию
         if (!tables.isEmpty()) {
             currentTable = tables.get(0);
             loadDevicesForTable(currentTable, true);
@@ -397,10 +400,6 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
             List<Device> finalDeviceList = deviceList;
             runOnUiThread(() -> {
                 adapter.hideLoading();
-
-                if (isFirstLoad) {
-                    allLoadedDevices.clear();
-                }
                 allLoadedDevices.clear();
                 allLoadedDevices.addAll(finalDeviceList);
 
@@ -417,7 +416,8 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
             return;
         }
 
-        String folder = tabLayout.getTabAt(pos).getText().toString();
+        if (pos == -1 || tabLayout.getTabAt(pos) == null) return;
+        String folder = (String) tabLayout.getTabAt(pos).getTag();
 
         new Thread(() -> {
             int count = new MainDatabaseHelper(DeviceListActivity.this)

@@ -215,9 +215,13 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
 
 
+    private String getDisplayFolderName(String folderName) {
+        return "unified_data".equals(folderName) ? "Основная" : folderName;
+    }
+
     private void updateToolbarTitle(String folderName) {
         if (toolbarFolderTitleTextView != null) {
-            toolbarFolderTitleTextView.setText(folderName);
+            toolbarFolderTitleTextView.setText(getDisplayFolderName(folderName));
         }
     }
 
