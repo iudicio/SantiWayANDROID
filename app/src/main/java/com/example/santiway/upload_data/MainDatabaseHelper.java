@@ -184,7 +184,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         }
         values.put("timestamp", device.getTimestamp());
         values.put("status", "GREY"); // Статус
-        values.put("folder_name", "");
+        values.put("folder_name", tableName);
 
         // Логика поиска/обновления: ищем по MAC-адресу и типу "Bluetooth"
         String selection = "bssid = ? AND type = ?";
@@ -220,7 +220,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         }
         values.put("timestamp", device.getTimestamp());
         values.put("status", "GREY");
-        values.put("folder_name", "");
+        values.put("folder_name", tableName);
 
         String selection = "bssid = ?";
         String[] selectionArgs = {device.getBssid()};
@@ -259,7 +259,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         }
         values.put("timestamp", tower.getTimestamp());
         values.put("status", "GREY");
-        values.put("folder_name", "");
+        values.put("folder_name", tableName);
 
         String selection = "cell_id = ? AND network_type = ?";
         String[] selectionArgs = {String.valueOf(tower.getCellId()), tower.getNetworkType()};
@@ -394,7 +394,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             result = db.insert("\"" + tableName + "\"", null, values);
 
             if (result != -1) {
-                addToUniqueDevices(db, values);
+                addToFolderUniqueDevices(db, tableName, values);
             }
 
             db.setTransactionSuccessful();
@@ -462,13 +462,13 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             Log.e(TAG, "Error creating notification: " + e.getMessage());
         }
     }
-    public void clearTableData(String tableName) {
+    public void clearTableData(String folderName) {
         SQLiteDatabase db = this.getWritableDatabase();
         try {
-            db.delete("\"" + tableName + "\"", null, null);
-            Log.d("DB_CHECK", "Все данные из таблицы " + tableName + " удалены.");
+            db.delete("\"" + folderName + "\"", null, null);
+            db.delete("\"" + folderName + "_unique\"", null, null);
         } catch (Exception e) {
-            Log.e("DB_CHECK", "Ошибка при очистке: " + e.getMessage());
+            Log.e(TAG, "Error clearing folder tables: " + e.getMessage());
         } finally {
             db.close();
         }
@@ -476,9 +476,8 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     public void renameTable(String oldName, String newName) {
         SQLiteDatabase db = this.getWritableDatabase();
         try {
-            // Оборачиваем имена в двойные кавычки
-            String query = "ALTER TABLE \"" + oldName + "\" RENAME TO \"" + newName + "\"";
-            db.execSQL(query);
+            db.execSQL("ALTER TABLE \"" + oldName + "\" RENAME TO \"" + newName + "\"");
+            db.execSQL("ALTER TABLE \"" + oldName + "_unique\" RENAME TO \"" + newName + "_unique\"");
         } catch (Exception e) {
             Log.e("DB_RENAME", "Error: " + e.getMessage());
         }
@@ -674,7 +673,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     }
 
     // Добавлен метод из dev для массового обновления статуса
-    public int updateAllDeviceStatusForTable(String tableName, String newStatus) {
+    public int updateAllDeviceStatusForTable(String folderName, String newStatus) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
         values.put("status", newStatus);
@@ -683,37 +682,27 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
         try {
             db.beginTransaction();
-            // Обновляем все записи в таблице без условия WHERE
-            rowsAffected = db.update("\"" + tableName + "\"", values, null, null);
-
-            if (rowsAffected > 0) {
-                db.setTransactionSuccessful();
-                Log.d(TAG, "Status updated for all devices in table: " + tableName + ". Affected: " + rowsAffected);
-            }
+            rowsAffected = db.update("\"" + folderName + "\"", values, null, null);
+            db.update("\"" + folderName + "_unique\"", values, null, null);
+            db.setTransactionSuccessful();
         } catch (Exception e) {
-            Log.e(TAG, "Error updating all device statuses in table " + tableName + ": " + e.getMessage());
+            Log.e(TAG, "Error updating folder statuses: " + e.getMessage());
         } finally {
-            try {
-                db.endTransaction();
-            } catch (Exception e) {
-                Log.e(TAG, "Error ending transaction: " + e.getMessage());
-            }
+            db.endTransaction();
         }
+
         return rowsAffected;
     }
 
-    public boolean deleteTable(String tableName) {
-        if (tableName.equals("unified_data")) return false;
-
+    public boolean deleteTable(String folderName) {
         SQLiteDatabase db = this.getWritableDatabase();
         try {
-            String safeName = "\"" + tableName + "\"";
-            db.execSQL("DROP TABLE IF EXISTS " + safeName);
+            db.execSQL("DROP TABLE IF EXISTS \"" + folderName + "\"");
+            db.execSQL("DROP TABLE IF EXISTS \"" + folderName + "_unique\"");
             return true;
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e(TAG, "Error deleting folder tables: " + e.getMessage());
             return false;
-        } finally {
         }
     }
 
@@ -723,7 +712,12 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         Cursor cursor = null;
         try {
             cursor = db.rawQuery(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%'",
+                    "SELECT name FROM sqlite_master " +
+                            "WHERE type='table' " +
+                            "AND name NOT LIKE 'sqlite_%' " +
+                            "AND name NOT LIKE 'android_%' " +
+                            "AND name != 'unique_devices' " +
+                            "AND name NOT LIKE '%_unique'",
                     null
             );
             if (cursor != null && cursor.moveToFirst()) {
@@ -731,8 +725,6 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                     tables.add(cursor.getString(0));
                 } while (cursor.moveToNext());
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error getting all tables: " + e.getMessage());
         } finally {
             if (cursor != null) cursor.close();
         }
@@ -741,55 +733,106 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     public void createTableIfNotExists(String tableName) {
         SQLiteDatabase db = this.getWritableDatabase();
         try {
-            String safeName = "\"" + tableName + "\"";
-
-            // Проверяем существование таблицы
-            Cursor cursor = db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-                    new String[]{tableName});
-            boolean tableExists = cursor != null && cursor.getCount() > 0;
-            if (cursor != null) cursor.close();
-
-            if (!tableExists) {
-                // Создаем новую таблицу
-                String createTableQuery = "CREATE TABLE " + safeName + " (" +
-                        "id INTEGER PRIMARY KEY AUTOINCREMENT," +
-                        "type TEXT NOT NULL," +
-                        "name TEXT," +
-                        "bssid TEXT," +
-                        "signal_strength INTEGER," +
-                        "frequency INTEGER," +
-                        "capabilities TEXT," +
-                        "vendor TEXT," +
-                        "cell_id INTEGER," +
-                        "lac INTEGER," +
-                        "mcc INTEGER," +
-                        "mnc INTEGER," +
-                        "psc INTEGER," +
-                        "pci INTEGER," +
-                        "tac INTEGER," +
-                        "earfcn INTEGER," +
-                        "arfcn INTEGER," +
-                        "signal_quality INTEGER," +
-                        "network_type TEXT," +
-                        "is_registered INTEGER," +
-                        "is_neighbor INTEGER," +
-                        "latitude REAL," +
-                        "longitude REAL," +
-                        "altitude REAL," +
-                        "location_accuracy REAL," +
-                        "timestamp INTEGER," +
-                        "status TEXT DEFAULT 'ignore'," +
-                        "is_uploaded INTEGER DEFAULT 0," +
-                        "folder_name TEXT DEFAULT '')"; // Добавляем колонку
-                db.execSQL(createTableQuery);
-            } else {
-                // Проверяем и добавляем недостающие колонки
-                addMissingColumns(db, tableName);
-            }
+            createFolderRawTableIfNotExists(db, tableName);
+            createFolderUniqueTableIfNotExists(db, getUniqueTableName(tableName));
         } catch (Exception e) {
             Log.e(TAG, "Error creating table " + tableName + ": " + e.getMessage());
-        } finally {
         }
+    }
+
+    private String getUniqueTableName(String folderName) {
+        return folderName + "_unique";
+    }
+
+    private void createFolderRawTableIfNotExists(SQLiteDatabase db, String tableName) {
+        String safeName = "\"" + tableName + "\"";
+        Cursor cursor = db.rawQuery(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                new String[]{tableName}
+        );
+        boolean tableExists = cursor != null && cursor.getCount() > 0;
+        if (cursor != null) cursor.close();
+
+        if (!tableExists) {
+            String createTableQuery = "CREATE TABLE " + safeName + " (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    "type TEXT NOT NULL," +
+                    "name TEXT," +
+                    "bssid TEXT," +
+                    "signal_strength INTEGER," +
+                    "frequency INTEGER," +
+                    "capabilities TEXT," +
+                    "vendor TEXT," +
+                    "cell_id INTEGER," +
+                    "lac INTEGER," +
+                    "mcc INTEGER," +
+                    "mnc INTEGER," +
+                    "psc INTEGER," +
+                    "pci INTEGER," +
+                    "tac INTEGER," +
+                    "earfcn INTEGER," +
+                    "arfcn INTEGER," +
+                    "signal_quality INTEGER," +
+                    "network_type TEXT," +
+                    "is_registered INTEGER," +
+                    "is_neighbor INTEGER," +
+                    "latitude REAL," +
+                    "longitude REAL," +
+                    "altitude REAL," +
+                    "location_accuracy REAL," +
+                    "timestamp INTEGER," +
+                    "status TEXT DEFAULT 'GREY'," +
+                    "is_uploaded INTEGER DEFAULT 0," +
+                    "folder_name TEXT DEFAULT '')";
+            db.execSQL(createTableQuery);
+        } else {
+            addMissingColumns(db, tableName);
+        }
+    }
+
+    private void createFolderUniqueTableIfNotExists(SQLiteDatabase db, String uniqueTableName) {
+        String safeName = "\"" + uniqueTableName + "\"";
+
+        String createTableQuery = "CREATE TABLE IF NOT EXISTS " + safeName + " (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "type TEXT NOT NULL," +
+                "name TEXT," +
+                "bssid TEXT," +
+                "cell_id INTEGER," +
+                "unique_identifier TEXT UNIQUE," +
+                "signal_strength INTEGER," +
+                "frequency INTEGER," +
+                "capabilities TEXT," +
+                "vendor TEXT," +
+                "lac INTEGER," +
+                "mcc INTEGER," +
+                "mnc INTEGER," +
+                "psc INTEGER," +
+                "pci INTEGER," +
+                "tac INTEGER," +
+                "earfcn INTEGER," +
+                "arfcn INTEGER," +
+                "signal_quality INTEGER," +
+                "network_type TEXT," +
+                "is_registered INTEGER," +
+                "is_neighbor INTEGER," +
+                "latitude REAL," +
+                "longitude REAL," +
+                "altitude REAL," +
+                "location_accuracy REAL," +
+                "first_seen LONG," +
+                "last_seen LONG," +
+                "status TEXT DEFAULT 'GREY'," +
+                "is_uploaded INTEGER DEFAULT 0," +
+                "folder_name TEXT DEFAULT ''," +
+                "total_scans INTEGER DEFAULT 1," +
+                "avg_signal_strength REAL DEFAULT 0," +
+                "last_location_change LONG DEFAULT 0" +
+                ");";
+
+        db.execSQL(createTableQuery);
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_" + uniqueTableName + "_uid ON \"" + uniqueTableName + "\"(unique_identifier)");
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_" + uniqueTableName + "_last_seen ON \"" + uniqueTableName + "\"(last_seen)");
     }
 
     private void addMissingColumns(SQLiteDatabase db, String tableName) {
@@ -1131,11 +1174,27 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
      */
     public void addToUniqueDevices(SQLiteDatabase db, ContentValues deviceData) {
         try {
-            UniqueDevicesHelper helper = new UniqueDevicesHelper(mContext);
-            // Добавляем или обновляем устройство, используя переданное соединение
+            String folderName = deviceData.getAsString("folder_name");
+            if (folderName == null || folderName.trim().isEmpty()) {
+                Log.w(TAG, "addToUniqueDevices skipped: folder_name is empty");
+                return;
+            }
+
+            UniqueDevicesHelper helper =
+                    new UniqueDevicesHelper(mContext, getUniqueTableName(folderName));
             helper.addOrUpdateDevice(db, deviceData);
         } catch (Exception e) {
             Log.e(TAG, "Ошибка добавления в уникальные устройства: " + e.getMessage());
+        }
+    }
+
+    public void addToFolderUniqueDevices(SQLiteDatabase db, String folderName, ContentValues deviceData) {
+        try {
+            String uniqueTableName = getUniqueTableName(folderName);
+            UniqueDevicesHelper helper = new UniqueDevicesHelper(mContext, uniqueTableName);
+            helper.addOrUpdateDevice(db, deviceData);
+        } catch (Exception e) {
+            Log.e(TAG, "Ошибка добавления в уникальные устройства папки: " + e.getMessage());
         }
     }
 
@@ -1168,8 +1227,8 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     /**
      * Получает helper для работы с уникальными устройствами
      */
-    public UniqueDevicesHelper getUniqueDevicesHelper() {
-        return new UniqueDevicesHelper(mContext);
+    public UniqueDevicesHelper getUniqueDevicesHelper(String folderName) {
+        return new UniqueDevicesHelper(mContext, getUniqueTableName(folderName));
     }
 
     /**

@@ -168,6 +168,8 @@ public class DeviceUploadManager {
             device.setIs_alert(false);
             device.setUser_api(apiKey);
             device.setUser_phone_mac(phoneMac);
+            String name = getStringFromCursor(cursor, "name");
+            device.setDevice_name(name);
 
             Long timestamp = getLongFromCursor(cursor, "timestamp");
             if (timestamp != null) {
@@ -177,9 +179,14 @@ public class DeviceUploadManager {
                 device.setDetected_at(isoDate);
             }
 
-            String folderName = getStringFromCursor(cursor, "folder_name");
-            device.setFolder_name(folderName != null ? folderName : "unified_data");
-            device.setSystem_folder_name("unified_data");
+            String systemFolderName = getStringFromCursor(cursor, "folder_name");
+            if (systemFolderName == null || systemFolderName.trim().isEmpty()) {
+                systemFolderName = "unified_data";
+            }
+
+            device.setSystem_folder_name(systemFolderName);
+            device.setFolder_name(getDisplayFolderName(systemFolderName));
+
 
             return device;
 
@@ -193,6 +200,13 @@ public class DeviceUploadManager {
     private String getStringFromCursor(Cursor cursor, String column) {
         int index = cursor.getColumnIndex(column);
         return index != -1 ? cursor.getString(index) : null;
+    }
+
+    private String getDisplayFolderName(String systemFolderName) {
+        if ("unified_data".equals(systemFolderName)) {
+            return "Основная";
+        }
+        return systemFolderName;
     }
 
     private Integer getIntFromCursor(Cursor cursor, String column) {
@@ -248,19 +262,22 @@ public class DeviceUploadManager {
 
                     JsonObject json = new JsonObject();
                     json.addProperty("device_id", device.getDevice_id());
+                    json.addProperty("device_name", device.getDevice_name());
                     json.addProperty("network_type", device.getNetwork_type());
                     json.addProperty("signal_strength", device.getSignal_strength());
                     json.addProperty("latitude", device.getLatitude());
                     json.addProperty("longitude", device.getLongitude());
                     json.addProperty("detected_at", device.getDetected_at());
                     json.addProperty("folder_name", device.getFolder_name());
-                    json.addProperty("system_folder_name", "unified_data");
+                    json.addProperty("system_folder_name", device.getSystem_folder_name());
                     json.addProperty("user_api", apiKey);
                     json.addProperty("user_phone_mac", phoneMac);
                     json.addProperty("is_alert", false);
                     json.addProperty("is_ignored", false);
                     jsonArray.add(json);
                 }
+
+                Log.d(TAG, "UPLOAD JSON: " + jsonArray.toString());
 
                 Request request = new Request.Builder()
                         .url(endpoint)

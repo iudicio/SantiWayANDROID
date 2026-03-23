@@ -14,12 +14,14 @@ import java.util.Locale;
 
 public class UniqueDevicesHelper {
     private static final String TAG = "UniqueDevicesHelper";
-    private static final String UNIQUE_DEVICES_TABLE = "unique_devices";
+    private final String uniqueTableName;
     private final Context context;
     private boolean tableChecked = false;
 
-    public UniqueDevicesHelper(Context context) {
+    public UniqueDevicesHelper(Context context, String uniqueTableName) {
+
         this.context = context;
+        this.uniqueTableName = uniqueTableName;
     }
 
     /**
@@ -29,7 +31,7 @@ public class UniqueDevicesHelper {
         if (tableChecked) return;
 
         try {
-            String createTableQuery = "CREATE TABLE IF NOT EXISTS " + UNIQUE_DEVICES_TABLE + " (" +
+            String createTableQuery = "CREATE TABLE IF NOT EXISTS " + uniqueTableName + " (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT," +
                     "type TEXT NOT NULL," +
                     "name TEXT," +
@@ -69,9 +71,9 @@ public class UniqueDevicesHelper {
             db.execSQL(createTableQuery);
 
             // Создаем индексы для быстрого поиска
-            db.execSQL("CREATE INDEX IF NOT EXISTS idx_unique_identifier ON " + UNIQUE_DEVICES_TABLE + "(unique_identifier)");
-            db.execSQL("CREATE INDEX IF NOT EXISTS idx_unique_last_seen ON " + UNIQUE_DEVICES_TABLE + "(last_seen)");
-            db.execSQL("CREATE INDEX IF NOT EXISTS idx_unique_type ON " + UNIQUE_DEVICES_TABLE + "(type)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_unique_identifier ON " + uniqueTableName + "(unique_identifier)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_unique_last_seen ON " + uniqueTableName + "(last_seen)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_unique_type ON " + uniqueTableName + "(type)");
 
             tableChecked = true;
             Log.d(TAG, "Таблица уникальных устройств создана или уже существует");
@@ -117,7 +119,7 @@ public class UniqueDevicesHelper {
 
         try {
             // Проверяем, существует ли устройство по уникальному идентификатору
-            cursor = db.query(UNIQUE_DEVICES_TABLE,
+            cursor = db.query(uniqueTableName,
                     new String[]{"id", "total_scans", "avg_signal_strength", "name", "latitude", "longitude", "bssid", "cell_id"},
                     "unique_identifier = ?",
                     new String[]{uniqueIdentifier},
@@ -178,7 +180,7 @@ public class UniqueDevicesHelper {
                     }
                 }
 
-                db.update(UNIQUE_DEVICES_TABLE, values, "id = ?", new String[]{String.valueOf(id)});
+                db.update(uniqueTableName, values, "id = ?", new String[]{String.valueOf(id)});
                 Log.d(TAG, "Обновлено устройство: " + uniqueIdentifier + ", сканирований: " + (totalScans + 1));
             } else {
                 // Новое устройство
@@ -190,7 +192,7 @@ public class UniqueDevicesHelper {
                 values.put("avg_signal_strength", signalObj != null ? signalObj : 0);
                 values.put("last_location_change", currentTime);
 
-                db.insert(UNIQUE_DEVICES_TABLE, null, values);
+                db.insert(uniqueTableName, null, values);
                 Log.d(TAG, "Добавлено новое устройство: " + uniqueIdentifier);
             }
         } catch (Exception e) {
@@ -258,7 +260,7 @@ public class UniqueDevicesHelper {
             createTableIfNeeded(db);
 
             String query = "SELECT type, name, bssid, cell_id, latitude, longitude, last_seen, status, total_scans, network_type " +
-                    "FROM " + UNIQUE_DEVICES_TABLE + " ORDER BY last_seen DESC";
+                    "FROM " + uniqueTableName + " ORDER BY last_seen DESC";
 
             cursor = db.rawQuery(query, null);
 
@@ -308,6 +310,79 @@ public class UniqueDevicesHelper {
         return deviceList;
     }
 
+    public List<DeviceListActivity.Device> getAllDevicesWithSearch(String query) {
+        List<DeviceListActivity.Device> deviceList = new ArrayList<>();
+        MainDatabaseHelper dbHelper = new MainDatabaseHelper(context);
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
+
+        try {
+            db = dbHelper.getReadableDatabase();
+            createTableIfNeeded(db);
+
+            String normalizedQuery = query == null ? "" : query.trim().toUpperCase(Locale.US);
+            String likeQuery = "%" + normalizedQuery + "%";
+
+            String sql = "SELECT type, name, bssid, cell_id, latitude, longitude, last_seen, status, total_scans, network_type " +
+                    "FROM \"" + uniqueTableName + "\" " +
+                    "WHERE UPPER(COALESCE(name, '')) LIKE ? " +
+                    "   OR UPPER(COALESCE(bssid, '')) LIKE ? " +
+                    "   OR CAST(COALESCE(cell_id, '') AS TEXT) LIKE ? " +
+                    "   OR UPPER(COALESCE(network_type, '')) LIKE ? " +
+                    "ORDER BY last_seen DESC";
+
+            cursor = db.rawQuery(sql, new String[]{likeQuery, likeQuery, likeQuery, likeQuery});
+
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    String type = cursor.getString(cursor.getColumnIndexOrThrow("type"));
+                    String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
+                    String mac = cursor.getString(cursor.getColumnIndexOrThrow("bssid"));
+                    int cellId = cursor.getInt(cursor.getColumnIndexOrThrow("cell_id"));
+                    double lat = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
+                    double lon = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
+                    long lastSeen = cursor.getLong(cursor.getColumnIndexOrThrow("last_seen"));
+                    String status = cursor.getString(cursor.getColumnIndexOrThrow("status"));
+                    int totalScans = cursor.getInt(cursor.getColumnIndexOrThrow("total_scans"));
+                    String networkType = cursor.getString(cursor.getColumnIndexOrThrow("network_type"));
+
+                    String locationStr = String.format(Locale.getDefault(), "Lat: %.4f, Lon: %.4f", lat, lon);
+                    String timeStr = new java.text.SimpleDateFormat("HH:mm:ss dd.MM.yyyy",
+                            Locale.getDefault()).format(new java.util.Date(lastSeen));
+
+                    String displayName;
+                    String displayId;
+
+                    if ("Cell".equals(type)) {
+                        displayName = (name != null && !name.isEmpty()) ? name : "Cell Tower";
+                        displayId = "CID: " + cellId + (networkType != null ? " (" + networkType + ")" : "");
+                    } else {
+                        displayName = (name != null && !name.isEmpty()) ? name : "Unknown";
+                        displayId = mac != null ? mac : "";
+                    }
+
+                    String finalDisplayName = displayName + " [" + totalScans + "] " + displayId;
+
+                    deviceList.add(new DeviceListActivity.Device(
+                            finalDisplayName,
+                            type,
+                            locationStr,
+                            timeStr,
+                            mac != null ? mac : String.valueOf(cellId),
+                            status
+                    ));
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Ошибка поиска устройств: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            if (db != null && db.isOpen()) db.close();
+        }
+
+        return deviceList;
+    }
+
     /**
      * Получает статистику по конкретному устройству
      */
@@ -331,7 +406,7 @@ public class UniqueDevicesHelper {
                 uniqueIdentifier = "CELL:" + identifier;
             }
 
-            cursor = db.query(UNIQUE_DEVICES_TABLE,
+            cursor = db.query(uniqueTableName,
                     new String[]{"name", "type", "first_seen", "last_seen", "total_scans",
                             "avg_signal_strength", "last_location_change", "bssid", "cell_id", "network_type"},
                     "unique_identifier = ?",
@@ -373,7 +448,7 @@ public class UniqueDevicesHelper {
             // Убеждаемся, что таблица существует
             createTableIfNeeded(db);
 
-            db.delete(UNIQUE_DEVICES_TABLE, null, null);
+            db.delete(uniqueTableName, null, null);
             Log.d(TAG, "Все уникальные устройства удалены");
         } catch (Exception e) {
             Log.e(TAG, "Ошибка очистки таблицы: " + e.getMessage());
