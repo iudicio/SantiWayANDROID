@@ -320,15 +320,18 @@ public class UniqueDevicesHelper {
             db = dbHelper.getReadableDatabase();
             createTableIfNeeded(db);
 
-            String likeQuery = "%" + query + "%";
+            String normalizedQuery = query == null ? "" : query.trim().toUpperCase(Locale.US);
+            String likeQuery = "%" + normalizedQuery + "%";
 
             String sql = "SELECT type, name, bssid, cell_id, latitude, longitude, last_seen, status, total_scans, network_type " +
                     "FROM \"" + uniqueTableName + "\" " +
-                    "WHERE UPPER(COALESCE(name, '')) LIKE UPPER(?) " +
-                    "   OR UPPER(COALESCE(bssid, '')) LIKE UPPER(?) " +
+                    "WHERE UPPER(COALESCE(name, '')) LIKE ? " +
+                    "   OR UPPER(COALESCE(bssid, '')) LIKE ? " +
+                    "   OR CAST(COALESCE(cell_id, '') AS TEXT) LIKE ? " +
+                    "   OR UPPER(COALESCE(network_type, '')) LIKE ? " +
                     "ORDER BY last_seen DESC";
 
-            cursor = db.rawQuery(sql, new String[]{likeQuery, likeQuery});
+            cursor = db.rawQuery(sql, new String[]{likeQuery, likeQuery, likeQuery, likeQuery});
 
             if (cursor != null && cursor.moveToFirst()) {
                 do {

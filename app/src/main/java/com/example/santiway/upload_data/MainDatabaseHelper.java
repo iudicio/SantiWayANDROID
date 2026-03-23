@@ -184,7 +184,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         }
         values.put("timestamp", device.getTimestamp());
         values.put("status", "GREY"); // Статус
-        values.put("folder_name", "");
+        values.put("folder_name", tableName);
 
         // Логика поиска/обновления: ищем по MAC-адресу и типу "Bluetooth"
         String selection = "bssid = ? AND type = ?";
@@ -220,7 +220,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         }
         values.put("timestamp", device.getTimestamp());
         values.put("status", "GREY");
-        values.put("folder_name", "");
+        values.put("folder_name", tableName);
 
         String selection = "bssid = ?";
         String[] selectionArgs = {device.getBssid()};
@@ -259,7 +259,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         }
         values.put("timestamp", tower.getTimestamp());
         values.put("status", "GREY");
-        values.put("folder_name", "");
+        values.put("folder_name", tableName);
 
         String selection = "cell_id = ? AND network_type = ?";
         String[] selectionArgs = {String.valueOf(tower.getCellId()), tower.getNetworkType()};
