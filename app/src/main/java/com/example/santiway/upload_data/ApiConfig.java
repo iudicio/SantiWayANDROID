@@ -12,14 +12,11 @@ import com.example.santiway.R;
  * Central place for API configuration.
  *
  * Supports server address as:
- *  - domain: device-analysis.ru
  *  - full URL: https://device-analysis.ru
- *  - IP(+port): 192.168.0.10:8000
  */
 public final class ApiConfig {
     private static final String TAG = "ApiConfig";
 
-    /** Always ends with "/" (e.g. "https://device-analysis.ru/") */
     private static String apiBaseUrl;
 
     private static String apiKey;
@@ -42,10 +39,7 @@ public final class ApiConfig {
         // --- Server address (IP or domain) ---
         // NOTE: resource name kept for backward compatibility.
         String defaultServerAddress = safeTrim(context.getString(R.string.domen_server));
-        if (defaultServerAddress == null) {
-            Log.e(TAG, "Server address is not configured in strings.xml, using fallback");
-            defaultServerAddress = "192.168.110.49";
-        }
+
         setServerAddress(defaultServerAddress);
         Log.d(TAG, "Using server address from strings.xml: " + defaultServerAddress);
 
@@ -64,7 +58,6 @@ public final class ApiConfig {
      * Examples:
      *  - "device-analysis.ru"
      *  - "https://device-analysis.ru"
-     *  - "192.168.0.5:8000"
      */
     public static void setServerAddress(String address) {
         apiBaseUrl = normalizeBaseUrl(address);
@@ -145,18 +138,11 @@ public final class ApiConfig {
      */
     private static String normalizeBaseUrl(String address) {
         String a = safeTrim(address);
-        // If scheme not specified, default to http (good for local IP testing).
-        if (!a.startsWith("http://") && !a.startsWith("https://")) {
-            a = "http://" + a;
-        }
 
         // Remove trailing slashes
         while (a.endsWith("/")) {
             a = a.substring(0, a.length() - 1);
         }
-
-        // Remove explicit :80
-        a = a.replaceFirst(":80$", "");
 
         return a + "/";
     }

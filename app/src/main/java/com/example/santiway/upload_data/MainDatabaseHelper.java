@@ -50,7 +50,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     @Override
     public void onCreate(SQLiteDatabase db) {
         // Создание единой таблицы для всех данных
-        String createUnifiedTable = "CREATE TABLE \"unified_data\" (" +
+        String createUnifiedTable = "CREATE TABLE \"Основная\" (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "type TEXT NOT NULL," +
                 "name TEXT," +
@@ -83,8 +83,23 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 "UNIQUE(bssid, timestamp)," +      // Уникальность для WiFi/Bluetooth по MAC + время
                 "UNIQUE(cell_id, timestamp)" +      // Уникальность для сотовых вышек по cell_id + время
                 ");";
+
+        String createTargetTable = "CREATE TABLE IF NOT EXISTS target_devices (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "device_key TEXT NOT NULL UNIQUE" + //Уникальность по mac/cell_id
+                ");";
+
+        String createSafeTable = "CREATE TABLE IF NOT EXISTS safe_devices (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "device_key TEXT NOT NULL UNIQUE" + //Уникальность по mac/cell_id
+                ");";
+
         db.execSQL(createUnifiedTable);
+        db.execSQL(createTargetTable);
+        db.execSQL(createSafeTable);
     }
+
+
     public void deleteOldRecordsFromAllTables(long maxAgeMillis) {
         SQLiteDatabase db = this.getWritableDatabase();
         try {
@@ -117,46 +132,46 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        if (oldVersion < 8) {
-            try {
-                Cursor cursor = db.rawQuery(
-                        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%'",
-                        null
-                );
-
-                if (cursor != null) {
-                    try {
-                        while (cursor.moveToNext()) {
-                            String tableName = cursor.getString(0);
-                            try {
-                                // Проверяем существование колонки
-                                Cursor pragma = db.rawQuery("PRAGMA table_info(\"" + tableName + "\")", null);
-                                boolean hasColumn = false;
-                                int nameIndex = pragma.getColumnIndex("name");
-                                while (pragma.moveToNext()) {
-                                    if (nameIndex >= 0 && "folder_name".equals(pragma.getString(nameIndex))) {
-                                        hasColumn = true;
-                                        break;
-                                    }
-                                }
-                                pragma.close();
-
-                                if (!hasColumn) {
-                                    db.execSQL("ALTER TABLE \"" + tableName + "\" ADD COLUMN folder_name TEXT DEFAULT ''");
-                                    Log.d(TAG, "Added folder_name to table: " + tableName);
-                                }
-                            } catch (Exception e) {
-                                Log.e(TAG, "Error updating table " + tableName + ": " + e.getMessage());
-                            }
-                        }
-                    } finally {
-                        cursor.close();
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error during database upgrade: " + e.getMessage());
-            }
-        }
+//        if (oldVersion < 8) {
+//            try {
+//                Cursor cursor = db.rawQuery(
+//                        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%'",
+//                        null
+//                );
+//
+//                if (cursor != null) {
+//                    try {
+//                        while (cursor.moveToNext()) {
+//                            String tableName = cursor.getString(0);
+//                            try {
+//                                // Проверяем существование колонки
+//                                Cursor pragma = db.rawQuery("PRAGMA table_info(\"" + tableName + "\")", null);
+//                                boolean hasColumn = false;
+//                                int nameIndex = pragma.getColumnIndex("name");
+//                                while (pragma.moveToNext()) {
+//                                    if (nameIndex >= 0 && "folder_name".equals(pragma.getString(nameIndex))) {
+//                                        hasColumn = true;
+//                                        break;
+//                                    }
+//                                }
+//                                pragma.close();
+//
+//                                if (!hasColumn) {
+//                                    db.execSQL("ALTER TABLE \"" + tableName + "\" ADD COLUMN folder_name TEXT DEFAULT ''");
+//                                    Log.d(TAG, "Added folder_name to table: " + tableName);
+//                                }
+//                            } catch (Exception e) {
+//                                Log.e(TAG, "Error updating table " + tableName + ": " + e.getMessage());
+//                            }
+//                        }
+//                    } finally {
+//                        cursor.close();
+//                    }
+//                }
+//            } catch (Exception e) {
+//                Log.e(TAG, "Error during database upgrade: " + e.getMessage());
+//            }
+//        }
     }
     public long addBluetoothDevice(BluetoothDevice device, String tableName) {
         ContentValues values = new ContentValues();
@@ -395,6 +410,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
             if (result != -1) {
                 addToFolderUniqueDevices(db, tableName, values);
+                syncStatusTables(db, uniqueId, values.getAsString("status"));
             }
 
             db.setTransactionSuccessful();
@@ -464,13 +480,22 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     }
     public void clearTableData(String folderName) {
         SQLiteDatabase db = this.getWritableDatabase();
+
         try {
+            db.beginTransaction();
+
             db.delete("\"" + folderName + "\"", null, null);
             db.delete("\"" + folderName + "_unique\"", null, null);
+
+            // После очистки текущей папки служебные таблицы тоже должны очиститься
+            db.delete("target_devices", null, null);
+            db.delete("safe_devices", null, null);
+
+            db.setTransactionSuccessful();
         } catch (Exception e) {
             Log.e(TAG, "Error clearing folder tables: " + e.getMessage());
         } finally {
-            db.close();
+            if (db.inTransaction()) db.endTransaction();
         }
     }
     public void renameTable(String oldName, String newName) {
@@ -638,38 +663,222 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         return deviceList;
     }
 
-    public int updateDeviceStatus(String tableName, String mac, String newStatus) {
+    public int updateDeviceStatus(String tableName, String deviceKey, String newStatus) {
         SQLiteDatabase db = this.getWritableDatabase();
         int rowsAffected = 0;
 
         try {
+            deviceKey = normalizeDeviceKey(deviceKey);
+            if (deviceKey == null || deviceKey.isEmpty()) {
+                return 0;
+            }
+
+            db.beginTransaction();
+
             ContentValues values = new ContentValues();
             values.put("status", newStatus);
 
-            // Обновляем по MAC-адресу (поле bssid) и типу
-            // Для Wi-Fi и Bluetooth используем поле bssid, для Cell - другие поля
-            String selection;
-            String[] selectionArgs;
+            // 1. Обновляем raw-таблицу
+            if (deviceKey.contains(":")) {
+                // Wi-Fi / Bluetooth -> MAC
+                rowsAffected = db.update(
+                        "\"" + tableName + "\"",
+                        values,
+                        "UPPER(COALESCE(bssid, '')) = ?",
+                        new String[]{deviceKey}
+                );
+            } else if (deviceKey.contains("_")) {
+                // Cell -> обновляем по данным из unique-таблицы
+                Cursor cellCursor = null;
+                try {
+                    cellCursor = db.rawQuery(
+                            "SELECT cell_id, mcc, mnc, lac, tac, network_type " +
+                                    "FROM \"" + tableName + "_unique\" " +
+                                    "WHERE UPPER(unique_identifier) = ? LIMIT 1",
+                            new String[]{deviceKey}
+                    );
 
-            if (mac != null && !mac.isEmpty()) {
-                // Если есть MAC, обновляем по bssid
-                selection = "bssid = ?";
-                selectionArgs = new String[]{mac};
+                    if (cellCursor.moveToFirst()) {
+                        String cellId = String.valueOf(cellCursor.getInt(0));
+                        String mcc = String.valueOf(cellCursor.getInt(1));
+                        String mnc = String.valueOf(cellCursor.getInt(2));
+                        String lac = String.valueOf(cellCursor.getInt(3));
+                        String tac = String.valueOf(cellCursor.getInt(4));
+                        String networkType = cellCursor.getString(5);
+
+                        String whereClause;
+                        String[] whereArgs;
+
+                        if ("LTE".equalsIgnoreCase(networkType) || "5G".equalsIgnoreCase(networkType)) {
+                            whereClause = "type = 'Cell' AND CAST(cell_id AS TEXT) = ? AND " +
+                                    "CAST(mcc AS TEXT) = ? AND CAST(mnc AS TEXT) = ? AND CAST(tac AS TEXT) = ?";
+                            whereArgs = new String[]{cellId, mcc, mnc, tac};
+                        } else {
+                            whereClause = "type = 'Cell' AND CAST(cell_id AS TEXT) = ? AND " +
+                                    "CAST(mcc AS TEXT) = ? AND CAST(mnc AS TEXT) = ? AND CAST(lac AS TEXT) = ?";
+                            whereArgs = new String[]{cellId, mcc, mnc, lac};
+                        }
+
+                        rowsAffected = db.update(
+                                "\"" + tableName + "\"",
+                                values,
+                                whereClause,
+                                whereArgs
+                        );
+                    }
+                } finally {
+                    if (cellCursor != null) cellCursor.close();
+                }
             } else {
-                // Если MAC нет, обновляем все записи без фильтра
-                selection = null;
-                selectionArgs = null;
+                // fallback: старый вариант для Cell по одному cell_id
+                rowsAffected = db.update(
+                        "\"" + tableName + "\"",
+                        values,
+                        "CAST(cell_id AS TEXT) = ?",
+                        new String[]{deviceKey}
+                );
             }
 
-            rowsAffected = db.update("\"" + tableName + "\"", values, selection, selectionArgs);
-            Log.d(TAG, "Updated status for " + rowsAffected + " devices in table: " + tableName);
+            // 2. Обновляем unique-таблицу
+            db.update(
+                    "\"" + tableName + "_unique\"",
+                    values,
+                    "UPPER(COALESCE(unique_identifier, '')) = ? " +
+                            "OR UPPER(COALESCE(bssid, '')) = ? " +
+                            "OR CAST(cell_id AS TEXT) = ?",
+                    new String[]{deviceKey, deviceKey, deviceKey}
+            );
+
+            // 3. Полностью пересобираем служебные таблицы
+            rebuildStatusTables(tableName);
+
+            db.setTransactionSuccessful();
 
         } catch (Exception e) {
             Log.e(TAG, "Error updating device status: " + e.getMessage());
         } finally {
+            if (db.inTransaction()) db.endTransaction();
         }
 
         return rowsAffected;
+    }
+
+    private String normalizeDeviceKey(String deviceKey) {
+        return deviceKey == null ? null : deviceKey.trim().toUpperCase(Locale.US);
+    }
+
+    private void addDeviceToTarget(SQLiteDatabase db, String deviceKey) {
+        deviceKey = normalizeDeviceKey(deviceKey);
+        if (deviceKey == null || deviceKey.isEmpty()) return;
+
+        ContentValues values = new ContentValues();
+        values.put("device_key", deviceKey);
+
+        db.insertWithOnConflict(
+                "target_devices",
+                null,
+                values,
+                SQLiteDatabase.CONFLICT_IGNORE
+        );
+    }
+
+    private void addDeviceToSafe(SQLiteDatabase db, String deviceKey) {
+        deviceKey = normalizeDeviceKey(deviceKey);
+        if (deviceKey == null || deviceKey.isEmpty()) return;
+
+        ContentValues values = new ContentValues();
+        values.put("device_key", deviceKey);
+
+        db.insertWithOnConflict(
+                "safe_devices",
+                null,
+                values,
+                SQLiteDatabase.CONFLICT_IGNORE
+        );
+    }
+
+    private void removeDeviceFromTarget(SQLiteDatabase db, String deviceKey) {
+        deviceKey = normalizeDeviceKey(deviceKey);
+        if (deviceKey == null || deviceKey.isEmpty()) return;
+
+        db.delete("target_devices", "device_key = ?", new String[]{deviceKey});
+    }
+
+    private void removeDeviceFromSafe(SQLiteDatabase db, String deviceKey) {
+        deviceKey = normalizeDeviceKey(deviceKey);
+        if (deviceKey == null || deviceKey.isEmpty()) return;
+
+        db.delete("safe_devices", "device_key = ?", new String[]{deviceKey});
+    }
+
+    private void syncStatusTables(SQLiteDatabase db, String deviceKey, String status) {
+        deviceKey = normalizeDeviceKey(deviceKey);
+        if (deviceKey == null || deviceKey.isEmpty()) return;
+
+        String normalizedStatus = status == null ? "GREY" : status.trim().toUpperCase(Locale.US);
+
+        switch (normalizedStatus) {
+            case "TARGET":
+                addDeviceToTarget(db, deviceKey);
+                removeDeviceFromSafe(db, deviceKey);
+                break;
+
+            case "SAFE":
+                addDeviceToSafe(db, deviceKey);
+                removeDeviceFromTarget(db, deviceKey);
+                break;
+
+            default:
+                removeDeviceFromTarget(db, deviceKey);
+                removeDeviceFromSafe(db, deviceKey);
+                break;
+        }
+    }
+
+    public void rebuildStatusTables(String folderName) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor cursor = null;
+
+        try {
+            db.beginTransaction();
+
+            // Полностью очищаем служебные таблицы
+            db.delete("target_devices", null, null);
+            db.delete("safe_devices", null, null);
+
+            // Берем все устройства из unique-таблицы
+            cursor = db.rawQuery(
+                    "SELECT unique_identifier, bssid, cell_id, status " +
+                            "FROM \"" + folderName + "_unique\"",
+                    null
+            );
+
+            while (cursor != null && cursor.moveToNext()) {
+                String uniqueIdentifier = cursor.getString(0);
+                String bssid = cursor.getString(1);
+                int cellId = cursor.getInt(2);
+                String status = cursor.getString(3);
+
+                String deviceKey = null;
+
+                if (uniqueIdentifier != null && !uniqueIdentifier.trim().isEmpty()) {
+                    deviceKey = uniqueIdentifier;
+                } else if (bssid != null && !bssid.trim().isEmpty()) {
+                    deviceKey = bssid;
+                } else if (cellId > 0) {
+                    deviceKey = String.valueOf(cellId);
+                }
+
+                syncStatusTables(db, deviceKey, status);
+            }
+
+            db.setTransactionSuccessful();
+        } catch (Exception e) {
+            Log.e(TAG, "Error rebuilding status tables: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            if (db.inTransaction()) db.endTransaction();
+        }
     }
 
     // Добавлен метод из dev для массового обновления статуса
@@ -682,13 +891,18 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
         try {
             db.beginTransaction();
+
             rowsAffected = db.update("\"" + folderName + "\"", values, null, null);
             db.update("\"" + folderName + "_unique\"", values, null, null);
+
+            // Полная пересборка target/safe по актуальному status из _unique
+            rebuildStatusTables(folderName);
+
             db.setTransactionSuccessful();
         } catch (Exception e) {
             Log.e(TAG, "Error updating folder statuses: " + e.getMessage());
         } finally {
-            db.endTransaction();
+            if (db.inTransaction()) db.endTransaction();
         }
 
         return rowsAffected;
@@ -717,6 +931,8 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                             "AND name NOT LIKE 'sqlite_%' " +
                             "AND name NOT LIKE 'android_%' " +
                             "AND name != 'unique_devices' " +
+                            "AND name != 'target_devices' " +
+                            "AND name != 'safe_devices' " +
                             "AND name NOT LIKE '%_unique'",
                     null
             );
@@ -733,6 +949,9 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     public void createTableIfNotExists(String tableName) {
         SQLiteDatabase db = this.getWritableDatabase();
         try {
+            if ("target_devices".equals(tableName) || "safe_devices".equals(tableName)) {
+                return;
+            }
             createFolderRawTableIfNotExists(db, tableName);
             createFolderUniqueTableIfNotExists(db, getUniqueTableName(tableName));
         } catch (Exception e) {
