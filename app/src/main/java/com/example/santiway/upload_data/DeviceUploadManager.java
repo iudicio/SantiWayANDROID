@@ -98,7 +98,7 @@ public class DeviceUploadManager {
             db = databaseHelper.getReadableDatabase();
 
             String query =
-                    "SELECT id, * FROM \"unified_data\" " +
+                    "SELECT id, * FROM \"Основная\" " +
                             "WHERE is_uploaded = 0 " +
                             "ORDER BY timestamp ASC LIMIT " + BATCH_SIZE;
 
@@ -181,7 +181,7 @@ public class DeviceUploadManager {
 
             String systemFolderName = getStringFromCursor(cursor, "folder_name");
             if (systemFolderName == null || systemFolderName.trim().isEmpty()) {
-                systemFolderName = "unified_data";
+                systemFolderName = "Основная";
             }
 
             device.setSystem_folder_name(systemFolderName);
@@ -203,7 +203,7 @@ public class DeviceUploadManager {
     }
 
     private String getDisplayFolderName(String systemFolderName) {
-        if ("unified_data".equals(systemFolderName)) {
+        if ("Основная".equals(systemFolderName)) {
             return "Основная";
         }
         return systemFolderName;
@@ -364,7 +364,7 @@ public class DeviceUploadManager {
                 ContentValues v = new ContentValues();
                 v.put("is_uploaded", 1);
 
-                db.update("\"unified_data\"", v, "id IN (" + ph + ")", args);
+                db.update("\"Основная\"", v, "id IN (" + ph + ")", args);
             }
 
             db.setTransactionSuccessful();
@@ -382,12 +382,12 @@ public class DeviceUploadManager {
             Cursor cursor = null;
             if (deviceId.contains(":")) {
                 cursor = db.rawQuery(
-                        "SELECT timestamp, is_uploaded FROM \"unified_data\" WHERE bssid = ? ORDER BY timestamp DESC LIMIT 5",
+                        "SELECT timestamp, is_uploaded FROM \"Основная\" WHERE bssid = ? ORDER BY timestamp DESC LIMIT 5",
                         new String[]{deviceId}
                 );
             } else {
                 cursor = db.rawQuery(
-                        "SELECT timestamp, is_uploaded FROM \"unified_data\" WHERE cell_id = ? ORDER BY timestamp DESC LIMIT 5",
+                        "SELECT timestamp, is_uploaded FROM \"Основная\" WHERE cell_id = ? ORDER BY timestamp DESC LIMIT 5",
                         new String[]{deviceId}
                 );
             }
@@ -453,7 +453,7 @@ public class DeviceUploadManager {
         try {
             db = databaseHelper.getReadableDatabase();
             cursor = db.rawQuery(
-                    "SELECT COUNT(*) FROM \"unified_data\" WHERE is_uploaded = 0",
+                    "SELECT COUNT(*) FROM \"Основная\" WHERE is_uploaded = 0",
                     null
             );
 

@@ -80,7 +80,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private MainDatabaseHelper databaseHelper;
     private LocationManager locationManager;
     private boolean isScanning = false;
-    private String currentScanFolder = "unified_data";
+    private String currentScanFolder = "Основная";
     private DeviceUploadManager uploadManager;
 
     private Handler timerHandler = new Handler();
@@ -228,7 +228,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     @Override
     public void onFolderCreated(String folderName) {
-        if (folderName.equals("unified_data")) {
+        if (folderName.equals("Основная")) {
             Toast.makeText(this, "Имя папки недоступно", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -660,8 +660,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     private List<String> getAllFolders() {
         List<String> tables = databaseHelper.getAllTables();
-        if (!tables.contains("unified_data")) {
-            tables.add("unified_data");
+        if (!tables.contains("Основная")) {
+            tables.add("Основная");
         }
         return tables;
     }
@@ -688,13 +688,13 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         List<String> deletableFolders = new ArrayList<>();
 
         for (String folder : folders) {
-            if (!folder.isEmpty() && !folder.equals("unified_data")) {
+            if (!folder.isEmpty() && !folder.equals("Основная")) {
                 deletableFolders.add(folder);
             }
         }
 
         if (deletableFolders.isEmpty()) {
-            Toast.makeText(this, "Нет папок для удаления (кроме 'unified_data')", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Нет папок для удаления (кроме 'Основная')", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -714,7 +714,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
             if (currentScanFolder.equals(folderName)) {
                 stopScanning();
-                currentScanFolder = "unified_data";
+                currentScanFolder = "Основная";
                 updateToolbarTitle(currentScanFolder);
                 startScanning();
             }

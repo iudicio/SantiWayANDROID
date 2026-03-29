@@ -65,7 +65,6 @@
     <string name="all_permissions_granted_message">Все разрешения приняты.</string>
 
     <string name="default_api_key"></string>
-    <string name="default_server_ip">109.71.247.188</string>
     <string name="domen_server">https://device-analysis.ru</string>
 
 </resources>

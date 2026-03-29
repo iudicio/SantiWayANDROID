@@ -50,7 +50,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     @Override
     public void onCreate(SQLiteDatabase db) {
         // Создание единой таблицы для всех данных
-        String createUnifiedTable = "CREATE TABLE \"unified_data\" (" +
+        String createUnifiedTable = "CREATE TABLE \"Основная\" (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "type TEXT NOT NULL," +
                 "name TEXT," +
