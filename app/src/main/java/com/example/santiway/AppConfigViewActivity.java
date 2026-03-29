@@ -111,7 +111,7 @@ public class AppConfigViewActivity extends ComponentActivity {
 
         // Загружаем значения из strings.xml
         String defaultApiKey = getString(R.string.default_api_key);
-        String defaultServerIp = getString(R.string.default_server_ip);
+        String defaultServerIp = getString(R.string.domen_server);
 
         // Отображаем API ключ (только для чтения)
         if (defaultApiKey != null && !defaultApiKey.isEmpty()) {
@@ -219,7 +219,7 @@ public class AppConfigViewActivity extends ComponentActivity {
         stringBuilder.append("=== ОБЩИЕ НАСТРОЙКИ ===\n");
 
         // IP сервера всегда из strings.xml
-        String serverIp = getString(R.string.default_server_ip);
+        String serverIp = getString(R.string.domen_server);
         stringBuilder.append("IPv4 сервера: ").append(serverIp).append("\n");
 
         // API ключ всегда из strings.xml
