@@ -2,27 +2,30 @@ package com.example.santiway;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.text.format.DateUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.Animation;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
+
 import java.util.ArrayList;
 import java.util.List;
-import android.view.animation.AlphaAnimation;
-import android.view.animation.Animation;
 
 public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
     private static final int VIEW_TYPE_ITEM = 0;
     private static final int VIEW_TYPE_LOADING = 1;
 
-    private List<DeviceListActivity.Device> deviceList;
-    private Context context;
+    private final List<DeviceListActivity.Device> deviceList;
+    private final Context context;
     private boolean showLoading = false;
     private boolean isFirstLoad = true;
 
@@ -30,7 +33,7 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
         void onDeviceClick(DeviceListActivity.Device device, String tableName, int position);
     }
 
-    private OnDeviceClickListener deviceClickListener;
+    private final OnDeviceClickListener deviceClickListener;
     private String currentTableName;
 
     public DeviceListAdapter(List<DeviceListActivity.Device> deviceList, Context context,
@@ -122,9 +125,12 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
         return VIEW_TYPE_ITEM;
     }
 
-    // КЛАСС ДЛЯ ОБЫЧНОГО УСТРОЙСТВА
     public static class DeviceViewHolder extends RecyclerView.ViewHolder {
-        TextView deviceNameTextView, deviceTypeTextView, deviceLocationTextView, deviceTimeTextView;
+        TextView deviceNameTextView;
+        TextView deviceMacTextView;
+        TextView deviceTypeTextView;
+        TextView deviceLocationTextView;
+        TextView deviceTimeTextView;
         Button infoButton;
         View statusBar;
         ImageButton shareButton;
@@ -132,8 +138,8 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
         public DeviceViewHolder(@NonNull View itemView) {
             super(itemView);
             deviceNameTextView = itemView.findViewById(R.id.device_name);
+            deviceMacTextView = itemView.findViewById(R.id.device_mac);
             deviceTypeTextView = itemView.findViewById(R.id.device_type);
-            deviceLocationTextView = itemView.findViewById(R.id.device_location);
             deviceTimeTextView = itemView.findViewById(R.id.device_time);
             infoButton = itemView.findViewById(R.id.info_button);
             statusBar = itemView.findViewById(R.id.device_status_bar);
@@ -141,19 +147,41 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
         }
 
         public void bind(DeviceListActivity.Device device, OnDeviceClickListener listener, String tableName, int position) {
-            deviceNameTextView.setText(device.getName() != null ? device.getName() : "Unknown");
-            deviceTypeTextView.setText(device.getType() != null ? device.getType() : "N/A");
-            deviceLocationTextView.setText(device.getLocation() != null ? device.getLocation() : "N/A");
-            deviceTimeTextView.setText(device.getTime() != null ? device.getTime() : "N/A");
+            String deviceName = device.getName() != null ? device.getName().trim() : "Unknown";
+            if (deviceName.length() > 30) {
+                deviceName = deviceName.substring(0, 30).trim() + "...";
+            }
+            deviceNameTextView.setText(deviceName);
 
-            // Клик по всей карточке -> открываем карту/инфо
+            String deviceMac = device.getMac() != null ? device.getMac().trim() : "";
+            if (deviceMacTextView != null) {
+                if (deviceMac.isEmpty()) {
+                    deviceMacTextView.setVisibility(View.GONE);
+                } else {
+                    deviceMacTextView.setVisibility(View.VISIBLE);
+                    deviceMacTextView.setText(deviceMac);
+                }
+            }
+
+            deviceTypeTextView.setText(device.getType() != null ? device.getType() : "N/A");
+
+            if (device.getTimestamp() > 0) {
+                CharSequence relativeTime = DateUtils.getRelativeTimeSpanString(
+                        device.getTimestamp(),
+                        System.currentTimeMillis(),
+                        DateUtils.MINUTE_IN_MILLIS
+                );
+                deviceTimeTextView.setText(relativeTime);
+            } else {
+                deviceTimeTextView.setText(device.getTime() != null ? device.getTime() : "N/A");
+            }
+
             itemView.setOnClickListener(v -> {
                 if (listener != null) {
                     listener.onDeviceClick(device, tableName, position);
                 }
             });
 
-            // Клик по кнопке SHARE -> экспорт JSON
             if (shareButton != null) {
                 shareButton.setOnClickListener(v -> {
                     Context viewContext = v.getContext();
@@ -163,7 +191,6 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                 });
             }
 
-            // Логика индикатора статуса
             if (statusBar != null) {
                 statusBar.clearAnimation();
 
@@ -172,9 +199,8 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                         : "GREY";
 
                 switch (status) {
-
                     case "TARGET":
-                        statusBar.setBackgroundColor(Color.parseColor("#FF3B30")); // красный
+                        statusBar.setBackgroundColor(Color.parseColor("#FF3B30"));
 
                         AlphaAnimation pulse = new AlphaAnimation(1.0f, 0.3f);
                         pulse.setDuration(800);
@@ -184,27 +210,29 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                         break;
 
                     case "SAFE":
-                        statusBar.setBackgroundColor(Color.parseColor("#34C759")); // зелёный
+                        statusBar.setBackgroundColor(Color.parseColor("#34C759"));
                         break;
 
                     case "GREY":
                     default:
-                        statusBar.setBackgroundColor(Color.parseColor("#808080")); // серый
+                        statusBar.setBackgroundColor(Color.parseColor("#808080"));
                         break;
                 }
             }
 
             if (infoButton != null) {
                 infoButton.setOnClickListener(v -> {
-                    if (listener != null) listener.onDeviceClick(device, tableName, position);
+                    if (listener != null) {
+                        listener.onDeviceClick(device, tableName, position);
+                    }
                 });
             }
         }
     }
 
-    // КЛАСС ДЛЯ ЗАГРУЗКИ (НИЗ СПИСКА)
     public static class LoadingViewHolder extends RecyclerView.ViewHolder {
         ProgressBar progressBar;
+
         public LoadingViewHolder(@NonNull View itemView) {
             super(itemView);
             progressBar = itemView.findViewById(R.id.progress_bar);
