@@ -33,7 +33,7 @@
             android:padding="16dp">
 
             <LinearLayout
-                android:layout_width="0dp"
+                android:layout_width="140dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:orientation="vertical">
@@ -44,8 +44,19 @@
                     android:layout_height="wrap_content"
                     android:text="Название устройства"
                     android:textColor="@android:color/white"
-                    android:textSize="18sp"
+                    android:textSize="12sp"
                     android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/device_mac"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="00:11:22:33:44:55"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
 
                 <TextView
                     android:id="@+id/device_type"
@@ -55,14 +66,6 @@
                     android:textColor="#3DDC84"
                     android:textSize="14sp" />
 
-                <TextView
-                    android:id="@+id/device_location"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="Местоположение"
-                    android:textColor="#AAAAAA"
-                    android:textSize="14sp" />
             </LinearLayout>
 
             <TextView
@@ -70,7 +73,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="#AAAAAA"
-                android:textSize="14sp"
+                android:textSize="12sp"
                 android:layout_marginEnd="12dp"
                 android:text="Time" />
 

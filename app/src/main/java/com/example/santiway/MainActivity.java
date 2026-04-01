@@ -92,6 +92,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private ApkAssembler apkAssembler;
     private BroadcastReceiver webSocketReceiver;
     private BroadcastReceiver uploadUpdateReceiver;
+    private static final String PREFS_SCANNER_STATE = "scanner_state";
+    private static final String KEY_IS_SCANNING = "is_scanning";
+    private static final String KEY_SCAN_START_TIME = "scan_start_time";
 
     private Runnable timerRunnable = new Runnable() {
         @Override
@@ -190,6 +193,17 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         findViewById(R.id.footer_device).setOnClickListener(v -> openDeviceListActivity());
         findViewById(R.id.footer_create).setOnClickListener(v -> showCreateFolderDialog());
         findViewById(R.id.footer_delete).setOnClickListener(v -> showFolderManagementDialog());
+
+        SharedPreferences prefs = getSharedPreferences(PREFS_SCANNER_STATE, MODE_PRIVATE);
+        isScanning = prefs.getBoolean(KEY_IS_SCANNING, false);
+        startTime = prefs.getLong(KEY_SCAN_START_TIME, 0L);
+
+        updateScanStatusUI(isScanning);
+
+        if (isScanning && startTime > 0L) {
+            timerHandler.removeCallbacks(timerRunnable);
+            timerHandler.post(timerRunnable);
+        }
 
         ApiConfig.initialize(this);
         uploadManager = new DeviceUploadManager(this);
@@ -304,10 +318,17 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     }
 
     private void startScanning() {
-        // Проверяем функционалы перед началом сканирования
         checkAllFunctionalityAndWarn();
 
         isScanning = true;
+        startTime = System.currentTimeMillis();
+
+        getSharedPreferences(PREFS_SCANNER_STATE, MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_IS_SCANNING, true)
+                .putLong(KEY_SCAN_START_TIME, startTime)
+                .apply();
+
         updateScanStatusUI(true);
 
         double latitude = 0.0;
@@ -331,14 +352,25 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         startScannerService(BluetoothForegroundService.class, latitude, longitude, altitude, accuracy);
 
         timerHandler.removeCallbacks(timerRunnable);
-        startTime = System.currentTimeMillis();
         timerHandler.postDelayed(timerRunnable, 0);
 
         Toast.makeText(this, "Сканирование запущено: " + currentScanFolder, Toast.LENGTH_SHORT).show();
     }
 
     private void stopScanning() {
+        stopScanning(true);
+    }
+
+    private void stopScanning(boolean showToast) {
         isScanning = false;
+        startTime = 0L;
+
+        getSharedPreferences(PREFS_SCANNER_STATE, MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_IS_SCANNING, false)
+                .putLong(KEY_SCAN_START_TIME, 0L)
+                .apply();
+
         updateScanStatusUI(false);
 
         stopScannerService(WifiForegroundService.class);
@@ -346,8 +378,11 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         stopScannerService(BluetoothForegroundService.class);
 
         timerHandler.removeCallbacks(timerRunnable);
+        timeLabelTextView.setText("Время работы : 00:00:00");
 
-        Toast.makeText(this, "Сканирование остановлено", Toast.LENGTH_SHORT).show();
+        if (showToast) {
+            Toast.makeText(this, "Сканирование остановлено", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void updateScanStatusUI(boolean scanning) {
@@ -386,11 +421,14 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         if (locationManager != null) {
             locationManager.cleanup();
         }
-        stopScanning();
+        //stopScanning();
         if (folderSwitchedReceiver != null) {
             unregisterReceiver(folderSwitchedReceiver);
         }
-        timerHandler.removeCallbacks(timerRunnable);
+        if (isScanning && startTime > 0L) {
+            timerHandler.removeCallbacks(timerRunnable);
+            timerHandler.post(timerRunnable);
+        }
         if (isWebSocketBound) {
             unbindService(webSocketConnection);
         }
