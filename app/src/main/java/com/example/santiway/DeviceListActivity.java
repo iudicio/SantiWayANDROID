@@ -557,12 +557,14 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         String time;
         String mac;
         String status;
+        long timestamp;
 
         public Device(String name, String type, String location, String time) {
             this.name = name;
             this.type = type;
             this.location = location;
             this.time = time;
+            this.timestamp = 0L;
         }
 
         public Device(String name, String type, String location, String time, String mac, String status) {
@@ -572,9 +574,19 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
             this.time = time;
             this.mac = mac;
             this.status = status;
+            this.timestamp = 0L;
         }
 
-        // Parcelable implementation
+        public Device(String name, String type, String location, String time, String mac, String status, long timestamp) {
+            this.name = name;
+            this.type = type;
+            this.location = location;
+            this.time = time;
+            this.mac = mac;
+            this.status = status;
+            this.timestamp = timestamp;
+        }
+
         protected Device(Parcel in) {
             name = in.readString();
             type = in.readString();
@@ -582,6 +594,7 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
             time = in.readString();
             mac = in.readString();
             status = in.readString();
+            timestamp = in.readLong();
         }
 
         public static final Creator<Device> CREATOR = new Creator<Device>() {
@@ -609,17 +622,17 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
             dest.writeString(time);
             dest.writeString(mac);
             dest.writeString(status);
+            dest.writeLong(timestamp);
         }
 
-        // Getters
         public String getName() { return name; }
         public String getType() { return type; }
         public String getLocation() { return location; }
         public String getTime() { return time; }
         public String getMac() { return mac; }
         public String getStatus() { return status; }
+        public long getTimestamp() { return timestamp; }
 
-        // Setters
         public void setStatus(String status) { this.status = status; }
         public void setMac(String mac) { this.mac = mac; }
     }

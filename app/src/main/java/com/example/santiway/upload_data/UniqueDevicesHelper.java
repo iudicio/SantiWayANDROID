@@ -255,8 +255,6 @@ public class UniqueDevicesHelper {
 
         try {
             db = dbHelper.getReadableDatabase();
-
-            // Убеждаемся, что таблица существует
             createTableIfNeeded(db);
 
             String query = "SELECT type, name, bssid, cell_id, latitude, longitude, last_seen, status, total_scans, network_type " +
@@ -270,35 +268,35 @@ public class UniqueDevicesHelper {
                     String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
                     String mac = cursor.getString(cursor.getColumnIndexOrThrow("bssid"));
                     int cellId = cursor.getInt(cursor.getColumnIndexOrThrow("cell_id"));
-                    double lat = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
-                    double lon = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
                     long lastSeen = cursor.getLong(cursor.getColumnIndexOrThrow("last_seen"));
                     String status = cursor.getString(cursor.getColumnIndexOrThrow("status"));
                     int totalScans = cursor.getInt(cursor.getColumnIndexOrThrow("total_scans"));
                     String networkType = cursor.getString(cursor.getColumnIndexOrThrow("network_type"));
 
-                    String locationStr = String.format(Locale.getDefault(), "Lat: %.4f, Lon: %.4f", lat, lon);
-                    String timeStr = new java.text.SimpleDateFormat("HH:mm:ss dd.MM.yyyy",
-                            Locale.getDefault()).format(new java.util.Date(lastSeen));
-
-                    // Формируем отображаемое имя
                     String displayName;
-                    String displayId;
+                    String deviceId;
 
                     if ("Cell".equals(type)) {
                         displayName = (name != null && !name.isEmpty()) ? name : "Cell Tower";
-                        displayId = "CID: " + cellId + (networkType != null ? " (" + networkType + ")" : "");
+                        deviceId = "CID: " + cellId + (networkType != null ? " (" + networkType + ")" : "");
                     } else {
                         displayName = (name != null && !name.isEmpty()) ? name : "Unknown";
-                        displayId = mac != null ? mac : "";
+                        deviceId = mac != null ? mac : "";
                     }
 
-                    // Добавляем информацию о количестве сканирований
-                    String finalDisplayName = displayName + " [" + totalScans + "] " + displayId;
+                    String finalDisplayName = displayName + " [" + totalScans + "]";
+                    String finalId = mac != null && !mac.isEmpty() ? mac : String.valueOf(cellId);
+                    String finalStatus = (status != null && !status.isEmpty()) ? status : "GREY";
 
                     deviceList.add(new DeviceListActivity.Device(
-                            finalDisplayName, type, locationStr, timeStr,
-                            mac != null ? mac : String.valueOf(cellId), status));
+                            finalDisplayName,
+                            type,
+                            "",
+                            "",
+                            finalId,
+                            finalStatus,
+                            lastSeen
+                    ));
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
@@ -307,6 +305,7 @@ public class UniqueDevicesHelper {
             if (cursor != null) cursor.close();
             if (db != null && db.isOpen()) db.close();
         }
+
         return deviceList;
     }
 
@@ -339,37 +338,34 @@ public class UniqueDevicesHelper {
                     String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
                     String mac = cursor.getString(cursor.getColumnIndexOrThrow("bssid"));
                     int cellId = cursor.getInt(cursor.getColumnIndexOrThrow("cell_id"));
-                    double lat = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
-                    double lon = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
                     long lastSeen = cursor.getLong(cursor.getColumnIndexOrThrow("last_seen"));
                     String status = cursor.getString(cursor.getColumnIndexOrThrow("status"));
                     int totalScans = cursor.getInt(cursor.getColumnIndexOrThrow("total_scans"));
                     String networkType = cursor.getString(cursor.getColumnIndexOrThrow("network_type"));
 
-                    String locationStr = String.format(Locale.getDefault(), "Lat: %.4f, Lon: %.4f", lat, lon);
-                    String timeStr = new java.text.SimpleDateFormat("HH:mm:ss dd.MM.yyyy",
-                            Locale.getDefault()).format(new java.util.Date(lastSeen));
-
                     String displayName;
-                    String displayId;
+                    String deviceId;
 
                     if ("Cell".equals(type)) {
                         displayName = (name != null && !name.isEmpty()) ? name : "Cell Tower";
-                        displayId = "CID: " + cellId + (networkType != null ? " (" + networkType + ")" : "");
+                        deviceId = "CID: " + cellId + (networkType != null ? " (" + networkType + ")" : "");
                     } else {
                         displayName = (name != null && !name.isEmpty()) ? name : "Unknown";
-                        displayId = mac != null ? mac : "";
+                        deviceId = mac != null ? mac : "";
                     }
 
-                    String finalDisplayName = displayName + " [" + totalScans + "] " + displayId;
+                    String finalDisplayName = displayName + " [" + totalScans + "]";
+                    String finalId = mac != null && !mac.isEmpty() ? mac : String.valueOf(cellId);
+                    String finalStatus = (status != null && !status.isEmpty()) ? status : "GREY";
 
                     deviceList.add(new DeviceListActivity.Device(
                             finalDisplayName,
                             type,
-                            locationStr,
-                            timeStr,
-                            mac != null ? mac : String.valueOf(cellId),
-                            status
+                            "",
+                            "",
+                            finalId,
+                            finalStatus,
+                            lastSeen
                     ));
                 } while (cursor.moveToNext());
             }
