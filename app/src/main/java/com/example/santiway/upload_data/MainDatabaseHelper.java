@@ -6,14 +6,17 @@ import android.app.PendingIntent;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.graphics.Color;
 import android.media.RingtoneManager;
 import android.os.Build;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.util.Log;
+import android.graphics.Color;
 
 import androidx.core.app.NotificationCompat;
 
@@ -36,6 +39,8 @@ import com.example.santiway.DeviceListActivity;
 public class MainDatabaseHelper extends SQLiteOpenHelper {
     private static long lastGlobalSoundTime = 0;
     private static final long SOUND_INTERVAL = 3600000;
+    private static final int TARGET_NOTIFICATION_ID = 1001;
+    private static final String TARGET_NOTIFICATION_CHANNEL_ID = "target_alerts_channel";
 
     private static final String TAG = "MainDatabaseHelper";
     private static final String DATABASE_NAME = "UnifiedScanner.db";
@@ -439,13 +444,12 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         try {
             String type = values.getAsString("type");
             String name = values.getAsString("name");
-
             if (name == null || name.isEmpty()) {
                 name = "Unknown";
             }
 
+            // 1. Сохраняем уведомление в БД
             NotificationDatabaseHelper notifDb = new NotificationDatabaseHelper(mContext);
-
             String title = "Target: " + type;
             String message = String.format(Locale.getDefault(),
                     "Устройство %s (%s) в движении!\nКоординаты: %.6f, %.6f",
@@ -457,25 +461,89 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                     message,
                     new Date(),
                     NotificationData.NotificationType.ALARM,
-                    null, null, lat, lon
+                    null, null, lat, lon,
+                    uniqueId
             );
-
             notifDb.addNotification(alert, uniqueId);
 
-            // Глобальное уведомление (не чаще раза в час)
-            long currentTime = System.currentTimeMillis();
-            if (currentTime - lastGlobalSoundTime > SOUND_INTERVAL) {
-                lastGlobalSoundTime = currentTime;
-                sendSystemNotification(
-                        "Внимание: Обнаружены цели!",
-                        "Новые движущиеся устройства. Проверьте список."
-                );
+            // 2. Создаем канал уведомлений (только один раз, при первом вызове)
+            NotificationManager notificationManager = (NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && notificationManager != null) {
+                NotificationChannel channel = notificationManager.getNotificationChannel(TARGET_NOTIFICATION_CHANNEL_ID);
+                if (channel == null) {
+                    NotificationChannel newChannel = new NotificationChannel(
+                            TARGET_NOTIFICATION_CHANNEL_ID,
+                            "Обнаружение целей",
+                            NotificationManager.IMPORTANCE_HIGH
+                    );
+                    newChannel.setDescription("Уведомления о движущихся целевых устройствах");
+                    newChannel.enableVibration(true);
+                    newChannel.setVibrationPattern(new long[]{0, 500, 200, 500});
+                    newChannel.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), null);
+                    newChannel.enableLights(true);
+                    newChannel.setLightColor(Color.RED);
+                    notificationManager.createNotificationChannel(newChannel);
+                    Log.d(TAG, "✅ Created HIGH importance channel");
+                }
             }
 
-            Log.d(TAG, "🔔 Target notification created for: " + uniqueId);
+            // 3. Создаем Intent для открытия NotificationsActivity
+            Intent intent = new Intent(mContext, NotificationsActivity.class);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            PendingIntent pendingIntent = PendingIntent.getActivity(
+                    mContext,
+                    0,
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
+
+            // 4. Счетчик уведомлений
+            List<NotificationData> allNotifs = notifDb.getAllNotifications();
+            int alertCount = 0;
+            for (NotificationData n : allNotifs) {
+                if (n.getType() == NotificationData.NotificationType.ALARM) {
+                    alertCount++;
+                }
+            }
+            String contentText = "Обнаружено: " + alertCount + " целей";
+
+            // 5. Получаем флаг "первое ли уведомление" из SharedPreferences
+            SharedPreferences prefs = mContext.getSharedPreferences("notif_prefs", Context.MODE_PRIVATE);
+            boolean isFirstAlert = prefs.getBoolean("is_first_alert", true);
+
+            // 6. Строим базовое уведомление
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(mContext, TARGET_NOTIFICATION_CHANNEL_ID)
+                    .setSmallIcon(R.drawable.ic_notifications)
+                    .setContentTitle("Внимание: Обнаружены цели!")
+                    .setContentText(contentText)
+                    .setContentIntent(pendingIntent)
+                    .setAutoCancel(true);
+
+            // 7. Логика: первый раз - со звуком и push, потом - тихо
+            if (isFirstAlert) {
+                builder.setPriority(NotificationCompat.PRIORITY_HIGH)
+                        .setCategory(NotificationCompat.CATEGORY_ALARM)
+                        .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+                        .setVibrate(new long[]{0, 500, 200, 500});
+
+                // Сохраняем, что первый alert уже был
+                prefs.edit().putBoolean("is_first_alert", false).apply();
+                Log.d(TAG, "🔊 FIRST ALERT: with sound and vibration");
+            } else {
+                builder.setPriority(NotificationCompat.PRIORITY_LOW)
+                        .setOnlyAlertOnce(true);
+                Log.d(TAG, "🔇 UPDATE ONLY: silent notification");
+            }
+
+            // 8. Показываем или обновляем уведомление
+            if (notificationManager != null) {
+                notificationManager.notify(TARGET_NOTIFICATION_ID, builder.build());
+                Log.d(TAG, "✅ Notification sent/updated. Total alerts: " + alertCount);
+            }
 
         } catch (Exception e) {
-            Log.e(TAG, "Error creating notification: " + e.getMessage());
+            Log.e(TAG, "Error creating notification: " + e.getMessage(), e);
         }
     }
     public void clearTableData(String folderName) {
@@ -1276,7 +1344,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                             "ID: %s - расстояние > 1 км и скорость < 20 км/ч, дальше не считаем",
                             uniqueId
                     ));
-                    return "GREY";
+                    return "TARGET";
                 }
 
                 if (currentJumpMeters > 10000.0 && speedKmH > 20.0) {
@@ -1285,7 +1353,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                             "ID: %s - расстояние > 10 км и скорость > 20 км/ч, дальше не считаем",
                             uniqueId
                     ));
-                    return "GREY";
+                    return "TARGET";
                 }
 
                 // 4. Считаем накопленный путь за 24 часа
@@ -1490,5 +1558,110 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         }
 
         return values;
+    }
+
+    // метод для получения истории устройства:
+    public List<DeviceLocation> getFullDeviceHistory(String tableName, String mac) {
+        List<DeviceLocation> history = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+
+        try {
+            String query = "SELECT name, latitude, longitude, timestamp, bssid FROM \"" + tableName + "\" " +
+                    "WHERE bssid = ? ORDER BY timestamp ASC";
+            cursor = db.rawQuery(query, new String[]{mac});
+
+            while (cursor.moveToNext()) {
+                String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
+                double latitude = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
+                double longitude = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
+                String timestamp = cursor.getString(cursor.getColumnIndexOrThrow("timestamp"));
+                String bssid = cursor.getString(cursor.getColumnIndexOrThrow("bssid"));
+
+                history.add(new DeviceLocation(name, latitude, longitude, timestamp, bssid));
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting device history: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            db.close();
+        }
+
+        return history;
+    }
+
+    // метод для получения полной информации об устройстве по его ID:
+    public DeviceInfo getDeviceInfoForNotification(String uniqueId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        DeviceInfo deviceInfo = null;
+
+        try {
+            // Ищем во всех таблицах
+            List<String> tables = getAllTables();
+
+            for (String tableName : tables) {
+                String query;
+                String[] args;
+
+                if (uniqueId.contains(":")) {
+                    // Это MAC-адрес
+                    query = "SELECT name, bssid, type, latitude, longitude, timestamp, status FROM \"" + tableName + "\" " +
+                            "WHERE bssid = ? ORDER BY timestamp DESC LIMIT 1";
+                    args = new String[]{uniqueId};
+                } else {
+                    // Это cell_id
+                    query = "SELECT name, cell_id, type, latitude, longitude, timestamp, status FROM \"" + tableName + "\" " +
+                            "WHERE CAST(cell_id AS TEXT) = ? ORDER BY timestamp DESC LIMIT 1";
+                    args = new String[]{uniqueId};
+                }
+
+                cursor = db.rawQuery(query, args);
+
+                if (cursor != null && cursor.moveToFirst()) {
+                    String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
+                    String type = cursor.getString(cursor.getColumnIndexOrThrow("type"));
+                    double latitude = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
+                    double longitude = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
+                    long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
+                    String status = cursor.getString(cursor.getColumnIndexOrThrow("status"));
+
+                    deviceInfo = new DeviceInfo(name, uniqueId, type, latitude, longitude, timestamp, status, tableName);
+                    break;
+                }
+                if (cursor != null) cursor.close();
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting device info for notification: " + e.getMessage());
+        } finally {
+            if (cursor != null && !cursor.isClosed()) cursor.close();
+            db.close();
+        }
+
+        return deviceInfo;
+    }
+
+    // Вспомогательный класс для передачи данных
+    public static class DeviceInfo {
+        public String name;
+        public String mac;
+        public String type;
+        public double latitude;
+        public double longitude;
+        public long timestamp;
+        public String status;
+        public String tableName;
+
+        public DeviceInfo(String name, String mac, String type, double latitude, double longitude,
+                          long timestamp, String status, String tableName) {
+            this.name = name;
+            this.mac = mac;
+            this.type = type;
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.timestamp = timestamp;
+            this.status = status;
+            this.tableName = tableName;
+        }
     }
 }
