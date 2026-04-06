@@ -83,6 +83,11 @@ public class ActivityMapActivity extends AppCompatActivity {
             }
         }
 
+        String deviceStatus = intent.getStringExtra("device_status");
+        if (deviceStatus != null) {
+            currentStatus = deviceStatus;
+        }
+
         // Настройка Toolbar
         setupToolbar();
 
