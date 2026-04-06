@@ -117,7 +117,7 @@ public class ActivityMapOSM extends Fragment {
         // Сразу устанавливаем приближение для быстрой загрузки
         mapController.setZoom(15.0);
 
-        // Определяем начальную точку для центрирования
+        // Определяем начальную точку для центрирования (ПОСЛЕДНЯЯ точка)
         GeoPoint initialCenter = getInitialCenterPoint();
         mapController.setCenter(initialCenter);
 
@@ -129,9 +129,9 @@ public class ActivityMapOSM extends Fragment {
     }
 
     private GeoPoint getInitialCenterPoint() {
-        // 1. Приоритет: последняя точка устройства
+        // 1. Приоритет: ПОСЛЕДНЯЯ точка устройства (индекс size() - 1)
         if (!deviceHistoryPoints.isEmpty()) {
-            return deviceHistoryPoints.get(0);
+            return deviceHistoryPoints.get(deviceHistoryPoints.size() - 1);
         }
 
         // 2. Резерв: текущее местоположение пользователя (если есть GPS)
@@ -195,50 +195,38 @@ public class ActivityMapOSM extends Fragment {
         }
         historyMarkers.clear();
 
-        // Создаем стрелочки для маршрута
+        // Создаем маркеры для всех точек
         for (int i = 0; i < deviceHistoryPoints.size(); i++) {
             GeoPoint currentPoint = deviceHistoryPoints.get(i);
             Marker marker = new Marker(mapView);
             marker.setPosition(currentPoint);
             marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER);
 
-            // Если есть следующая точка, рисуем стрелочку в ее направлении
-            if (i < deviceHistoryPoints.size() - 1) {
-                GeoPoint nextPoint = deviceHistoryPoints.get(i + 1);
-                float bearing = calculateBearing(
-                        currentPoint.getLatitude(), currentPoint.getLongitude(),
-                        nextPoint.getLatitude(), nextPoint.getLongitude()
-                );
-
-                // Поворачиваем иконку в направлении движения
-                marker.setRotation(bearing);
-
-                // Используем кастомную иконку стрелочки
+            // Последняя точка (i == size-1) - главный маркер
+            if (i == deviceHistoryPoints.size() - 1) {
+                // Последняя точка - главный маркер
+                marker.setTitle(deviceName + " (Последнее местоположение)");
+                marker.setSnippet("MAC: " + (deviceMac != null ? deviceMac : "N/A") +
+                        "\nВремя: " + (deviceHistoryTimestamps.size() > i ? deviceHistoryTimestamps.get(i) : "Неизвестно"));
                 try {
-                    // Создаем Bitmap стрелочки программно
-                    Bitmap arrowBitmap = createArrowBitmap(
-                            ContextCompat.getColor(requireContext(),
-                                    getStatusColor(deviceStatus))
-                    );
-                    marker.setIcon(new BitmapDrawable(getResources(), arrowBitmap));
+                    // Используем цвет в зависимости от статуса
+                    int color = getStatusColor(deviceStatus);
+                    Bitmap customMarker = createCustomMarker(color);
+                    marker.setIcon(new BitmapDrawable(getResources(), customMarker));
                 } catch (Exception e) {
-                    // Если не получилось, используем стандартную иконку
-                    marker.setIcon(ContextCompat.getDrawable(requireContext(),
-                            R.drawable.ic_arrow_direction));
+                    marker.setIcon(getResources().getDrawable(R.drawable.ic_mark));
                 }
-
+            } else {
+                // Промежуточные точки - маленькие маркеры
                 marker.setTitle("Точка " + (i + 1));
                 if (deviceHistoryTimestamps != null && i < deviceHistoryTimestamps.size()) {
                     marker.setSnippet("Время: " + deviceHistoryTimestamps.get(i));
                 }
-            } else {
-                // Последняя точка - другая иконка
-                marker.setTitle(deviceName + " (Последнее)");
-                marker.setSnippet("MAC: " + (deviceMac != null ? deviceMac : "N/A"));
                 try {
-                    marker.setIcon(getResources().getDrawable(R.drawable.ic_mark));
+                    Bitmap smallMarker = createSmallMarker();
+                    marker.setIcon(new BitmapDrawable(getResources(), smallMarker));
                 } catch (Exception e) {
-                    marker.setIcon(getResources().getDrawable(android.R.drawable.ic_dialog_map));
+                    // Используем стандартную иконку
                 }
             }
 
@@ -251,60 +239,65 @@ public class ActivityMapOSM extends Fragment {
             drawHistoryLine();
         }
 
-        // Центрируем карту
-        centerMapOnHistory();
+        // Центрируем карту на ПОСЛЕДНЕЙ точке
+        centerMapOnLastPoint();
 
         mapView.invalidate();
     }
 
-    private void centerMapOnHistory() {
+    // Создание кастомного маркера для последней точки
+    private Bitmap createCustomMarker(int color) {
+        int size = 64; // Размер маркера
+        Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint();
+
+        paint.setColor(color);
+        paint.setStyle(Paint.Style.FILL);
+        paint.setAntiAlias(true);
+
+        // Рисуем круг
+        canvas.drawCircle(size / 2, size / 2, size / 2 - 4, paint);
+
+        // Рисуем обводку
+        paint.setColor(Color.WHITE);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3);
+        canvas.drawCircle(size / 2, size / 2, size / 2 - 4, paint);
+
+        // Рисуем точку в центре
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor(Color.WHITE);
+        canvas.drawCircle(size / 2, size / 2, size / 6, paint);
+
+        return bitmap;
+    }
+
+    // Создание маленького маркера для промежуточных точек
+    private Bitmap createSmallMarker() {
+        int size = 24;
+        Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint();
+
+        paint.setColor(Color.parseColor("#3DDC84"));
+        paint.setStyle(Paint.Style.FILL);
+        paint.setAntiAlias(true);
+
+        canvas.drawCircle(size / 2, size / 2, size / 2 - 2, paint);
+
+        return bitmap;
+    }
+
+    private void centerMapOnLastPoint() {
         if (deviceHistoryPoints.isEmpty()) {
             return;
         }
 
-        // Если всего одна точка, центрируем на ней
-        if (deviceHistoryPoints.size() == 1) {
-            mapController.setCenter(deviceHistoryPoints.get(0));
-            mapController.setZoom(18.0); // Близкий зум для одной точки
-            return;
-        }
-
-        // Вычисляем границы всех точек
-        double minLat = deviceHistoryPoints.get(0).getLatitude();
-        double maxLat = deviceHistoryPoints.get(0).getLatitude();
-        double minLon = deviceHistoryPoints.get(0).getLongitude();
-        double maxLon = deviceHistoryPoints.get(0).getLongitude();
-
-        for (GeoPoint point : deviceHistoryPoints) {
-            minLat = Math.min(minLat, point.getLatitude());
-            maxLat = Math.max(maxLat, point.getLatitude());
-            minLon = Math.min(minLon, point.getLongitude());
-            maxLon = Math.max(maxLon, point.getLongitude());
-        }
-
-        // Центрируем карту на всем маршруте
-        GeoPoint center = new GeoPoint(
-                (minLat + maxLat) / 2,
-                (minLon + maxLon) / 2
-        );
-
-        mapController.setCenter(center);
-
-        // Автоматически рассчитываем оптимальный зум
-        double latDiff = maxLat - minLat;
-        double lonDiff = maxLon - minLon;
-        double maxDiff = Math.max(latDiff, lonDiff);
-
-        // Формула для расчета зума на основе расстояния
-        if (maxDiff < 0.001) { // ~100 метров
-            mapController.setZoom(18.0);
-        } else if (maxDiff < 0.01) { // ~1 км
-            mapController.setZoom(16.0);
-        } else if (maxDiff < 0.1) { // ~10 км
-            mapController.setZoom(13.0);
-        } else {
-            mapController.setZoom(11.0);
-        }
+        // Центрируем на ПОСЛЕДНЕЙ точке
+        GeoPoint lastPoint = deviceHistoryPoints.get(deviceHistoryPoints.size() - 1);
+        mapController.setCenter(lastPoint);
+        mapController.setZoom(18.0); // Близкий зум для последней точки
     }
 
     private int getStatusColor(String status) {
@@ -322,7 +315,7 @@ public class ActivityMapOSM extends Fragment {
     }
 
     private Bitmap createArrowBitmap(int color) {
-        int size = 48; // Размер стрелочки
+        int size = 48;
         Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         Paint paint = new Paint();
@@ -331,11 +324,10 @@ public class ActivityMapOSM extends Fragment {
         paint.setStyle(Paint.Style.FILL);
         paint.setAntiAlias(true);
 
-        // Рисуем треугольник (стрелочку)
         Path path = new Path();
-        path.moveTo(size / 2, 0); // Верхняя точка
-        path.lineTo(size, size);  // Правая нижняя
-        path.lineTo(0, size);     // Левая нижняя
+        path.moveTo(size / 2, 0);
+        path.lineTo(size, size);
+        path.lineTo(0, size);
         path.close();
 
         canvas.drawPath(path, paint);
@@ -361,10 +353,9 @@ public class ActivityMapOSM extends Fragment {
             return;
         }
 
-        // Создаем линию
         historyPolyline = new Polyline();
         historyPolyline.setPoints(deviceHistoryPoints);
-        historyPolyline.setColor(Color.parseColor("#3DDC84")); // Зеленый цвет как в дизайне
+        historyPolyline.setColor(Color.parseColor("#3DDC84"));
         historyPolyline.setWidth(8f);
         historyPolyline.setGeodesic(true);
 

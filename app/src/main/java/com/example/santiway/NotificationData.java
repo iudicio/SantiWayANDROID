@@ -16,6 +16,7 @@ public class NotificationData implements Serializable {
     private List<String> binaryMimeTypes; // Типы контента (e.g., "image/jpeg", "application/vnd.android.package-archive")
     private Double latitude;
     private Double longitude;
+    private String deviceId;
 
     public enum NotificationType {
         ALARM, SYSTEM, INFO;
@@ -34,7 +35,9 @@ public class NotificationData implements Serializable {
         }
     }
 
-    public NotificationData(String id, String title, String text, Date timestamp, NotificationType type, List<byte[]> binaryContents, List<String> binaryMimeTypes, Double latitude, Double longitude) {
+    public NotificationData(String id, String title, String text, Date timestamp, NotificationType type,
+                            List<byte[]> binaryContents, List<String> binaryMimeTypes,
+                            Double latitude, Double longitude, String deviceId) {
         this.id = id;
         this.title = title;
         this.text = text;
@@ -44,6 +47,7 @@ public class NotificationData implements Serializable {
         this.binaryMimeTypes = binaryMimeTypes;
         this.latitude = latitude;
         this.longitude = longitude;
+        this.deviceId = deviceId;
     }
 
     // Геттеры
@@ -56,6 +60,7 @@ public class NotificationData implements Serializable {
     public List<String> getBinaryMimeTypes() { return binaryMimeTypes; }
     public Double getLatitude() { return latitude; }
     public Double getLongitude() { return longitude; }
+    public String getDeviceId() { return deviceId; }
 
     public boolean isDeletable() {
         return this.type != NotificationType.SYSTEM;
