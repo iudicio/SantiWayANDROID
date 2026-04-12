@@ -17,11 +17,11 @@
         <androidx.appcompat.widget.Toolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="116dp"
+            android:layout_height="?attr/actionBarSize"
+            android:layout_marginTop="24dp"
             android:background="#0B1A2C"
             app:titleTextColor="@android:color/white"
-            app:navigationIcon="@drawable/ic_apps"
-            android:paddingTop="48dp">
+            app:navigationIcon="@drawable/ic_apps">
 
             <TextView
                 android:id="@+id/toolbar_folder_title"
@@ -52,10 +52,9 @@
         <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:paddingTop="16dp"
-            android:paddingBottom="48dp">    <TextView
+            android:paddingTop="16dp">
+
+            <TextView
             android:id="@+id/time_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -86,6 +85,8 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="32dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
                 app:cardBackgroundColor="#172A46" app:cardCornerRadius="12dp"
                 app:contentPadding="16dp"
                 app:cardElevation="4dp"
@@ -128,6 +129,8 @@
                 app:cardBackgroundColor="#172A46"
                 app:cardCornerRadius="12dp"
                 app:contentPadding="16dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
                 app:cardElevation="4dp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
@@ -169,6 +172,8 @@
                 app:cardBackgroundColor="#172A46"
                 app:cardCornerRadius="12dp"
                 app:contentPadding="16dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
                 app:cardElevation="4dp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
@@ -210,6 +215,8 @@
                 app:cardBackgroundColor="#1E3A5A"
                 app:cardCornerRadius="12dp"
                 app:contentPadding="16dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
                 app:cardElevation="2dp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
@@ -268,10 +275,16 @@
                 android:id="@+id/footer_card_container"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="#172A46" app:cardCornerRadius="24dp" app:cardElevation="8dp"
+                android:layout_marginStart="0dp"
+                android:layout_marginEnd="0dp"
+                android:layout_marginBottom="0dp"
+                app:cardBackgroundColor="#172A46"
+                app:cardCornerRadius="0dp"
+                app:cardElevation="10dp"
+                app:cardPreventCornerOverlap="false"
                 app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent">
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent">
 
                 <LinearLayout
                     android:id="@+id/footer_actions"
@@ -280,8 +293,8 @@
                     android:background="@android:color/transparent"
                     android:gravity="center"
                     android:orientation="horizontal"
-                    android:paddingTop="4dp"
-                    android:paddingBottom="20dp" >
+                    android:paddingTop="6dp"
+                    android:paddingBottom="6dp" >
 
                     <include layout="@layout/footer_button_layout" />
 
