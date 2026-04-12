@@ -146,6 +146,37 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
             shareButton = itemView.findViewById(R.id.share_button);
         }
 
+        private String formatRelativeTime(long diffMillis) {
+            long minutes = diffMillis / (60 * 1000);
+            long hours = diffMillis / (60 * 60 * 1000);
+            long days = diffMillis / (24 * 60 * 60 * 1000);
+            long months = days / 30;
+
+            if (minutes < 60) return Math.max(minutes, 1) + " Мин.";
+            if (hours < 24) return hours + " Ч.";
+            if (days < 30) return days + " Д.";
+            return Math.max(months, 1) + " М.";
+        }
+
+        private String formatRelativeTime(String source) {
+            if (source == null || source.trim().isEmpty()) return "N/A";
+
+            return source.trim()
+                    .replace("минут", "Мин.")
+                    .replace("минута", "Мин.")
+                    .replace("минуту", "Мин.")
+                    .replace("мин", "Мин.")
+                    .replace("час", "Ч.")
+                    .replace("часа", "Ч.")
+                    .replace("часов", "Ч.")
+                    .replace("день", "Д.")
+                    .replace("дня", "Д.")
+                    .replace("дней", "Д.")
+                    .replace("месяц", "М.")
+                    .replace("месяца", "М.")
+                    .replace("месяцев", "М.");
+        }
+
         public void bind(DeviceListActivity.Device device, OnDeviceClickListener listener, String tableName, int position) {
             String deviceName = device.getName() != null ? device.getName().trim() : "Unknown";
             if (deviceName.length() > 30) {
@@ -166,14 +197,10 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
             deviceTypeTextView.setText(device.getType() != null ? device.getType() : "N/A");
 
             if (device.getTimestamp() > 0) {
-                CharSequence relativeTime = DateUtils.getRelativeTimeSpanString(
-                        device.getTimestamp(),
-                        System.currentTimeMillis(),
-                        DateUtils.MINUTE_IN_MILLIS
-                );
-                deviceTimeTextView.setText(relativeTime);
+                long diff = System.currentTimeMillis() - device.getTimestamp();
+                deviceTimeTextView.setText(formatRelativeTime(diff));
             } else {
-                deviceTimeTextView.setText(device.getTime() != null ? device.getTime() : "N/A");
+                deviceTimeTextView.setText(formatRelativeTime(device.getTime()));
             }
 
             itemView.setOnClickListener(v -> {
