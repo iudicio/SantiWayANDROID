@@ -86,7 +86,7 @@ public class DeviceUploadManager {
     }
 
     /**
-     * ПОЛУЧАЕТ ДАННЫЕ ДЛЯ ОТПРАВКИ ИЗ unified_data
+     * ПОЛУЧАЕТ ДАННЫЕ ДЛЯ ОТПРАВКИ ИЗ Основная
      * Важно: получаем записи с is_uploaded = 0
      */
     public List<PendingUpload> getPendingUploadsBatch() {
@@ -132,7 +132,7 @@ public class DeviceUploadManager {
 
     /**
      * Конвертация курсора в ApiDevice для отправки
-     * ВАЖНО: берем данные из unified_data, но для MAC и времени используем точные значения
+     * ВАЖНО: берем данные из Основная, но для MAC и времени используем точные значения
      */
     private ApiDevice cursorToApiDevice(Cursor cursor) {
         try {
@@ -338,7 +338,7 @@ public class DeviceUploadManager {
     }
 
     /**
-     * ПОМЕЧАЕТ ОТПРАВЛЕННЫЕ УСТРОЙСТВА В unified_data
+     * ПОМЕЧАЕТ ОТПРАВЛЕННЫЕ УСТРОЙСТВА В Основная
      * Важно: помечаем по связке device_id + timestamp
      */
     private void markRowsAsUploaded(List<Long> ids) {

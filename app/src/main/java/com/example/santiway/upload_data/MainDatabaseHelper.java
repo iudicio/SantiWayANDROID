@@ -41,6 +41,8 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     private static final long SOUND_INTERVAL = 3600000;
     private static final int TARGET_NOTIFICATION_ID = 1001;
     private static final String TARGET_NOTIFICATION_CHANNEL_ID = "target_alerts_channel";
+    public static final String ACTION_DEVICES_CHANGED = "com.example.santiway.ACTION_DEVICES_CHANGED";
+    public static final String EXTRA_TABLE_NAME = "table_name";
 
     private static final String TAG = "MainDatabaseHelper";
     private static final String DATABASE_NAME = "UnifiedScanner.db";
@@ -416,6 +418,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             if (result != -1) {
                 addToFolderUniqueDevices(db, tableName, values);
                 syncStatusTables(db, uniqueId, values.getAsString("status"));
+                notifyDevicesChanged(tableName);
             }
 
             db.setTransactionSuccessful();
@@ -560,6 +563,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             db.delete("safe_devices", null, null);
 
             db.setTransactionSuccessful();
+            notifyDevicesChanged(folderName);
         } catch (Exception e) {
             Log.e(TAG, "Error clearing folder tables: " + e.getMessage());
         } finally {
@@ -821,6 +825,8 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             rebuildStatusTables(tableName);
 
             db.setTransactionSuccessful();
+            notifyDevicesChanged(tableName);
+
 
         } catch (Exception e) {
             Log.e(TAG, "Error updating device status: " + e.getMessage());
@@ -967,6 +973,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             rebuildStatusTables(folderName);
 
             db.setTransactionSuccessful();
+            notifyDevicesChanged(folderName);
         } catch (Exception e) {
             Log.e(TAG, "Error updating folder statuses: " + e.getMessage());
         } finally {
@@ -1519,7 +1526,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     }
 
     /**
-     * Получает последнюю запись устройства из unified_data
+     * Получает последнюю запись устройства из Основная
      */
     public ContentValues getLatestDeviceData(String uniqueId, String tableName) {
         SQLiteDatabase db = this.getReadableDatabase();
@@ -1558,6 +1565,83 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         }
 
         return values;
+    }
+
+    //единый метод получения статуса из target_devices / safe_devices
+    public String getStatusFromServiceTables(String deviceKey) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+
+        try {
+            deviceKey = normalizeDeviceKey(deviceKey);
+            if (deviceKey == null || deviceKey.isEmpty()) {
+                return "GREY";
+            }
+
+            cursor = db.rawQuery(
+                    "SELECT 1 FROM target_devices WHERE UPPER(device_key) = ? LIMIT 1",
+                    new String[]{deviceKey}
+            );
+            if (cursor != null && cursor.moveToFirst()) {
+                return "TARGET";
+            }
+            if (cursor != null) {
+                cursor.close();
+                cursor = null;
+            }
+
+            cursor = db.rawQuery(
+                    "SELECT 1 FROM safe_devices WHERE UPPER(device_key) = ? LIMIT 1",
+                    new String[]{deviceKey}
+            );
+            if (cursor != null && cursor.moveToFirst()) {
+                return "SAFE";
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting status from service tables: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+
+        return "GREY";
+    }
+
+    // метод для получения deviceKey
+    public String buildDeviceKeyFromRow(
+            String bssid,
+            Long cellId,
+            Integer mcc,
+            Integer mnc,
+            Integer lac,
+            Long tac,
+            String networkType
+    ) {
+        if (bssid != null && !bssid.trim().isEmpty()) {
+            return normalizeDeviceKey(bssid);
+        }
+
+        if (cellId != null && cellId > 0 && cellId != 2147483647) {
+            if ("LTE".equalsIgnoreCase(networkType) || "5G".equalsIgnoreCase(networkType)) {
+                return normalizeDeviceKey(String.format(
+                        Locale.US, "%d_%d_%d_%d",
+                        mcc != null ? mcc : 0,
+                        mnc != null ? mnc : 0,
+                        tac != null ? tac : 0,
+                        cellId
+                ));
+            } else {
+                return normalizeDeviceKey(String.format(
+                        Locale.US, "%d_%d_%d_%d",
+                        mcc != null ? mcc : 0,
+                        mnc != null ? mnc : 0,
+                        lac != null ? lac : 0,
+                        cellId
+                ));
+            }
+        }
+
+        return null;
     }
 
     // метод для получения истории устройства:
@@ -1662,6 +1746,16 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             this.timestamp = timestamp;
             this.status = status;
             this.tableName = tableName;
+        }
+    }
+
+    private void notifyDevicesChanged(String tableName) {
+        try {
+            Intent intent = new Intent(ACTION_DEVICES_CHANGED);
+            intent.putExtra(EXTRA_TABLE_NAME, tableName);
+            mContext.sendBroadcast(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "Error sending devices changed broadcast: " + e.getMessage(), e);
         }
     }
 }

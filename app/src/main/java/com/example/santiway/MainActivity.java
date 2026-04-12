@@ -230,7 +230,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
 
     private String getDisplayFolderName(String folderName) {
-        return "unified_data".equals(folderName) ? "Основная" : folderName;
+        return folderName;
     }
 
     private void updateToolbarTitle(String folderName) {
@@ -668,8 +668,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
         if (id == R.id.nav_clear_triggers) {
             if (currentScanFolder != null && !currentScanFolder.isEmpty()) {
-                int affectedRows = databaseHelper.updateAllDeviceStatusForTable(currentScanFolder, "CLEAR");
-                Toast.makeText(this, affectedRows + " устройств в '" + currentScanFolder + "' помечены как CLEAR.", Toast.LENGTH_SHORT).show();
+                int affectedRows = databaseHelper.updateAllDeviceStatusForTable(currentScanFolder, "GREY");
+                Toast.makeText(this, affectedRows + " устройств в '" + currentScanFolder + "' помечены как GREY.", Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, "Текущая папка для сканирования не определена.", Toast.LENGTH_SHORT).show();
             }
