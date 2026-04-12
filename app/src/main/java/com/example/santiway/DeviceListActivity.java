@@ -11,6 +11,10 @@ import android.util.Log;
 import android.view.MenuItem;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -34,7 +38,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
-public class DeviceListActivity extends AppCompatActivity implements DeviceListAdapter.OnDeviceClickListener {
+public class DeviceListActivity extends AppCompatActivity implements DeviceListAdapter.OnDeviceClickListener, StatusUpdateListener {
 
     private Toolbar toolbar;
     private TabLayout tabLayout;
@@ -55,14 +59,45 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
     private String currentStatusFilter = "ALL";
     private TextInputEditText etSearchDevice;
     private String currentSearchQuery = "";
+    private boolean autoRefreshStarted = false;
 
     // Хендлер для задержки
     private Handler handler = new Handler();
+    private final BroadcastReceiver devicesChangedReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent == null) return;
+
+            String changedTable = intent.getStringExtra(MainDatabaseHelper.EXTRA_TABLE_NAME);
+            if (changedTable == null || currentTable == null) return;
+            if (!changedTable.equals(currentTable)) return;
+            if (isLoading) return;
+
+            handler.removeCallbacks(refreshRunnable);
+            handler.postDelayed(refreshRunnable, 200);
+        }
+    };
+
+    private final Runnable refreshRunnable = () -> {
+        if (currentTable != null && !currentTable.isEmpty() && !isLoading) {
+            loadDevicesForTable(currentTable, true);
+        }
+    };
+    private final Runnable autoRefreshRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!isFinishing() && !isDestroyed() && currentTable != null && !currentTable.isEmpty()) {
+                if (!isLoading) {
+                    loadDevicesForTable(currentTable, true);
+                }
+                handler.postDelayed(this, 1500); // 1.5 сек
+            }
+        }
+    };
     @Override
     public void onDeviceClick(Device device, String tableName, int position) {
         openDeviceMap(device, tableName, position);
     }
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -242,6 +277,54 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         setupSearch();
     }
 
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        IntentFilter filter = new IntentFilter(MainDatabaseHelper.ACTION_DEVICES_CHANGED);
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(devicesChangedReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(devicesChangedReceiver, filter);
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        try {
+            unregisterReceiver(devicesChangedReceiver);
+        } catch (Exception ignored) { }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        if (!autoRefreshStarted) {
+            handler.post(autoRefreshRunnable);
+            autoRefreshStarted = true;
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        handler.removeCallbacks(autoRefreshRunnable);
+        autoRefreshStarted = false;
+    }
+
+    @Override
+    public void onStatusUpdated() {
+        runOnUiThread(() -> {
+            if (currentTable != null && !currentTable.isEmpty() && !isLoading) {
+                loadDevicesForTable(currentTable, true);
+            }
+        });
+    }
+
     // Метод для открытия карты устройства
     private void openDeviceMap(Device device, String tableName, int position) {
         if (tableName == null || tableName.isEmpty()) {
@@ -312,7 +395,7 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
     }
 
     private String getDisplayTableName(String tableName) {
-        return "unified_data".equals(tableName) ? "Основная" : tableName;
+        return tableName;
     }
 
     private void setupTabLayout() {
@@ -392,7 +475,13 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
                     deviceList = uniqueHelper.getAllDevicesWithSearch(currentSearchQuery);
                 }
 
-                hasMoreData = false; // для unique-таблицы пагинация не нужна
+                for (Device device : deviceList) {
+                    String deviceKey = device.getMac();
+                    String actualStatus = databaseHelper.getStatusFromServiceTables(deviceKey);
+                    device.setStatus(actualStatus);
+                }
+
+                hasMoreData = false;
             } catch (Exception e) {
                 Log.e("LOAD_DEVICES", "Ошибка загрузки устройств: " + e.getMessage(), e);
             }
@@ -416,7 +505,7 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
             return;
         }
 
-        if (pos == -1 || tabLayout.getTabAt(pos) == null) return;
+        if (tabLayout.getTabAt(pos) == null) return;
         String folder = (String) tabLayout.getTabAt(pos).getTag();
 
         new Thread(() -> {
@@ -430,13 +519,8 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
                         Toast.LENGTH_SHORT
                 ).show();
 
-                // Обновляем локальный список, чтобы цвет сменился сразу
-                for (Device device : allLoadedDevices) {
-                    device.setStatus(status);
-                }
-
-                applyCurrentFilter();
-
+                resetPagination();
+                loadDevicesForTable(folder, true);
             });
         }).start();
     }

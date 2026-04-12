@@ -35,7 +35,7 @@ public class CellForegroundService extends Service {
     private boolean isScanning = false;
     private final long scanInterval = 10000;
 
-    private String currentTableName = "unified_data";
+    private String currentTableName = "Основная";
     private double currentLatitude = 0.0;
     private double currentLongitude = 0.0;
     private double currentAltitude = 0.0;
@@ -148,8 +148,8 @@ public class CellForegroundService extends Service {
             long resultId = databaseHelper.addCellTower(tower, currentTableName);
             if (resultId != -1) return true;
         } catch (Exception e) {
-            Log.e(TAG, "Failed to save to database. Retrying with 'unified_data'. Error: " + e.getMessage());
-            currentTableName = "unified_data";
+            Log.e(TAG, "Failed to save to database. Retrying with 'Основная'. Error: " + e.getMessage());
+            currentTableName = "Основная";
             try {
                 long retryResultId = databaseHelper.addCellTower(tower, currentTableName);
                 if (retryResultId != -1) {
@@ -157,7 +157,7 @@ public class CellForegroundService extends Service {
                     return true;
                 }
             } catch (Exception retryE) {
-                Log.e(TAG, "Failed to save to 'unified_data' as well. Error: " + retryE.getMessage());
+                Log.e(TAG, "Failed to save to 'Основная' as well. Error: " + retryE.getMessage());
             }
         }
         return false;
