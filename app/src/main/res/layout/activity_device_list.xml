@@ -98,6 +98,7 @@
         app:boxCornerRadiusTopEnd="12dp"
         app:boxCornerRadiusBottomStart="12dp"
         app:boxCornerRadiusBottomEnd="12dp"
+        app:hintEnabled="false"
         app:hintTextColor="@android:color/darker_gray"
         app:startIconDrawable="@android:drawable/ic_menu_search"
         app:startIconTint="@android:color/white"
