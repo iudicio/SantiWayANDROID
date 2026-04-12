@@ -31,6 +31,8 @@ public class DeviceDetailsBottomSheet extends BottomSheetDialogFragment implemen
 
     public static final String TAG = "DeviceDetailsBottomSheet";
     private static final String ARG_DEVICE = "device_details";
+    private static final String ARG_TABLE_NAME = "table_name";
+    private String tableName;
 
     private DeviceListActivity.Device device;
     private MapView mapView; // Google Maps MapView
@@ -44,10 +46,11 @@ public class DeviceDetailsBottomSheet extends BottomSheetDialogFragment implemen
     /**
      * Создает новый экземпляр Bottom Sheet, передавая объект Device.
      */
-    public static DeviceDetailsBottomSheet newInstance(DeviceListActivity.Device device) {
+    public static DeviceDetailsBottomSheet newInstance(DeviceListActivity.Device device, String tableName) {
         DeviceDetailsBottomSheet fragment = new DeviceDetailsBottomSheet();
         Bundle args = new Bundle();
         args.putParcelable(ARG_DEVICE, device);
+        args.putString(ARG_TABLE_NAME, tableName);
         fragment.setArguments(args);
         return fragment;
     }
@@ -80,6 +83,7 @@ public class DeviceDetailsBottomSheet extends BottomSheetDialogFragment implemen
 
         if (getArguments() != null) {
             device = getArguments().getParcelable(ARG_DEVICE);
+            tableName = getArguments().getString(ARG_TABLE_NAME);
 
             if (device != null) {
                 String details = formatDeviceDetails(device);
@@ -118,27 +122,39 @@ public class DeviceDetailsBottomSheet extends BottomSheetDialogFragment implemen
             String newStatus;
 
             if (v.getId() == R.id.btn_alert) {
-                newStatus = "ALERT";
+                newStatus = "TARGET";
             } else if (v.getId() == R.id.btn_safe) {
                 newStatus = "SAFE";
             } else if (v.getId() == R.id.btn_clear) {
-                newStatus = "CLEAR";
+                newStatus = "GREY";
             } else {
                 return;
             }
 
-            // 1. ОБНОВЛЕНИЕ СТАТУСА В БАЗЕ ДАННЫХ
-            databaseHelper.updateDeviceStatus("unified_data", currentDevice.mac, newStatus);
+            if (databaseHelper == null || tableName == null || tableName.trim().isEmpty()) {
+                Toast.makeText(getContext(), "Не удалось определить папку устройства", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
-            // 2. ОБНОВЛЕНИЕ ЛОКАЛЬНОГО ОБЪЕКТА И ЭКРАНА
-            currentDevice.status = newStatus;
-            detailsTextView.setText(formatDeviceDetails(currentDevice));
+            int affected = databaseHelper.updateDeviceStatus(tableName, currentDevice.mac, newStatus);
 
-            Toast.makeText(getContext(), "Статус устройства " + currentDevice.name + " изменен на " + newStatus, Toast.LENGTH_SHORT).show();
+            if (affected >= 0) {
+                currentDevice.status = newStatus;
+                detailsTextView.setText(formatDeviceDetails(currentDevice));
 
-            // 3. ИСПРАВЛЕНИЕ: Используем прямой интерфейс StatusUpdateListener
-            if (getActivity() instanceof StatusUpdateListener) {
-                ((StatusUpdateListener) getActivity()).onStatusUpdated();
+                Toast.makeText(
+                        getContext(),
+                        "Статус устройства " + currentDevice.name + " изменен на " + newStatus,
+                        Toast.LENGTH_SHORT
+                ).show();
+
+                if (getActivity() instanceof StatusUpdateListener) {
+                    ((StatusUpdateListener) getActivity()).onStatusUpdated();
+                }
+
+                dismiss();
+            } else {
+                Toast.makeText(getContext(), "Ошибка обновления статуса", Toast.LENGTH_SHORT).show();
             }
         };
 

@@ -89,118 +89,174 @@ public class UniqueDevicesHelper {
         String type = deviceData.getAsString("type");
         String uniqueIdentifier = null;
         String bssid = null;
-        Integer cellId = null;
-
-        // Определяем уникальный идентификатор в зависимости от типа
-        if ("Wi-Fi".equals(type) || "Bluetooth".equals(type)) {
-            bssid = deviceData.getAsString("bssid");
-            if (bssid != null && !bssid.isEmpty()) {
-                // Приводим MAC-адрес к верхнему регистру
-                bssid = bssid.toUpperCase(Locale.US);
-                uniqueIdentifier = "MAC:" + bssid;
-                deviceData.put("bssid", bssid); // Сохраняем в верхнем регистре
-            }
-        } else if ("Cell".equals(type)) {
-            cellId = deviceData.getAsInteger("cell_id");
-            if (cellId != null && cellId > 0) {
-                uniqueIdentifier = "CELL:" + cellId;
-            }
-        }
-
-        if (uniqueIdentifier == null) {
-            Log.d(TAG, "Пропуск устройства без уникального идентификатора: " + type);
-            return; // Пропускаем устройства без уникального идентификатора
-        }
-
-        // Убеждаемся, что таблица существует
-        createTableIfNeeded(db);
-
-        Cursor cursor = null;
+        Long cellId = null;
 
         try {
-            // Проверяем, существует ли устройство по уникальному идентификатору
-            cursor = db.query(uniqueTableName,
-                    new String[]{"id", "total_scans", "avg_signal_strength", "name", "latitude", "longitude", "bssid", "cell_id"},
-                    "unique_identifier = ?",
-                    new String[]{uniqueIdentifier},
-                    null, null, null);
+            // Убеждаемся, что таблица существует
+            createTableIfNeeded(db);
 
-            long currentTime = System.currentTimeMillis();
-            ContentValues values = new ContentValues();
+            // 1. Формируем ЕДИНЫЙ device key / unique_identifier
+            if ("Wi-Fi".equalsIgnoreCase(type) || "Bluetooth".equalsIgnoreCase(type)) {
+                bssid = deviceData.getAsString("bssid");
 
-            // Копируем все поля из исходных данных
-            copyFields(deviceData, values);
-
-            // Добавляем уникальный идентификатор
-            values.put("unique_identifier", uniqueIdentifier);
-
-            // Для сотовых вышек сохраняем cell_id отдельно
-            if (cellId != null) {
-                values.put("cell_id", cellId);
-            }
-
-            // Для MAC-адресов сохраняем в верхнем регистре
-            if (bssid != null) {
-                values.put("bssid", bssid);
-            }
-
-            if (cursor != null && cursor.moveToFirst()) {
-                // Устройство существует - обновляем
-                int id = cursor.getInt(cursor.getColumnIndexOrThrow("id"));
-                int totalScans = cursor.getInt(cursor.getColumnIndexOrThrow("total_scans"));
-                float avgSignal = cursor.getFloat(cursor.getColumnIndexOrThrow("avg_signal_strength"));
-                String oldName = cursor.getString(cursor.getColumnIndexOrThrow("name"));
-                double oldLat = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
-                double oldLon = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
-
-                // Обновляем счетчик и средний сигнал
-                Integer newSignalObj = deviceData.getAsInteger("signal_strength");
-                int newSignal = newSignalObj != null ? newSignalObj : 0;
-                float newAvgSignal = (avgSignal * totalScans + newSignal) / (totalScans + 1);
-
-                values.put("total_scans", totalScans + 1);
-                values.put("avg_signal_strength", newAvgSignal);
-                values.put("last_seen", currentTime);
-
-                // Проверяем изменение названия
-                String newName = deviceData.getAsString("name");
-                if (newName != null && !newName.isEmpty() && !newName.equals(oldName)) {
-                    values.put("name", newName);
+                if (bssid != null && !bssid.trim().isEmpty()) {
+                    bssid = bssid.trim().toUpperCase(Locale.US);
+                    uniqueIdentifier = bssid;              // ВАЖНО: без "MAC:"
+                    deviceData.put("bssid", bssid);
                 }
 
-                // Проверяем изменение координат
-                Double newLatObj = deviceData.getAsDouble("latitude");
-                Double newLonObj = deviceData.getAsDouble("longitude");
+            } else if ("Cell".equalsIgnoreCase(type)) {
+                cellId = deviceData.getAsLong("cell_id");
+                Integer mcc = deviceData.getAsInteger("mcc");
+                Integer mnc = deviceData.getAsInteger("mnc");
+                Integer lac = deviceData.getAsInteger("lac");
+                Long tac = deviceData.getAsLong("tac");
+                String networkType = deviceData.getAsString("network_type");
 
-                if (newLatObj != null && newLonObj != null) {
-                    double newLat = newLatObj;
-                    double newLon = newLonObj;
-                    if (Math.abs(oldLat - newLat) > 0.0001 || Math.abs(oldLon - newLon) > 0.0001) {
-                        values.put("last_location_change", currentTime);
+                if (cellId != null && cellId > 0 && cellId != 2147483647) {
+                    if ("LTE".equalsIgnoreCase(networkType) || "5G".equalsIgnoreCase(networkType)) {
+                        uniqueIdentifier = String.format(
+                                Locale.US,
+                                "%d_%d_%d_%d",
+                                mcc != null ? mcc : 0,
+                                mnc != null ? mnc : 0,
+                                tac != null ? tac : 0,
+                                cellId
+                        );
+                    } else {
+                        uniqueIdentifier = String.format(
+                                Locale.US,
+                                "%d_%d_%d_%d",
+                                mcc != null ? mcc : 0,
+                                mnc != null ? mnc : 0,
+                                lac != null ? lac : 0,
+                                cellId
+                        );
                     }
+
+                    uniqueIdentifier = uniqueIdentifier.toUpperCase(Locale.US);
+                }
+            }
+
+            if (uniqueIdentifier == null || uniqueIdentifier.trim().isEmpty()) {
+                Log.d(TAG, "Пропуск устройства без корректного unique_identifier: " + type);
+                return;
+            }
+
+            Cursor cursor = null;
+
+            try {
+                // 2. Ищем устройство по новому unique_identifier
+                cursor = db.query(
+                        "\"" + uniqueTableName + "\"",
+                        new String[]{
+                                "id",
+                                "total_scans",
+                                "avg_signal_strength",
+                                "name",
+                                "latitude",
+                                "longitude",
+                                "bssid",
+                                "cell_id"
+                        },
+                        "UPPER(unique_identifier) = ?",
+                        new String[]{uniqueIdentifier},
+                        null,
+                        null,
+                        null
+                );
+
+                long currentTime = System.currentTimeMillis();
+                ContentValues values = new ContentValues();
+
+                // 3. Копируем исходные поля
+                copyFields(deviceData, values);
+
+                // 4. Явно проставляем ключевые поля
+                values.put("unique_identifier", uniqueIdentifier);
+
+                if (bssid != null && !bssid.isEmpty()) {
+                    values.put("bssid", bssid);
                 }
 
-                db.update(uniqueTableName, values, "id = ?", new String[]{String.valueOf(id)});
-                Log.d(TAG, "Обновлено устройство: " + uniqueIdentifier + ", сканирований: " + (totalScans + 1));
-            } else {
-                // Новое устройство
-                values.put("first_seen", currentTime);
-                values.put("last_seen", currentTime);
-                values.put("total_scans", 1);
+                if (cellId != null) {
+                    values.put("cell_id", cellId);
+                }
 
-                Integer signalObj = deviceData.getAsInteger("signal_strength");
-                values.put("avg_signal_strength", signalObj != null ? signalObj : 0);
-                values.put("last_location_change", currentTime);
+                // Если статуса нет — пусть остается GREY как технический дефолт
+                String status = values.getAsString("status");
+                if (status == null || status.trim().isEmpty()) {
+                    values.put("status", "GREY");
+                }
 
-                db.insert(uniqueTableName, null, values);
-                Log.d(TAG, "Добавлено новое устройство: " + uniqueIdentifier);
+                if (cursor != null && cursor.moveToFirst()) {
+                    // 5. Устройство уже есть -> обновляем агрегированные поля
+                    int id = cursor.getInt(cursor.getColumnIndexOrThrow("id"));
+                    int totalScans = cursor.getInt(cursor.getColumnIndexOrThrow("total_scans"));
+
+                    Integer oldAvgSignal = null;
+                    int avgSignalIndex = cursor.getColumnIndex("avg_signal_strength");
+                    if (avgSignalIndex >= 0 && !cursor.isNull(avgSignalIndex)) {
+                        oldAvgSignal = cursor.getInt(avgSignalIndex);
+                    }
+
+                    Integer newSignal = values.getAsInteger("signal_strength");
+                    if (newSignal != null) {
+                        int updatedAvg;
+                        if (oldAvgSignal != null) {
+                            updatedAvg = (oldAvgSignal * totalScans + newSignal) / (totalScans + 1);
+                        } else {
+                            updatedAvg = newSignal;
+                        }
+                        values.put("avg_signal_strength", updatedAvg);
+                    }
+
+                    values.put("total_scans", totalScans + 1);
+                    values.put("last_seen", currentTime);
+
+                    // Если имя пустое, сохраняем старое
+                    String currentName = values.getAsString("name");
+                    if (currentName == null || currentName.trim().isEmpty()) {
+                        int nameIndex = cursor.getColumnIndex("name");
+                        if (nameIndex >= 0 && !cursor.isNull(nameIndex)) {
+                            values.put("name", cursor.getString(nameIndex));
+                        }
+                    }
+
+                    db.update(
+                            "\"" + uniqueTableName + "\"",
+                            values,
+                            "id = ?",
+                            new String[]{String.valueOf(id)}
+                    );
+
+                } else {
+                    // 6. Новое устройство -> вставляем
+                    values.put("first_seen", currentTime);
+                    values.put("last_seen", currentTime);
+
+                    if (values.getAsInteger("total_scans") == null) {
+                        values.put("total_scans", 1);
+                    }
+
+                    Integer signal = values.getAsInteger("signal_strength");
+                    if (signal != null && values.getAsInteger("avg_signal_strength") == null) {
+                        values.put("avg_signal_strength", signal);
+                    }
+
+                    db.insert(
+                            "\"" + uniqueTableName + "\"",
+                            null,
+                            values
+                    );
+                }
+
+            } finally {
+                if (cursor != null) cursor.close();
             }
+
         } catch (Exception e) {
-            Log.e(TAG, "Ошибка обновления устройства: " + e.getMessage());
-        } finally {
-            if (cursor != null) {
-                cursor.close();
-            }
+            Log.e(TAG, "Ошибка addOrUpdateDevice: " + e.getMessage(), e);
         }
     }
 
@@ -257,36 +313,44 @@ public class UniqueDevicesHelper {
             db = dbHelper.getReadableDatabase();
             createTableIfNeeded(db);
 
-            String query = "SELECT type, name, bssid, cell_id, latitude, longitude, last_seen, status, total_scans, network_type " +
-                    "FROM " + uniqueTableName + " ORDER BY last_seen DESC";
+            String sql = "SELECT type, name, bssid, cell_id, unique_identifier, " +
+                    "latitude, longitude, last_seen, status, total_scans, network_type " +
+                    "FROM \"" + uniqueTableName + "\" " +
+                    "ORDER BY last_seen DESC";
 
-            cursor = db.rawQuery(query, null);
+            cursor = db.rawQuery(sql, null);
 
             if (cursor != null && cursor.moveToFirst()) {
                 do {
                     String type = cursor.getString(cursor.getColumnIndexOrThrow("type"));
                     String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
                     String mac = cursor.getString(cursor.getColumnIndexOrThrow("bssid"));
-                    int cellId = cursor.getInt(cursor.getColumnIndexOrThrow("cell_id"));
+                    long cellId = cursor.getLong(cursor.getColumnIndexOrThrow("cell_id"));
+                    String uniqueIdentifier = cursor.getString(cursor.getColumnIndexOrThrow("unique_identifier"));
                     long lastSeen = cursor.getLong(cursor.getColumnIndexOrThrow("last_seen"));
                     String status = cursor.getString(cursor.getColumnIndexOrThrow("status"));
                     int totalScans = cursor.getInt(cursor.getColumnIndexOrThrow("total_scans"));
                     String networkType = cursor.getString(cursor.getColumnIndexOrThrow("network_type"));
 
                     String displayName;
-                    String deviceId;
+                    String finalId;
 
-                    if ("Cell".equals(type)) {
-                        displayName = (name != null && !name.isEmpty()) ? name : "Cell Tower";
-                        deviceId = "CID: " + cellId + (networkType != null ? " (" + networkType + ")" : "");
+                    if ("Cell".equalsIgnoreCase(type)) {
+                        displayName = (name != null && !name.trim().isEmpty()) ? name : "Cell Tower";
+
+                        finalId = (uniqueIdentifier != null && !uniqueIdentifier.trim().isEmpty())
+                                ? uniqueIdentifier
+                                : String.valueOf(cellId);
                     } else {
-                        displayName = (name != null && !name.isEmpty()) ? name : "Unknown";
-                        deviceId = mac != null ? mac : "";
+                        displayName = (name != null && !name.trim().isEmpty()) ? name : "Unknown";
+
+                        finalId = (mac != null && !mac.trim().isEmpty())
+                                ? mac
+                                : "";
                     }
 
                     String finalDisplayName = displayName + " [" + totalScans + "]";
-                    String finalId = mac != null && !mac.isEmpty() ? mac : String.valueOf(cellId);
-                    String finalStatus = (status != null && !status.isEmpty()) ? status : "GREY";
+                    String finalStatus = (status != null && !status.trim().isEmpty()) ? status : "GREY";
 
                     deviceList.add(new DeviceListActivity.Device(
                             finalDisplayName,
@@ -300,7 +364,7 @@ public class UniqueDevicesHelper {
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
-            Log.e(TAG, "Ошибка получения списка устройств: " + e.getMessage());
+            Log.e(TAG, "Ошибка получения списка устройств: " + e.getMessage(), e);
         } finally {
             if (cursor != null) cursor.close();
             if (db != null && db.isOpen()) db.close();
@@ -322,41 +386,51 @@ public class UniqueDevicesHelper {
             String normalizedQuery = query == null ? "" : query.trim().toUpperCase(Locale.US);
             String likeQuery = "%" + normalizedQuery + "%";
 
-            String sql = "SELECT type, name, bssid, cell_id, latitude, longitude, last_seen, status, total_scans, network_type " +
+            String sql = "SELECT type, name, bssid, cell_id, unique_identifier, " +
+                    "latitude, longitude, last_seen, status, total_scans, network_type " +
                     "FROM \"" + uniqueTableName + "\" " +
                     "WHERE UPPER(COALESCE(name, '')) LIKE ? " +
                     "   OR UPPER(COALESCE(bssid, '')) LIKE ? " +
+                    "   OR UPPER(COALESCE(unique_identifier, '')) LIKE ? " +
                     "   OR CAST(COALESCE(cell_id, '') AS TEXT) LIKE ? " +
                     "   OR UPPER(COALESCE(network_type, '')) LIKE ? " +
                     "ORDER BY last_seen DESC";
 
-            cursor = db.rawQuery(sql, new String[]{likeQuery, likeQuery, likeQuery, likeQuery});
+            cursor = db.rawQuery(sql, new String[]{
+                    likeQuery, likeQuery, likeQuery, likeQuery, likeQuery
+            });
 
             if (cursor != null && cursor.moveToFirst()) {
                 do {
                     String type = cursor.getString(cursor.getColumnIndexOrThrow("type"));
                     String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
                     String mac = cursor.getString(cursor.getColumnIndexOrThrow("bssid"));
-                    int cellId = cursor.getInt(cursor.getColumnIndexOrThrow("cell_id"));
+                    long cellId = cursor.getLong(cursor.getColumnIndexOrThrow("cell_id"));
+                    String uniqueIdentifier = cursor.getString(cursor.getColumnIndexOrThrow("unique_identifier"));
                     long lastSeen = cursor.getLong(cursor.getColumnIndexOrThrow("last_seen"));
                     String status = cursor.getString(cursor.getColumnIndexOrThrow("status"));
                     int totalScans = cursor.getInt(cursor.getColumnIndexOrThrow("total_scans"));
                     String networkType = cursor.getString(cursor.getColumnIndexOrThrow("network_type"));
 
                     String displayName;
-                    String deviceId;
+                    String finalId;
 
-                    if ("Cell".equals(type)) {
-                        displayName = (name != null && !name.isEmpty()) ? name : "Cell Tower";
-                        deviceId = "CID: " + cellId + (networkType != null ? " (" + networkType + ")" : "");
+                    if ("Cell".equalsIgnoreCase(type)) {
+                        displayName = (name != null && !name.trim().isEmpty()) ? name : "Cell Tower";
+
+                        finalId = (uniqueIdentifier != null && !uniqueIdentifier.trim().isEmpty())
+                                ? uniqueIdentifier
+                                : String.valueOf(cellId);
                     } else {
-                        displayName = (name != null && !name.isEmpty()) ? name : "Unknown";
-                        deviceId = mac != null ? mac : "";
+                        displayName = (name != null && !name.trim().isEmpty()) ? name : "Unknown";
+
+                        finalId = (mac != null && !mac.trim().isEmpty())
+                                ? mac
+                                : "";
                     }
 
                     String finalDisplayName = displayName + " [" + totalScans + "]";
-                    String finalId = mac != null && !mac.isEmpty() ? mac : String.valueOf(cellId);
-                    String finalStatus = (status != null && !status.isEmpty()) ? status : "GREY";
+                    String finalStatus = (status != null && !status.trim().isEmpty()) ? status : "GREY";
 
                     deviceList.add(new DeviceListActivity.Device(
                             finalDisplayName,
@@ -370,7 +444,7 @@ public class UniqueDevicesHelper {
                 } while (cursor.moveToNext());
             }
         } catch (Exception e) {
-            Log.e(TAG, "Ошибка поиска устройств: " + e.getMessage());
+            Log.e(TAG, "Ошибка поиска устройств: " + e.getMessage(), e);
         } finally {
             if (cursor != null) cursor.close();
             if (db != null && db.isOpen()) db.close();

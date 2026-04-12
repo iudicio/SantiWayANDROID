@@ -176,30 +176,7 @@ public class ActivityMapActivity extends AppCompatActivity {
 
     public String getDeviceStatus(String tableName, String mac) {
         MainDatabaseHelper dbHelper = new MainDatabaseHelper(this);
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        Cursor cursor = null;
-
-        try {
-            cursor = db.rawQuery(
-                    "SELECT status FROM \"" + tableName + "\" WHERE bssid = ? ORDER BY timestamp DESC LIMIT 1",
-                    new String[]{mac}
-            );
-
-            if (cursor != null && cursor.moveToFirst()) {
-                int index = cursor.getColumnIndex("status");
-                if (index != -1) {
-                    String status = cursor.getString(index);
-                    return (status != null && !status.isEmpty()) ? status : "GREY";
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error getting device status: " + e.getMessage());
-        } finally {
-            if (cursor != null) cursor.close();
-            db.close();
-        }
-
-        return "GREY";
+        return dbHelper.getStatusFromServiceTables(mac);
     }
 
     private void setupToolbar() {
@@ -260,9 +237,10 @@ public class ActivityMapActivity extends AppCompatActivity {
         if (deviceMac != null && tableName != null) {
             int affected = dbHelper.updateDeviceStatus(tableName, deviceMac, newStatus);
 
-            if (affected > 0) {
+            if (affected >= 0) {
                 currentStatus = newStatus;
                 updateButtonVisibility();
+                displayDeviceInfo();
 
                 String message = "";
                 switch (newStatus) {
@@ -279,19 +257,10 @@ public class ActivityMapActivity extends AppCompatActivity {
 
                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
 
-                // Обновляем статус в DeviceListActivity через Broadcast
-                sendStatusUpdateBroadcast();
             } else {
                 Toast.makeText(this, "Ошибка обновления статуса", Toast.LENGTH_SHORT).show();
             }
         }
-    }
-
-    private void sendStatusUpdateBroadcast() {
-        Intent broadcast = new Intent("DEVICE_STATUS_UPDATED");
-        broadcast.putExtra("mac", deviceMac);
-        broadcast.putExtra("status", currentStatus);
-        sendBroadcast(broadcast);
     }
 
     private void displayDeviceInfo() {
