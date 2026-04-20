@@ -22,6 +22,8 @@ import android.os.IBinder;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.MenuItem;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 import android.widget.ImageButton;
@@ -37,7 +39,10 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.Insets;
 import androidx.core.view.GravityCompat;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
@@ -49,6 +54,7 @@ import com.example.santiway.upload_data.DeviceUploadService;
 import com.example.santiway.upload_data.MainDatabaseHelper;
 //import com.example.santiway.upload_data.UniqueDeviceUploadWorker;
 import com.example.santiway.upload_data.UniqueDevicesHelper;
+import com.example.santiway.upload_name_device.UserDeviceSyncManager;
 import com.example.santiway.websocket.ApkAssembler;
 import com.example.santiway.websocket.WebSocketNotificationClient;
 import com.example.santiway.websocket.WebSocketService;
@@ -95,6 +101,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private static final String PREFS_SCANNER_STATE = "scanner_state";
     private static final String KEY_IS_SCANNING = "is_scanning";
     private static final String KEY_SCAN_START_TIME = "scan_start_time";
+    private static final String PREFS_APP = "app_prefs";
+    private static final String KEY_CURRENT_FOLDER = "current_folder";
 
     private Runnable timerRunnable = new Runnable() {
         @Override
@@ -154,7 +162,36 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         setContentView(R.layout.activity_main_new);
 
         drawerLayout = findViewById(R.id.drawer_layout);
+        View root = drawerLayout;
+        View bottomBar = findViewById(R.id.footer_actions);
         toolbar = findViewById(R.id.toolbar);
+
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+
+            ViewGroup.LayoutParams toolbarLp = toolbar.getLayoutParams();
+            toolbarLp.height = bars.top + dpToPx(56);
+            toolbar.setLayoutParams(toolbarLp);
+
+            toolbar.setPadding(
+                    toolbar.getPaddingLeft(),
+                    bars.top,
+                    toolbar.getPaddingRight(),
+                    toolbar.getPaddingBottom()
+            );
+
+            if (bottomBar != null) {
+                bottomBar.setPadding(
+                        bottomBar.getPaddingLeft(),
+                        bottomBar.getPaddingTop(),
+                        bottomBar.getPaddingRight(),
+                        bars.bottom
+                );
+            }
+
+            return insets;
+        });
+
         NavigationView navigationView = findViewById(R.id.nav_view);
 
         playPauseButton = findViewById(R.id.play_pause_button);
@@ -167,17 +204,24 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         lastUploadDateTextView = findViewById(R.id.last_upload_date);
 
         setSupportActionBar(toolbar);
-        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        getSupportActionBar().setDisplayShowTitleEnabled(false);
-        getSupportActionBar().setHomeAsUpIndicator(R.drawable.ic_apps);
+
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setDisplayShowTitleEnabled(false);
+            getSupportActionBar().setHomeAsUpIndicator(R.drawable.ic_apps);
+        }
         navigationView.setNavigationItemSelectedListener(this);
 
+        databaseHelper = new MainDatabaseHelper(this);
+
+        SharedPreferences appPrefs = getSharedPreferences(PREFS_APP, MODE_PRIVATE);
+        currentScanFolder = appPrefs.getString(KEY_CURRENT_FOLDER, "Основная");
+        databaseHelper.createTableIfNotExists(currentScanFolder);
         updateToolbarTitle(currentScanFolder);
+
         toolbarFolderTitleTextView.setOnClickListener(v -> showFolderSelectionDialog());
 
         registerFolderSwitchedReceiver();
-
-        databaseHelper = new MainDatabaseHelper(this);
 
         checkAndRequestPermissionsStepByStep();
 
@@ -207,14 +251,11 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         ApiConfig.initialize(this);
         uploadManager = new DeviceUploadManager(this);
+        new UserDeviceSyncManager(this).syncOwnerDevice();
         startUploadService();
         updateLastUploadDateDisplay();
         registerUploadUpdateReceiver();
-        //apkAssembler = new ApkAssembler(this);
-        //registerWebSocketReceivers();
-        //startWebSocketService();
         cleanupOldDataOnStart();
-
 
         LinearLayout notificationsButton = findViewById(R.id.footer_notifications);
         if (notificationsButton != null) {
@@ -227,10 +268,12 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
     }
 
-
-
     private String getDisplayFolderName(String folderName) {
         return folderName;
+    }
+
+    private int dpToPx(int dp) {
+        return Math.round(dp * getResources().getDisplayMetrics().density);
     }
 
     private void updateToolbarTitle(String folderName) {
@@ -239,7 +282,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
     }
 
-
     @Override
     public void onFolderCreated(String folderName) {
         if (folderName.equals("Основная")) {
@@ -247,9 +289,25 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             return;
         }
 
+        boolean wasScanning = isScanning;
+
+        if (wasScanning) {
+            stopScanning(false);
+        }
+
         databaseHelper.createTableIfNotExists(folderName);
         currentScanFolder = folderName;
         updateToolbarTitle(currentScanFolder);
+
+        getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                .edit()
+                .putString(KEY_CURRENT_FOLDER, currentScanFolder)
+                .apply();
+
+        if (wasScanning) {
+            startScanning();
+        }
+
         Toast.makeText(this, "Создана папка: " + folderName, Toast.LENGTH_SHORT).show();
     }
 
@@ -262,6 +320,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     if (newTableName != null && !newTableName.isEmpty()) {
                         currentScanFolder = newTableName;
                         updateToolbarTitle(currentScanFolder);
+                        getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                                .edit()
+                                .putString(KEY_CURRENT_FOLDER, currentScanFolder)
+                                .apply();
                         runOnUiThread(() -> Toast.makeText(MainActivity.this,
                                 "Папка сканирования переключена на: " + newTableName, Toast.LENGTH_LONG).show());
                     }
@@ -689,7 +751,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     }
 
     private void openDeviceListActivity() {
-        startActivity(new Intent(this, DeviceListActivity.class));
+        Intent intent = new Intent(this, DeviceListActivity.class);
+        intent.putExtra("selected_folder", currentScanFolder);
+        startActivity(intent);
     }
 
     private void viewAppConfig() {
@@ -710,10 +774,24 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         FolderSelectionBottomSheet bottomSheet = new FolderSelectionBottomSheet(folders, new FolderSelectionBottomSheet.FolderSelectionListener() {
             @Override
             public void onFolderSelected(String selectedFolder) {
-                stopScanning();
+                boolean wasScanning = isScanning;
+
+                if (wasScanning) {
+                    stopScanning(false);
+                }
+
                 currentScanFolder = selectedFolder;
                 updateToolbarTitle(currentScanFolder);
-                startScanning();
+
+                getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                        .edit()
+                        .putString(KEY_CURRENT_FOLDER, currentScanFolder)
+                        .apply();
+
+                if (wasScanning) {
+                    startScanning();
+                }
+
                 Toast.makeText(MainActivity.this, "Выбрана папка: " + currentScanFolder, Toast.LENGTH_SHORT).show();
             }
         });
@@ -754,6 +832,12 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 stopScanning();
                 currentScanFolder = "Основная";
                 updateToolbarTitle(currentScanFolder);
+
+                getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                        .edit()
+                        .putString(KEY_CURRENT_FOLDER, currentScanFolder)
+                        .apply();
+
                 startScanning();
             }
         } else {

@@ -114,6 +114,10 @@ public class ActivityMapOSM extends Fragment {
         mapView.setMultiTouchControls(true);
         mapController = mapView.getController();
 
+        mapView.getZoomController().setVisibility(
+                org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER
+        );
+
         // Сразу устанавливаем приближение для быстрой загрузки
         mapController.setZoom(15.0);
 

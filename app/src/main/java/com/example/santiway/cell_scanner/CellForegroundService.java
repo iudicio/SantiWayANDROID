@@ -26,7 +26,7 @@ import java.util.List;
 public class CellForegroundService extends Service {
     private static final String TAG = "CellForegroundService";
     private static final String CHANNEL_ID = "cell_scanner_channel";
-    private static final int NOTIFICATION_ID = 1002;
+    private static final int NOTIFICATION_ID = 1003;
 
     private MainDatabaseHelper databaseHelper;
     private CellScanner cellScanner;

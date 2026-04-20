@@ -825,6 +825,11 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             rebuildStatusTables(tableName);
 
             db.setTransactionSuccessful();
+
+            if ("TARGET".equalsIgnoreCase(newStatus)) {
+                notifyTargetDeviceNow(tableName, deviceKey);
+            }
+
             notifyDevicesChanged(tableName);
 
 
@@ -971,6 +976,37 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
             // Полная пересборка target/safe по актуальному status из _unique
             rebuildStatusTables(folderName);
+            if ("TARGET".equalsIgnoreCase(newStatus)) {
+                Cursor c = null;
+                try {
+                    c = db.rawQuery(
+                            "SELECT unique_identifier, bssid, cell_id FROM \"" + folderName + "_unique\"",
+                            null
+                    );
+
+                    while (c != null && c.moveToNext()) {
+                        String uniqueIdentifier = c.getString(0);
+                        String bssid = c.getString(1);
+                        int cellId = c.getInt(2);
+
+                        String deviceKey = null;
+
+                        if (uniqueIdentifier != null && !uniqueIdentifier.trim().isEmpty()) {
+                            deviceKey = uniqueIdentifier;
+                        } else if (bssid != null && !bssid.trim().isEmpty()) {
+                            deviceKey = bssid;
+                        } else if (cellId > 0) {
+                            deviceKey = String.valueOf(cellId);
+                        }
+
+                        if (deviceKey != null && !deviceKey.trim().isEmpty()) {
+                            notifyTargetDeviceNow(folderName, deviceKey);
+                        }
+                    }
+                } finally {
+                    if (c != null) c.close();
+                }
+            }
 
             db.setTransactionSuccessful();
             notifyDevicesChanged(folderName);
@@ -1565,6 +1601,49 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         }
 
         return values;
+    }
+
+    public void notifyTargetDeviceNow(String tableName, String deviceKey) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+
+        try {
+            deviceKey = normalizeDeviceKey(deviceKey);
+            if (deviceKey == null || deviceKey.isEmpty()) return;
+
+            if (deviceKey.contains(":")) {
+                cursor = db.rawQuery(
+                        "SELECT type, name, latitude, longitude, bssid " +
+                                "FROM \"" + tableName + "\" " +
+                                "WHERE UPPER(COALESCE(bssid, '')) = ? " +
+                                "ORDER BY timestamp DESC LIMIT 1",
+                        new String[]{deviceKey}
+                );
+            } else {
+                cursor = db.rawQuery(
+                        "SELECT type, name, latitude, longitude, cell_id " +
+                                "FROM \"" + tableName + "\" " +
+                                "WHERE CAST(cell_id AS TEXT) = ? " +
+                                "ORDER BY timestamp DESC LIMIT 1",
+                        new String[]{deviceKey}
+                );
+            }
+
+            if (cursor != null && cursor.moveToFirst()) {
+                ContentValues values = new ContentValues();
+                values.put("type", cursor.getString(cursor.getColumnIndexOrThrow("type")));
+                values.put("name", cursor.getString(cursor.getColumnIndexOrThrow("name")));
+
+                double lat = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
+                double lon = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
+
+                createTargetNotification(values, deviceKey, lat, lon);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error notifyTargetDeviceNow: " + e.getMessage(), e);
+        } finally {
+            if (cursor != null) cursor.close();
+        }
     }
 
     //единый метод получения статуса из target_devices / safe_devices

@@ -23,7 +23,7 @@ import java.util.List;
 
 public class DeviceUploadService extends Service {
     private static final String TAG = "DeviceUploadService";
-    private static final int NOTIFICATION_ID = 2001;
+    private static final int NOTIFICATION_ID = 1004;
     private static final String CHANNEL_ID = "upload_channel_id";
     private static final long UPLOAD_INTERVAL = 60000; // 1 минута
 

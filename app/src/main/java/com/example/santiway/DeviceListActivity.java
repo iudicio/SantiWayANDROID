@@ -19,6 +19,10 @@ import android.content.IntentFilter;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.constraintlayout.widget.ConstraintLayout;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -115,6 +119,41 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setTitle("Database Tables");
+
+        View root = findViewById(R.id.root_device_list);
+        View bottomActionsCard = findViewById(R.id.bottom_actions_card);
+        RecyclerView recyclerView = findViewById(R.id.devices_recycler_view);
+
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+
+            ViewGroup.LayoutParams toolbarLp = toolbar.getLayoutParams();
+            toolbarLp.height = bars.top + dpToPx(56);
+            toolbar.setLayoutParams(toolbarLp);
+
+            toolbar.setPadding(
+                    toolbar.getPaddingLeft(),
+                    bars.top,
+                    toolbar.getPaddingRight(),
+                    toolbar.getPaddingBottom()
+            );
+
+            ViewGroup.LayoutParams lp = bottomActionsCard.getLayoutParams();
+            if (lp instanceof ConstraintLayout.LayoutParams) {
+                ConstraintLayout.LayoutParams params = (ConstraintLayout.LayoutParams) lp;
+                params.bottomMargin = bars.bottom;
+                bottomActionsCard.setLayoutParams(params);
+            }
+
+            recyclerView.setPadding(
+                    recyclerView.getPaddingLeft(),
+                    recyclerView.getPaddingTop(),
+                    recyclerView.getPaddingRight(),
+                    bars.bottom + dpToPx(96)
+            );
+
+            return insets;
+        });
 
         databaseHelper = new MainDatabaseHelper(this);
         LinearLayout clearButton = findViewById(R.id.action_clear);
@@ -277,6 +316,10 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         setupSearch();
     }
 
+    private int dpToPx(int dp) {
+        return Math.round(dp * getResources().getDisplayMetrics().density);
+    }
+
     @Override
     protected void onStart() {
         super.onStart();
@@ -332,37 +375,36 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
             return;
         }
 
-        // Получаем полные данные устройства с MAC адресом
-        Device fullDevice = databaseHelper.getDeviceWithMac(tableName, position);
-
-        if (fullDevice == null) {
-            Toast.makeText(this, "Не удалось получить данные устройства", Toast.LENGTH_SHORT).show();
+        if (device == null || device.getMac() == null || device.getMac().trim().isEmpty()) {
+            Toast.makeText(this, "Не удалось получить идентификатор устройства", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // Получаем историю устройства по MAC адресу
-        List<MainDatabaseHelper.DeviceLocation> history =
-                databaseHelper.getDeviceHistoryByMac(tableName, fullDevice.getMac());
+        String deviceKey = device.getMac().trim();
+        String deviceStatus = device.getStatus() != null ? device.getStatus() : "GREY";
 
-        if (history.isEmpty()) {
+        MainDatabaseHelper dbHelper = new MainDatabaseHelper(this);
+        List<MainDatabaseHelper.DeviceLocation> history =
+                dbHelper.getDeviceHistoryByMac(tableName, deviceKey);
+
+        if (history == null || history.isEmpty()) {
             Toast.makeText(this, "Нет данных о местоположении устройства", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // Берем последнюю точку из истории
-        MainDatabaseHelper.DeviceLocation lastLocation = history.get(0);
+        MainDatabaseHelper.DeviceLocation lastLocation = history.get(history.size() - 1);
 
-        // Открываем новую Activity с картой и информацией
         Intent intent = new Intent(this, ActivityMapActivity.class);
         intent.putExtra("latitude", lastLocation.latitude);
         intent.putExtra("longitude", lastLocation.longitude);
         intent.putExtra("device_name", device.getName());
-        intent.putExtra("device_mac", fullDevice.getMac());
+        intent.putExtra("device_mac", deviceKey);
         intent.putExtra("device_type", device.getType());
         intent.putExtra("table_name", tableName);
+        intent.putExtra("device_status", deviceStatus);
         startActivity(intent);
     }
-    // В файле DeviceListActivity.java
+
     public void shareDeviceAsJson(Device device) {
         // Исправлено: используем currentTable (твоя глобальная переменная)
         String jsonString = databaseHelper.getDeviceExportJson(currentTable, device.getMac());
@@ -402,18 +444,33 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         tabLayout.removeAllTabs();
         List<String> tables = databaseHelper.getAllTables();
 
+        if (tables == null || tables.isEmpty()) {
+            currentTable = "";
+            adapter.clearData();
+            return;
+        }
+
         for (String tableName : tables) {
             TabLayout.Tab tab = tabLayout.newTab()
                     .setText(getDisplayTableName(tableName));
-            tab.setTag(tableName); // реальное имя таблицы
+            tab.setTag(tableName);
             tabLayout.addTab(tab);
         }
 
+        tabLayout.clearOnTabSelectedListeners();
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {
+                if (tab == null || tab.getTag() == null) return;
+
                 resetPagination();
                 currentTable = (String) tab.getTag();
+
+                getSharedPreferences("app_prefs", MODE_PRIVATE)
+                        .edit()
+                        .putString("current_folder", currentTable)
+                        .apply();
+
                 loadDevicesForTable(currentTable, true);
             }
 
@@ -422,18 +479,37 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
 
             @Override
             public void onTabReselected(TabLayout.Tab tab) {
-                String tableName = (String) tab.getTag();
-                if (!tableName.equals(currentTable)) {
-                    resetPagination();
-                    currentTable = tableName;
-                    loadDevicesForTable(currentTable, true);
-                }
+                if (tab == null || tab.getTag() == null) return;
+
+                currentTable = (String) tab.getTag();
+                resetPagination();
+                loadDevicesForTable(currentTable, true);
             }
         });
 
-        if (!tables.isEmpty()) {
-            currentTable = tables.get(0);
-            loadDevicesForTable(currentTable, true);
+        String intentFolder = getIntent().getStringExtra("selected_folder");
+        String savedFolder = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                .getString("current_folder", "Основная");
+
+        String folderToOpen = intentFolder != null && !intentFolder.trim().isEmpty()
+                ? intentFolder
+                : savedFolder;
+
+        int selectedIndex = -1;
+        for (int i = 0; i < tables.size(); i++) {
+            if (tables.get(i).equals(folderToOpen)) {
+                selectedIndex = i;
+                break;
+            }
+        }
+
+        if (selectedIndex == -1) {
+            selectedIndex = 0;
+        }
+
+        TabLayout.Tab initialTab = tabLayout.getTabAt(selectedIndex);
+        if (initialTab != null) {
+            initialTab.select();
         }
     }
 
@@ -475,6 +551,22 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
                     deviceList = uniqueHelper.getAllDevicesWithSearch(currentSearchQuery);
                 }
 
+                // Fallback: если unique-представление пустое, читаем из raw-таблицы
+                if (deviceList == null || deviceList.isEmpty()) {
+                    Log.w("LOAD_DEVICES", "Unique table is empty for " + tableName + ", fallback to raw table");
+
+                    if (currentSearchQuery == null || currentSearchQuery.isEmpty()) {
+                        deviceList = databaseHelper.getAllDataFromTableWithPagination(tableName, 0, PAGE_SIZE);
+                    } else {
+                        deviceList = databaseHelper.getAllDataFromTableWithPaginationAndSearch(
+                                tableName,
+                                currentSearchQuery,
+                                0,
+                                PAGE_SIZE
+                        );
+                    }
+                }
+
                 for (Device device : deviceList) {
                     String deviceKey = device.getMac();
                     String actualStatus = databaseHelper.getStatusFromServiceTables(deviceKey);
@@ -487,6 +579,7 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
             }
 
             List<Device> finalDeviceList = deviceList;
+            Log.d("LOAD_DEVICES", "table=" + tableName + ", loaded=" + deviceList.size());
             runOnUiThread(() -> {
                 adapter.hideLoading();
                 allLoadedDevices.clear();
@@ -494,6 +587,7 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
 
                 applyCurrentFilter();
                 isLoading = false;
+                Log.d("LOAD_DEVICES", "apply to adapter: table=" + tableName + ", count=" + finalDeviceList.size());
             });
         }).start();
     }
