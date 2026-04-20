@@ -31,13 +31,16 @@ public class UniqueDevicesHelper {
         if (tableChecked) return;
 
         try {
-            String createTableQuery = "CREATE TABLE IF NOT EXISTS " + uniqueTableName + " (" +
+            String safeTableName = "\"" + uniqueTableName + "\"";
+            String safeIndexBase = uniqueTableName.replaceAll("[^A-Za-z0-9_]", "_");
+
+            String createTableQuery = "CREATE TABLE IF NOT EXISTS " + safeTableName + " (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT," +
                     "type TEXT NOT NULL," +
                     "name TEXT," +
-                    "bssid TEXT," + // MAC-адрес для Wi-Fi/Bluetooth
-                    "cell_id INTEGER," + // ID вышки для сотовых сетей
-                    "unique_identifier TEXT UNIQUE," + // Уникальный идентификатор (MAC или cell_id с префиксом)
+                    "bssid TEXT," +
+                    "cell_id INTEGER," +
+                    "unique_identifier TEXT UNIQUE," +
                     "signal_strength INTEGER," +
                     "frequency INTEGER," +
                     "capabilities TEXT," +
@@ -60,7 +63,7 @@ public class UniqueDevicesHelper {
                     "location_accuracy REAL," +
                     "first_seen LONG," +
                     "last_seen LONG," +
-                    "status TEXT DEFAULT 'scanned'," +
+                    "status TEXT DEFAULT 'GREY'," +
                     "is_uploaded INTEGER DEFAULT 0," +
                     "folder_name TEXT DEFAULT ''," +
                     "total_scans INTEGER DEFAULT 1," +
@@ -70,15 +73,14 @@ public class UniqueDevicesHelper {
 
             db.execSQL(createTableQuery);
 
-            // Создаем индексы для быстрого поиска
-            db.execSQL("CREATE INDEX IF NOT EXISTS idx_unique_identifier ON " + uniqueTableName + "(unique_identifier)");
-            db.execSQL("CREATE INDEX IF NOT EXISTS idx_unique_last_seen ON " + uniqueTableName + "(last_seen)");
-            db.execSQL("CREATE INDEX IF NOT EXISTS idx_unique_type ON " + uniqueTableName + "(type)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS \"" + safeIndexBase + "_uid\" ON " + safeTableName + "(unique_identifier)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS \"" + safeIndexBase + "_last_seen\" ON " + safeTableName + "(last_seen)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS \"" + safeIndexBase + "_type\" ON " + safeTableName + "(type)");
 
             tableChecked = true;
-            Log.d(TAG, "Таблица уникальных устройств создана или уже существует");
+            Log.d(TAG, "Таблица уникальных устройств создана или уже существует: " + uniqueTableName);
         } catch (Exception e) {
-            Log.e(TAG, "Ошибка создания таблицы: " + e.getMessage());
+            Log.e(TAG, "Ошибка создания таблицы unique: " + e.getMessage(), e);
         }
     }
 
@@ -467,14 +469,7 @@ public class UniqueDevicesHelper {
             // Убеждаемся, что таблица существует
             createTableIfNeeded(db);
 
-            String uniqueIdentifier;
-            if (identifier.contains(":")) {
-                // Это MAC-адрес
-                uniqueIdentifier = "MAC:" + identifier.toUpperCase(Locale.US);
-            } else {
-                // Это cell_id
-                uniqueIdentifier = "CELL:" + identifier;
-            }
+            String uniqueIdentifier = identifier == null ? "" : identifier.trim().toUpperCase(Locale.US);
 
             cursor = db.query(uniqueTableName,
                     new String[]{"name", "type", "first_seen", "last_seen", "total_scans",

@@ -7,12 +7,17 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.constraintlayout.widget.ConstraintLayout;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import com.example.santiway.R;
 import com.example.santiway.upload_data.MainDatabaseHelper;
@@ -42,7 +47,6 @@ public class ActivityMapActivity extends AppCompatActivity {
     private TextView tvDetectionCount;
     private Button btnMakeTarget;
     private Button btnMakeSafe;
-    private Button btnMakeClear;
 
     // Данные устройства
     private String deviceMac;
@@ -67,6 +71,47 @@ public class ActivityMapActivity extends AppCompatActivity {
         // Инициализация UI
         initViews();
 
+        View root = findViewById(R.id.root_activity_map);
+        Toolbar toolbar = findViewById(R.id.toolbar_map);
+        View actionsContainer = findViewById(R.id.status_actions_container);
+        View infoCard = findViewById(R.id.device_info_card);
+
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+
+            int toolbarHeight = bars.top + dpToPx(56);
+
+            if (toolbar != null) {
+                ViewGroup.LayoutParams toolbarLp = toolbar.getLayoutParams();
+                toolbarLp.height = toolbarHeight;
+                toolbar.setLayoutParams(toolbarLp);
+
+                toolbar.setPadding(
+                        toolbar.getPaddingLeft(),
+                        bars.top,
+                        toolbar.getPaddingRight(),
+                        toolbar.getPaddingBottom()
+                );
+            }
+
+            if (actionsContainer != null) {
+                actionsContainer.setPadding(
+                        actionsContainer.getPaddingLeft(),
+                        actionsContainer.getPaddingTop(),
+                        actionsContainer.getPaddingRight(),
+                        actionsContainer.getPaddingBottom()
+                );
+            }
+
+            if (infoCard != null) {
+                ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) infoCard.getLayoutParams();
+                lp.bottomMargin = dpToPx(16) + bars.bottom;
+                infoCard.setLayoutParams(lp);
+            }
+
+            return insets;
+        });
+
         // Получаем данные из Intent
         Intent intent = getIntent();
         if (intent != null) {
@@ -77,15 +122,14 @@ public class ActivityMapActivity extends AppCompatActivity {
             deviceType = intent.getStringExtra("device_type");
             tableName = intent.getStringExtra("table_name");
 
-            // Получаем полную историю устройства из базы данных
+            String deviceStatus = intent.getStringExtra("device_status");
+            if (deviceStatus != null && !deviceStatus.trim().isEmpty()) {
+                currentStatus = deviceStatus;
+            }
+
             if (deviceMac != null && tableName != null) {
                 loadDeviceData();
             }
-        }
-
-        String deviceStatus = intent.getStringExtra("device_status");
-        if (deviceStatus != null) {
-            currentStatus = deviceStatus;
         }
 
         // Настройка Toolbar
@@ -111,7 +155,10 @@ public class ActivityMapActivity extends AppCompatActivity {
         tvDetectionCount = findViewById(R.id.tv_detection_count);
         btnMakeTarget = findViewById(R.id.btn_make_target);
         btnMakeSafe = findViewById(R.id.btn_make_safe);
-        btnMakeClear = findViewById(R.id.btn_make_clear);
+    }
+
+    private int dpToPx(int dp) {
+        return Math.round(dp * getResources().getDisplayMetrics().density);
     }
 
     private void loadDeviceData() {
@@ -156,7 +203,9 @@ public class ActivityMapActivity extends AppCompatActivity {
             }
 
             // Получаем текущий статус устройства из БД
-            currentStatus = getDeviceStatus(tableName, deviceMac);
+            if (currentStatus == null || "GREY".equalsIgnoreCase(currentStatus)) {
+                currentStatus = getDeviceStatus(tableName, deviceMac);
+            }
 
             // Собираем точки для карты в хронологическом порядке
             // Сортируем историю по времени для правильного отображения на карте
@@ -194,41 +243,36 @@ public class ActivityMapActivity extends AppCompatActivity {
     }
 
     private void setupButtons() {
-        // Настройка видимости кнопок в зависимости от статуса
-        updateButtonVisibility();
+        updateStatusToggle();
 
-        // Обработчики нажатий
-        btnMakeTarget.setOnClickListener(v -> changeDeviceStatus("TARGET"));
-        btnMakeSafe.setOnClickListener(v -> changeDeviceStatus("SAFE"));
-        btnMakeClear.setOnClickListener(v -> changeDeviceStatus("GREY"));
+        btnMakeTarget.setOnClickListener(v -> {
+            if (!"TARGET".equalsIgnoreCase(currentStatus)) {
+                changeDeviceStatus("TARGET");
+            }
+        });
+
+        btnMakeSafe.setOnClickListener(v -> {
+            if (!"SAFE".equalsIgnoreCase(currentStatus)) {
+                changeDeviceStatus("SAFE");
+            }
+        });
     }
 
-    private void updateButtonVisibility() {
+    private void updateStatusToggle() {
         String status = currentStatus != null ? currentStatus.toUpperCase(Locale.US) : "GREY";
+        boolean isTarget = "TARGET".equals(status);
+        boolean isSafe = "SAFE".equals(status);
 
-        switch (status) {
-            case "TARGET":
-                statusHeader.setBackgroundColor(Color.parseColor("#FF3B30"));
-                btnMakeTarget.setVisibility(View.GONE);
-                btnMakeSafe.setVisibility(View.VISIBLE);
-                btnMakeClear.setVisibility(View.VISIBLE);
-                break;
-
-            case "SAFE":
-                statusHeader.setBackgroundColor(Color.parseColor("#34C759"));
-                btnMakeTarget.setVisibility(View.VISIBLE);
-                btnMakeSafe.setVisibility(View.GONE);
-                btnMakeClear.setVisibility(View.VISIBLE);
-                break;
-
-            case "GREY":
-            default:
-                statusHeader.setBackgroundColor(Color.parseColor("#808080"));
-                btnMakeTarget.setVisibility(View.VISIBLE);
-                btnMakeSafe.setVisibility(View.VISIBLE);
-                btnMakeClear.setVisibility(View.GONE);
-                break;
+        if (isTarget) {
+            statusHeader.setBackgroundColor(Color.parseColor("#FF3B30"));
+        } else if (isSafe) {
+            statusHeader.setBackgroundColor(Color.parseColor("#34C759"));
+        } else {
+            statusHeader.setBackgroundColor(Color.parseColor("#808080"));
         }
+
+        btnMakeTarget.setAlpha(isTarget ? 0.45f : 1f);
+        btnMakeSafe.setAlpha(isSafe ? 0.45f : 1f);
     }
 
     private void changeDeviceStatus(String newStatus) {
@@ -239,66 +283,88 @@ public class ActivityMapActivity extends AppCompatActivity {
 
             if (affected >= 0) {
                 currentStatus = newStatus;
-                updateButtonVisibility();
+                updateStatusToggle();
                 displayDeviceInfo();
+                showMapFragment();
 
-                String message = "";
-                switch (newStatus) {
-                    case "TARGET":
-                        message = "Устройство помечено как TARGET";
-                        break;
-                    case "SAFE":
-                        message = "Устройство помечено как SAFE";
-                        break;
-                    default:
-                        message = "Устройство переведено в GREY";
-                        break;
-                }
+                String message = "TARGET".equalsIgnoreCase(newStatus)
+                        ? "Устройство помечено как TARGET"
+                        : "Устройство помечено как SAFE";
 
                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-
             } else {
                 Toast.makeText(this, "Ошибка обновления статуса", Toast.LENGTH_SHORT).show();
             }
         }
+
+
     }
 
     private void displayDeviceInfo() {
-        // MAC адрес
-        if (deviceMac != null) {
-            tvMacAddress.setText(deviceMac);
-        }
+        TextView tvSubtitle = findViewById(R.id.tv_device_subtitle);
+        TextView tvCid = findViewById(R.id.tv_cid);
+        View rowCid = findViewById(R.id.row_cid);
 
-        // Название устройства
-        if (deviceName != null && !deviceName.isEmpty()) {
-            tvDeviceName.setText(deviceName);
+        tvDeviceName.setText(
+                (deviceName != null && !deviceName.trim().isEmpty()) ? deviceName : "Unknown"
+        );
+
+        String subtitle = "";
+        if (deviceType != null && !deviceType.trim().isEmpty()) {
+            subtitle = deviceType;
+        }
+        if (detectionCount > 0) {
+            subtitle = subtitle.isEmpty()
+                    ? "[" + detectionCount + "]"
+                    : subtitle + " [" + detectionCount + "]";
+        }
+        tvSubtitle.setText(subtitle);
+
+        tvMacAddress.setText(deviceMac != null ? deviceMac : "Неизвестно");
+        tvDeviceType.setText(deviceType != null ? deviceType : "Неизвестно");
+
+        boolean isCell = deviceType != null &&
+                (deviceType.equalsIgnoreCase("Cell")
+                        || deviceType.equalsIgnoreCase("Cellular")
+                        || deviceType.equalsIgnoreCase("LTE")
+                        || deviceType.equalsIgnoreCase("GSM"));
+
+        if (isCell) {
+            rowCid.setVisibility(View.VISIBLE);
+            tvCid.setText(extractCidOrFallback());
         } else {
-            tvDeviceName.setText("Неизвестно");
+            rowCid.setVisibility(View.GONE);
         }
 
-        // Тип устройства
-        if (deviceType != null) {
-            tvDeviceType.setText(deviceType);
-        }
-
-        // Время первого обнаружения
         if (firstDetectionTime > 0) {
-            String firstTime = dateFormat.format(new Date(firstDetectionTime));
-            tvFirstDetected.setText(firstTime);
+            tvFirstDetected.setText(dateFormat.format(new Date(firstDetectionTime)));
         } else {
             tvFirstDetected.setText("Неизвестно");
         }
 
-        // Время последнего обнаружения
         if (lastDetectionTime > 0) {
-            String lastTime = dateFormat.format(new Date(lastDetectionTime));
-            tvLastDetected.setText(lastTime);
+            tvLastDetected.setText(dateFormat.format(new Date(lastDetectionTime)));
         } else {
             tvLastDetected.setText("Неизвестно");
         }
 
-        // Количество обнаружений
         tvDetectionCount.setText(String.valueOf(detectionCount));
+    }
+
+    private String extractCidOrFallback() {
+        if (deviceMac == null || deviceMac.trim().isEmpty()) {
+            return "Неизвестно";
+        }
+
+        // Если у тебя cell-id хранится как 250_1_36340_18168327
+        if (deviceMac.contains("_")) {
+            String[] parts = deviceMac.split("_");
+            if (parts.length > 0) {
+                return parts[parts.length - 1];
+            }
+        }
+
+        return deviceMac;
     }
 
     private void showMapFragment() {

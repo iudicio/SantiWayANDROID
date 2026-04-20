@@ -1,9 +1,11 @@
 package com.example.santiway;
 
 import com.example.santiway.host_database.*;
+import com.example.santiway.upload_name_device.UserDeviceSyncManager;
 
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -11,8 +13,12 @@ import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.appcompat.widget.Toolbar;
 
 import androidx.activity.ComponentActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import java.util.List;
 import java.util.regex.Pattern;
@@ -59,6 +65,38 @@ public class AppConfigViewActivity extends ComponentActivity {
 
         // Показать текущие значения
         showCurrentValues();
+
+        View root = findViewById(R.id.root_app_config);
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        View content = findViewById(R.id.content_container);
+
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+
+            ViewGroup.LayoutParams lp = toolbar.getLayoutParams();
+            lp.height = bars.top + dpToPx(56);
+            toolbar.setLayoutParams(lp);
+
+            toolbar.setPadding(
+                    toolbar.getPaddingLeft(),
+                    bars.top,
+                    toolbar.getPaddingRight(),
+                    toolbar.getPaddingBottom()
+            );
+
+            content.setPadding(
+                    content.getPaddingLeft(),
+                    content.getPaddingTop(),
+                    content.getPaddingRight(),
+                    bars.bottom
+            );
+
+            return insets;
+        });
+    }
+
+    private int dpToPx(int dp) {
+        return Math.round(dp * getResources().getDisplayMetrics().density);
     }
 
     private void setupSpinners() {
@@ -147,6 +185,7 @@ public class AppConfigViewActivity extends ComponentActivity {
             // Сохраняем протокол и имя устройства
             repository.setGeoProtocol(selectedProtocol);
             repository.setDeviceName(deviceName);
+            new UserDeviceSyncManager(this).syncOwnerDevice();
 
             showToast("Настройки протокола сохранены!");
             showCurrentValues();

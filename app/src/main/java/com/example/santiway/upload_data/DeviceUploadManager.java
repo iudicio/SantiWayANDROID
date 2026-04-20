@@ -19,8 +19,10 @@ import okhttp3.Response;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -97,33 +99,60 @@ public class DeviceUploadManager {
         try {
             db = databaseHelper.getReadableDatabase();
 
-            String query =
-                    "SELECT id, * FROM \"Основная\" " +
-                            "WHERE is_uploaded = 0 " +
-                            "ORDER BY timestamp ASC LIMIT " + BATCH_SIZE;
-
-            cursor = db.rawQuery(query, null);
-
-            if (cursor != null && cursor.moveToFirst()) {
-                int idCol = cursor.getColumnIndexOrThrow("id");
-
-                do {
-                    long rowId = cursor.getLong(idCol);
-                    ApiDevice device = cursorToApiDevice(cursor);
-                    if (device != null) {
-                        items.add(new PendingUpload(rowId, device));
-                        Log.d(TAG, "Pending rowId=" + rowId + " device=" + device.getDevice_id()
-                                + " at " + device.getDetected_at());
-                    }
-                } while (cursor.moveToNext());
+            List<String> tables = databaseHelper.getAllTables(); // уже без *_unique
+            if (tables == null || tables.isEmpty()) {
+                Log.d(TAG, "No regular tables found for upload");
+                return items;
             }
 
-            Log.d(TAG, "Found " + items.size() + " pending uploads");
+            for (String tableName : tables) {
+                if (items.size() >= BATCH_SIZE) break;
+
+                if (tableName == null || tableName.trim().isEmpty()) {
+                    continue;
+                }
+
+                int remaining = BATCH_SIZE - items.size();
+
+                String query =
+                        "SELECT id, * FROM \"" + tableName + "\" " +
+                                "WHERE is_uploaded = 0 " +
+                                "ORDER BY timestamp ASC LIMIT " + remaining;
+
+                try {
+                    cursor = db.rawQuery(query, null);
+
+                    if (cursor != null && cursor.moveToFirst()) {
+                        int idCol = cursor.getColumnIndexOrThrow("id");
+
+                        do {
+                            long rowId = cursor.getLong(idCol);
+                            ApiDevice device = cursorToApiDevice(cursor, tableName);
+
+                            if (device != null) {
+                                items.add(new PendingUpload(rowId, tableName, device));
+                                Log.d(TAG,
+                                        "Pending rowId=" + rowId +
+                                                ", table=" + tableName +
+                                                ", device=" + device.getDevice_id() +
+                                                ", detected_at=" + device.getDetected_at());
+                            }
+                        } while (cursor.moveToNext());
+                    }
+                } finally {
+                    if (cursor != null) {
+                        cursor.close();
+                        cursor = null;
+                    }
+                }
+            }
+
+            Log.d(TAG, "Found " + items.size() + " pending uploads from regular tables");
+
         } catch (Exception e) {
             Log.e(TAG, "Error getting pending uploads: " + e.getMessage(), e);
         } finally {
             if (cursor != null) cursor.close();
-            // db.close() обычно не обязательно, но оставлю как у тебя:
             if (db != null && db.isOpen()) db.close();
         }
 
@@ -134,7 +163,7 @@ public class DeviceUploadManager {
      * Конвертация курсора в ApiDevice для отправки
      * ВАЖНО: берем данные из Основная, но для MAC и времени используем точные значения
      */
-    private ApiDevice cursorToApiDevice(Cursor cursor) {
+    private ApiDevice cursorToApiDevice(Cursor cursor, String sourceTableName) {
         try {
             ApiDevice device = new ApiDevice();
 
@@ -181,9 +210,8 @@ public class DeviceUploadManager {
 
             String systemFolderName = getStringFromCursor(cursor, "folder_name");
             if (systemFolderName == null || systemFolderName.trim().isEmpty()) {
-                systemFolderName = "Основная";
+                systemFolderName = sourceTableName;
             }
-
             device.setSystem_folder_name(systemFolderName);
             device.setFolder_name(getDisplayFolderName(systemFolderName));
 
@@ -246,19 +274,15 @@ public class DeviceUploadManager {
         int attempt = 0;
         long backoff = 1000;
 
-        List<Long> ids = new java.util.ArrayList<>(items.size());
-
         while (attempt < MAX_RETRY_ATTEMPTS) {
             attempt++;
             Log.d(TAG, "Upload attempt " + attempt);
 
             try {
                 JsonArray jsonArray = new JsonArray();
-                ids.clear();
 
                 for (PendingUpload item : items) {
                     ApiDevice device = item.device;
-                    ids.add(item.rowId);
 
                     JsonObject json = new JsonObject();
                     json.addProperty("device_id", device.getDevice_id());
@@ -296,7 +320,7 @@ public class DeviceUploadManager {
                 if (response.isSuccessful()) {
                     Log.i(TAG, "✅ SUCCESS: Uploaded " + items.size() + " devices");
 
-                    markRowsAsUploaded(ids);
+                    markRowsAsUploaded(items);
 
                     saveLastUploadTime();
 
@@ -341,36 +365,72 @@ public class DeviceUploadManager {
      * ПОМЕЧАЕТ ОТПРАВЛЕННЫЕ УСТРОЙСТВА В Основная
      * Важно: помечаем по связке device_id + timestamp
      */
-    private void markRowsAsUploaded(List<Long> ids) {
-        if (ids == null || ids.isEmpty()) return;
+    private void markRowsAsUploaded(List<PendingUpload> items) {
+        if (items == null || items.isEmpty()) return;
 
         SQLiteDatabase db = null;
+
         try {
             db = databaseHelper.getWritableDatabase();
             db.beginTransaction();
 
-            for (int start = 0; start < ids.size(); start += BATCH_SIZE) {
-                int end = Math.min(start + BATCH_SIZE, ids.size());
-                List<Long> batch = ids.subList(start, end);
+            Map<String, List<Long>> idsByTable = new HashMap<>();
 
-                StringBuilder ph = new StringBuilder();
-                String[] args = new String[batch.size()];
-                for (int i = 0; i < batch.size(); i++) {
-                    if (i > 0) ph.append(",");
-                    ph.append("?");
-                    args[i] = String.valueOf(batch.get(i));
+            for (PendingUpload item : items) {
+                if (item == null || item.tableName == null || item.tableName.trim().isEmpty()) {
+                    continue;
                 }
 
-                ContentValues v = new ContentValues();
-                v.put("is_uploaded", 1);
+                List<Long> ids = idsByTable.get(item.tableName);
+                if (ids == null) {
+                    ids = new ArrayList<>();
+                    idsByTable.put(item.tableName, ids);
+                }
+                ids.add(item.rowId);
+            }
 
-                db.update("\"Основная\"", v, "id IN (" + ph + ")", args);
+            for (Map.Entry<String, List<Long>> entry : idsByTable.entrySet()) {
+                String tableName = entry.getKey();
+                List<Long> ids = entry.getValue();
+
+                if (ids == null || ids.isEmpty()) continue;
+
+                for (int start = 0; start < ids.size(); start += BATCH_SIZE) {
+                    int end = Math.min(start + BATCH_SIZE, ids.size());
+                    List<Long> batch = ids.subList(start, end);
+
+                    StringBuilder placeholders = new StringBuilder();
+                    String[] args = new String[batch.size()];
+
+                    for (int i = 0; i < batch.size(); i++) {
+                        if (i > 0) placeholders.append(",");
+                        placeholders.append("?");
+                        args[i] = String.valueOf(batch.get(i));
+                    }
+
+                    ContentValues values = new ContentValues();
+                    values.put("is_uploaded", 1);
+
+                    int updated = db.update(
+                            "\"" + tableName + "\"",
+                            values,
+                            "id IN (" + placeholders + ")",
+                            args
+                    );
+
+                    Log.d(TAG, "Marked uploaded in table " + tableName + ": " + updated + " rows");
+                }
             }
 
             db.setTransactionSuccessful();
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error marking rows as uploaded: " + e.getMessage(), e);
         } finally {
-            if (db != null) {
-                db.endTransaction();
+            if (db != null && db.isOpen()) {
+                try {
+                    if (db.inTransaction()) db.endTransaction();
+                } catch (Exception ignored) {}
                 db.close();
             }
         }
@@ -448,26 +508,46 @@ public class DeviceUploadManager {
     public int getPendingDevicesCount() {
         SQLiteDatabase db = null;
         Cursor cursor = null;
-        int count = 0;
+        int totalCount = 0;
 
         try {
             db = databaseHelper.getReadableDatabase();
-            cursor = db.rawQuery(
-                    "SELECT COUNT(*) FROM \"Основная\" WHERE is_uploaded = 0",
-                    null
-            );
+            List<String> tables = databaseHelper.getAllTables();
 
-            if (cursor != null && cursor.moveToFirst()) {
-                count = cursor.getInt(0);
+            if (tables == null || tables.isEmpty()) {
+                return 0;
             }
+
+            for (String tableName : tables) {
+                if (tableName == null || tableName.trim().isEmpty()) {
+                    continue;
+                }
+
+                try {
+                    cursor = db.rawQuery(
+                            "SELECT COUNT(*) FROM \"" + tableName + "\" WHERE is_uploaded = 0",
+                            null
+                    );
+
+                    if (cursor != null && cursor.moveToFirst()) {
+                        totalCount += cursor.getInt(0);
+                    }
+                } finally {
+                    if (cursor != null) {
+                        cursor.close();
+                        cursor = null;
+                    }
+                }
+            }
+
         } catch (Exception e) {
-            Log.e(TAG, "Error getting pending count: " + e.getMessage());
+            Log.e(TAG, "Error getting pending count: " + e.getMessage(), e);
         } finally {
             if (cursor != null) cursor.close();
-            if (db != null) db.close();
+            if (db != null && db.isOpen()) db.close();
         }
 
-        return count;
+        return totalCount;
     }
 
     public void cleanup() {
@@ -476,10 +556,12 @@ public class DeviceUploadManager {
 
     public static class PendingUpload {
         public final long rowId;
+        public final String tableName;
         public final ApiDevice device;
 
-        public PendingUpload(long rowId, ApiDevice device) {
+        public PendingUpload(long rowId, String tableName, ApiDevice device) {
             this.rowId = rowId;
+            this.tableName = tableName;
             this.device = device;
         }
     }
