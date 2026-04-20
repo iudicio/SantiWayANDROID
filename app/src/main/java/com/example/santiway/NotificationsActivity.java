@@ -7,11 +7,16 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.constraintlayout.widget.ConstraintLayout;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -51,6 +56,43 @@ public class NotificationsActivity extends AppCompatActivity implements Notifica
         Button clearAllButton = findViewById(R.id.btn_clear_all);
         clearAllButton.setOnClickListener(v -> clearAllNotifications());
         emptyStateText = findViewById(R.id.empty_state_text);
+
+        View root = findViewById(R.id.root_notifications);
+
+        ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+
+            ViewGroup.LayoutParams toolbarLp = toolbar.getLayoutParams();
+            toolbarLp.height = bars.top + dpToPx(56);
+            toolbar.setLayoutParams(toolbarLp);
+
+            toolbar.setPadding(
+                    toolbar.getPaddingLeft(),
+                    bars.top,
+                    toolbar.getPaddingRight(),
+                    toolbar.getPaddingBottom()
+            );
+
+            v.setPadding(
+                    v.getPaddingLeft(),
+                    v.getPaddingTop(),
+                    v.getPaddingRight(),
+                    bars.bottom
+            );
+
+            recyclerView.setPadding(
+                    recyclerView.getPaddingLeft(),
+                    recyclerView.getPaddingTop(),
+                    recyclerView.getPaddingRight(),
+                    dpToPx(16)
+            );
+
+            return insets;
+        });
+    }
+
+    private int dpToPx(int dp) {
+        return Math.round(dp * getResources().getDisplayMetrics().density);
     }
 
     @Override

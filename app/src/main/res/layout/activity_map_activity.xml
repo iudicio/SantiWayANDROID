@@ -1,286 +1,359 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/root_activity_map"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/white">
+    android:background="#0B1320"
+    tools:context=".activity_map.ActivityMapActivity">
 
-    <!-- Статусная полоса (меняет цвет в зависимости от статуса) -->
-    <View
-        android:id="@+id/status_header"
-        android:layout_width="match_parent"
-        android:layout_height="4dp"
-        android:background="#FF3D3D" />
-
-    <!-- Toolbar -->
-    <androidx.appcompat.widget.Toolbar
-        android:id="@+id/toolbar_map"
-        android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:background="#0B1A2C"
-        android:theme="?attr/actionBarTheme"
-        app:titleTextColor="@android:color/white"
-        app:navigationIcon="@drawable/ic_arrow_back"
-        app:title="Карта устройства" />
-
-    <!-- Карта (теперь сверху и занимает всё пространство под Toolbar) -->
+    <!-- Карта фоном на весь экран -->
     <FrameLayout
         android:id="@+id/map_container"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_marginTop="?attr/actionBarSize"
-        android:background="@android:color/darker_gray" />
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Кнопки действий (поверх карты) -->
+    <!-- Верхняя панель -->
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar_map"
+        android:layout_width="0dp"
+        android:layout_height="56dp"
+        android:background="#CC071427"
+        android:elevation="0dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="16dp"
+        app:contentInsetStartWithNavigation="0dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:navigationIcon="@android:drawable/ic_menu_revert"
+        app:titleTextColor="@android:color/white" />
+
+    <!-- Переключатель Target / Safe -->
     <LinearLayout
-        android:layout_width="match_parent"
+        android:id="@+id/status_actions_container"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/bg_map_device_card"
+        android:gravity="center"
         android:orientation="horizontal"
-        android:padding="8dp"
-        android:layout_marginTop="?attr/actionBarSize"
-        android:layout_margin="80dp"
-        android:background="@android:color/transparent"
-        android:gravity="center_horizontal">
+        android:padding="4dp"
+        app:layout_constraintTop_toBottomOf="@id/toolbar_map"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- Кнопка Target (маленькая) -->
-        <Button
+        <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/btn_make_target"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="4dp"
+            android:layout_width="110dp"
+            android:layout_height="35dp"
+            android:background="@drawable/bg_map_toggle_target"
+            android:backgroundTint="@null"
+            android:gravity="center"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
             android:text="Target"
-            android:textSize="12sp"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp"
+            android:textAllCaps="false"
             android:textColor="@android:color/white"
-            android:backgroundTint="#FF3D3D"
-            android:elevation="8dp" />
+            android:textSize="12sp"
+            android:textStyle="bold" />
 
-        <!-- Кнопка Safe (маленькая) -->
-        <Button
+        <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/btn_make_safe"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
+            android:layout_width="110dp"
+            android:layout_height="35dp"
+            android:layout_marginStart="3dp"
+            android:background="@drawable/bg_map_toggle_safe"
+            android:backgroundTint="@null"
+            android:gravity="center"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
             android:text="Safe"
-            android:textSize="12sp"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp"
+            android:textAllCaps="false"
             android:textColor="@android:color/white"
-            android:backgroundTint="#4CAF50"
-            android:elevation="8dp" />
-
-        <!-- Кнопка Clear (маленькая, показывается вместо двух других) -->
-        <Button
-            android:id="@+id/btn_make_clear"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Clear"
             android:textSize="12sp"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp"
-            android:textColor="@android:color/white"
-            android:backgroundTint="#2196F3"
-            android:elevation="8dp"
-            android:visibility="gone" />
-
+            android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Блок с информацией об устройстве (поверх карты внизу) -->
+    <!-- Правая колонка круглых кнопок -->
     <LinearLayout
-        android:layout_width="match_parent"
+        android:id="@+id/right_map_controls"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:background="#880B1A2C"
-        android:padding="16dp"
-        android:layout_marginBottom="80dp"
-        android:layout_marginRight="16dp"
-        android:layout_marginLeft="16dp"
-        android:clickable="false"
-        android:focusable="false"
-        android:focusableInTouchMode="false">
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="250dp"
+        android:gravity="center"
+        android:orientation="vertical"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent">
 
+        <ImageButton
+            android:id="@+id/btn_center_map"
+            android:layout_width="58dp"
+            android:layout_height="58dp"
+            android:background="@drawable/bg_map_round_action"
+            android:contentDescription="Center map"
+            android:padding="16dp"
+            android:src="@android:drawable/ic_menu_mylocation"
+            android:tint="@android:color/white" />
+
+        <ImageButton
+            android:id="@+id/btn_filter_map"
+            android:layout_width="58dp"
+            android:layout_height="58dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_map_round_action"
+            android:contentDescription="Filter"
+            android:padding="16dp"
+            android:src="@android:drawable/ic_menu_sort_by_size"
+            android:tint="@android:color/white" />
+
+        <ImageButton
+            android:id="@+id/btn_refresh_map"
+            android:layout_width="58dp"
+            android:layout_height="58dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_map_round_action"
+            android:contentDescription="Refresh"
+            android:padding="16dp"
+            android:src="@android:drawable/ic_popup_sync"
+            android:tint="@android:color/white" />
+    </LinearLayout>
+
+    <!-- Нижняя карточка -->
+    <LinearLayout
+        android:id="@+id/device_info_card"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="50dp"
+        android:background="@drawable/bg_map_device_card"
+        android:orientation="vertical"
+        android:layout_marginStart="60dp"
+        android:layout_marginEnd="60dp"
+        android:paddingStart="10dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="6dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <View
+            android:id="@+id/status_header"
+            android:layout_width="90dp"
+            android:layout_height="6dp"
+            android:layout_marginTop="5dp"
+            android:background="#34C759" />
+
+        <TextView
+            android:id="@+id/tv_device_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:text="Устройство"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_device_subtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="MTS RUS [31]"
+            android:textColor="#DCE4F2"
+            android:textSize="10sp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="5dp"
+            android:layout_marginBottom="5dp"
+            android:background="#33FFFFFF" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:minHeight="100dp">
+            android:orientation="vertical">
 
-            <!-- Информация об устройстве -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Информация об устройстве"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:textColor="@android:color/white"
-                android:layout_marginBottom="12dp" />
-
-            <!-- MAC адрес -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="6dp">
+                android:orientation="horizontal">
 
                 <TextView
+                    android:id="@+id/label_mac"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="MAC адрес:"
-                    android:textSize="12sp"
-                    android:textColor="@android:color/white" />
+                    android:textColor="#C9D3E6"
+                    android:textSize="10sp" />
 
                 <TextView
                     android:id="@+id/tv_mac_address"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="00:00:00:00:00:00"
-                    android:textSize="12sp"
+                    android:gravity="end"
+                    android:text="C2:18:03:00:3D:7E"
                     android:textColor="@android:color/white"
-                    android:textStyle="bold"
-                    android:textAllCaps="true"/>
-            </LinearLayout>
-
-            <!-- Название устройства -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="6dp">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Название:"
-                    android:textSize="12sp"
-                    android:textColor="@android:color/white" />
-
-                <TextView
-                    android:id="@+id/tv_device_name"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Неизвестно"
-                    android:textSize="12sp"
-                    android:textColor="@android:color/white"
+                    android:textSize="10sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
-            <!-- Тип устройства -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="6dp">
+                android:layout_marginTop="5dp"
+                android:orientation="horizontal">
 
                 <TextView
+                    android:id="@+id/label_type"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Тип:"
-                    android:textSize="12sp"
-                    android:textColor="@android:color/white"/>
+                    android:textColor="#C9D3E6"
+                    android:textSize="10sp" />
 
                 <TextView
                     android:id="@+id/tv_device_type"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Wi-Fi/Bluetooth"
-                    android:textSize="12sp"
+                    android:gravity="end"
+                    android:text="Cell"
                     android:textColor="@android:color/white"
+                    android:textSize="10sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
-            <!-- Время первого обнаружения -->
+            <LinearLayout
+                android:id="@+id/row_cid"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/label_cid"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="CID:"
+                    android:textColor="#C9D3E6"
+                    android:textSize="10sp" />
+
+                <TextView
+                    android:id="@+id/tv_cid"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="end"
+                    android:text="18168328 (LTE)"
+                    android:textColor="@android:color/white"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="6dp">
+                android:layout_marginTop="5dp"
+                android:orientation="horizontal">
 
                 <TextView
+                    android:id="@+id/label_first"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Первое обнаружение:"
-                    android:textSize="12sp"
-                    android:textColor="@android:color/white" />
+                    android:textColor="#C9D3E6"
+                    android:textSize="10sp" />
 
                 <TextView
                     android:id="@+id/tv_first_detected"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Неизвестно"
-                    android:textSize="12sp"
+                    android:gravity="end"
+                    android:text="01.04.2026 13:47:25"
                     android:textColor="@android:color/white"
+                    android:textSize="10sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
-            <!-- Время последнего обнаружения -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="6dp">
+                android:layout_marginTop="5dp"
+                android:orientation="horizontal">
 
                 <TextView
+                    android:id="@+id/label_last"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Последнее обнаружение:"
-                    android:textSize="12sp"
-                    android:textColor="@android:color/white" />
+                    android:textColor="#C9D3E6"
+                    android:textSize="10sp" />
 
                 <TextView
                     android:id="@+id/tv_last_detected"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Неизвестно"
-                    android:textSize="12sp"
+                    android:gravity="end"
+                    android:text="01.04.2026 13:48:54"
                     android:textColor="@android:color/white"
+                    android:textSize="10sp"
                     android:textStyle="bold" />
             </LinearLayout>
-
-            <!-- Количество обнаружений -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="6dp">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Количество обнаружений:"
-                    android:textSize="12sp"
-                    android:textColor="@android:color/white" />
-
-                <TextView
-                    android:id="@+id/tv_detection_count"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="0"
-                    android:textSize="12sp"
-                    android:textColor="@android:color/white"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
         </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="5dp"
+            android:layout_marginBottom="5dp"
+            android:background="#33FFFFFF" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/label_detect_count"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Обнаружения:"
+                android:textColor="#C9D3E6"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/tv_detection_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_map_count_chip"
+                android:paddingStart="8dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="5dp"
+                android:text="20"
+                android:textColor="@android:color/white"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
     </LinearLayout>
 
-</FrameLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>
