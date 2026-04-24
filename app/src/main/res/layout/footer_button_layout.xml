@@ -28,6 +28,30 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/footer_settings"
+        style="@style/FooterActionButton"
+        android:layout_weight="1"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@android:drawable/ic_menu_manage"
+            app:tint="@android:color/white"
+            android:contentDescription="Settings Icon" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Настройки"
+            style="@style/FooterActionText" />
+    </LinearLayout>
+
+    <LinearLayout
         android:id="@+id/footer_device"
         style="@style/FooterActionButton"
         android:layout_weight="1"
