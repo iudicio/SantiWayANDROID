@@ -192,8 +192,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             return insets;
         });
 
-        NavigationView navigationView = findViewById(R.id.nav_view);
-
         playPauseButton = findViewById(R.id.play_pause_button);
         toolbarFolderTitleTextView = findViewById(R.id.toolbar_folder_title);
         wifiStatusTextView = findViewById(R.id.wifi_status);
@@ -206,11 +204,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         setSupportActionBar(toolbar);
 
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setDisplayHomeAsUpEnabled(false);
             getSupportActionBar().setDisplayShowTitleEnabled(false);
-            getSupportActionBar().setHomeAsUpIndicator(R.drawable.ic_apps);
         }
-        navigationView.setNavigationItemSelectedListener(this);
 
         databaseHelper = new MainDatabaseHelper(this);
 
@@ -237,6 +233,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         findViewById(R.id.footer_device).setOnClickListener(v -> openDeviceListActivity());
         findViewById(R.id.footer_create).setOnClickListener(v -> showCreateFolderDialog());
         findViewById(R.id.footer_delete).setOnClickListener(v -> showFolderManagementDialog());
+        findViewById(R.id.footer_settings).setOnClickListener(v -> viewAppConfig());
 
         SharedPreferences prefs = getSharedPreferences(PREFS_SCANNER_STATE, MODE_PRIVATE);
         isScanning = prefs.getBoolean(KEY_IS_SCANNING, false);
@@ -743,10 +740,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == android.R.id.home) {
-            drawerLayout.openDrawer(GravityCompat.START);
-            return true;
-        }
         return super.onOptionsItemSelected(item);
     }
 

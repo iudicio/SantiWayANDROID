@@ -19,8 +19,7 @@
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:background="#0B1A2C"
-            app:titleTextColor="@android:color/white"
-            app:navigationIcon="@drawable/ic_apps">
+            app:titleTextColor="@android:color/white">
 
             <TextView
                 android:id="@+id/toolbar_folder_title"
@@ -304,26 +303,4 @@
 
     </LinearLayout>
 
-    <com.google.android.material.navigation.NavigationView
-        android:id="@+id/nav_view"
-        android:layout_width="wrap_content"
-        android:layout_height="match_parent"
-        android:layout_gravity="start"
-        android:theme="@style/NavigationViewStyle"
-        app:headerLayout="@layout/header_drawer_menu"
-        app:menu="@menu/drawer_menu"
-        android:background="@color/drawer_background"
-
-        app:itemTextColor="@color/drawer_item_text_color"
-        app:itemIconTint="@color/drawer_item_icon_color"
-
-        app:itemRippleColor="@color/ripple_green_drawer"
-
-        app:itemBackground="@drawable/drawer_item_selector"
-        app:itemTextAppearance="@style/NavigationViewTextStyle"
-
-        app:itemPaddingTop="12dp"
-        app:itemPaddingBottom="12dp"
-
-        />
 </androidx.drawerlayout.widget.DrawerLayout>
