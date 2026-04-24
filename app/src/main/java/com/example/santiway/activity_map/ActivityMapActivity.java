@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -38,7 +39,7 @@ public class ActivityMapActivity extends AppCompatActivity {
     private List<Long> deviceTimestamps = new ArrayList<>();
 
     // UI элементы
-    private View statusHeader;
+    private View deviceInfoCard;
     private TextView tvMacAddress;
     private TextView tvDeviceName;
     private TextView tvDeviceType;
@@ -146,7 +147,7 @@ public class ActivityMapActivity extends AppCompatActivity {
     }
 
     private void initViews() {
-        statusHeader = findViewById(R.id.status_header);
+        deviceInfoCard = findViewById(R.id.device_info_card);
         tvMacAddress = findViewById(R.id.tv_mac_address);
         tvDeviceName = findViewById(R.id.tv_device_name);
         tvDeviceType = findViewById(R.id.tv_device_type);
@@ -244,35 +245,55 @@ public class ActivityMapActivity extends AppCompatActivity {
 
     private void setupButtons() {
         updateStatusToggle();
-
-        btnMakeTarget.setOnClickListener(v -> {
-            if (!"TARGET".equalsIgnoreCase(currentStatus)) {
-                changeDeviceStatus("TARGET");
-            }
-        });
-
-        btnMakeSafe.setOnClickListener(v -> {
-            if (!"SAFE".equalsIgnoreCase(currentStatus)) {
-                changeDeviceStatus("SAFE");
-            }
-        });
     }
 
     private void updateStatusToggle() {
         String status = currentStatus != null ? currentStatus.toUpperCase(Locale.US) : "GREY";
-        boolean isTarget = "TARGET".equals(status);
-        boolean isSafe = "SAFE".equals(status);
 
-        if (isTarget) {
-            statusHeader.setBackgroundColor(Color.parseColor("#FF3B30"));
-        } else if (isSafe) {
-            statusHeader.setBackgroundColor(Color.parseColor("#34C759"));
+        if ("TARGET".equals(status)) {
+            setInfoCardColor("#CCFF3B30");
+
+            setupStatusButton(btnMakeTarget, "Grey", "#808080", "GREY");
+            setupStatusButton(btnMakeSafe, "Safe", "#34C759", "SAFE");
+
+        } else if ("SAFE".equals(status)) {
+            setInfoCardColor("#CC34C759");
+
+            setupStatusButton(btnMakeTarget, "Target", "#FF3B30", "TARGET");
+            setupStatusButton(btnMakeSafe, "Grey", "#808080", "GREY");
+
         } else {
-            statusHeader.setBackgroundColor(Color.parseColor("#808080"));
-        }
+            setInfoCardColor("#CC172A46");
 
-        btnMakeTarget.setAlpha(isTarget ? 0.45f : 1f);
-        btnMakeSafe.setAlpha(isSafe ? 0.45f : 1f);
+            setupStatusButton(btnMakeTarget, "Target", "#FF3B30", "TARGET");
+            setupStatusButton(btnMakeSafe, "Safe", "#34C759", "SAFE");
+        }
+    }
+
+    private void setupStatusButton(Button button, String text, String colorHex, String statusToSet) {
+        button.setText(text);
+        button.setAlpha(1f);
+        button.setTextColor(Color.WHITE);
+        button.setBackground(makeRoundedDrawable(colorHex, 18));
+
+        button.setOnClickListener(v -> {
+            if (!statusToSet.equalsIgnoreCase(currentStatus)) {
+                changeDeviceStatus(statusToSet);
+            }
+        });
+    }
+
+    private void setInfoCardColor(String colorHex) {
+        if (deviceInfoCard != null) {
+            deviceInfoCard.setBackground(makeRoundedDrawable(colorHex, 16));
+        }
+    }
+
+    private GradientDrawable makeRoundedDrawable(String colorHex, int radiusDp) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(Color.parseColor(colorHex));
+        drawable.setCornerRadius(dpToPx(radiusDp));
+        return drawable;
     }
 
     private void changeDeviceStatus(String newStatus) {
@@ -287,17 +308,20 @@ public class ActivityMapActivity extends AppCompatActivity {
                 displayDeviceInfo();
                 showMapFragment();
 
-                String message = "TARGET".equalsIgnoreCase(newStatus)
-                        ? "Устройство помечено как TARGET"
-                        : "Устройство помечено как SAFE";
+                String message;
+                if ("TARGET".equalsIgnoreCase(newStatus)) {
+                    message = "Устройство помечено как TARGET";
+                } else if ("SAFE".equalsIgnoreCase(newStatus)) {
+                    message = "Устройство помечено как SAFE";
+                } else {
+                    message = "Устройство помечено как GREY";
+                }
 
                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, "Ошибка обновления статуса", Toast.LENGTH_SHORT).show();
             }
         }
-
-
     }
 
     private void displayDeviceInfo() {
