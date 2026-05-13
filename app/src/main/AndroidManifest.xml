@@ -142,7 +142,8 @@
 
         <!--Сервис WebSocket подключения -->
         <service android:name=".websocket.WebSocketService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="dataSync"/>
     </application>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>

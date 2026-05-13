@@ -215,12 +215,12 @@ public class BluetoothForegroundService extends Service {
         myDev.setLocationAccuracy(currentAccuracy);
 
         // Сохранение в базу
-        long rowId = databaseHelper.addBluetoothDevice(myDev, currentTableName);
-
-        // Предупреждение о нулевых координатах
         if (currentLatitude == 0.0 && currentLongitude == 0.0) {
-            Log.w(TAG, "⚠️ Saving device with ZERO coordinates: " + address);
+            Log.w(TAG, "Skip device with ZERO coordinates: " + address);
+            return;
         }
+
+        long rowId = databaseHelper.addBluetoothDevice(myDev, currentTableName);
 
         Log.d(TAG, (isBle ? "BLE" : "Classic") + " устройство сохранено: " + name +
                 " [" + address + "] RSSI=" + rssi + " at [" + currentLatitude + ", " +
