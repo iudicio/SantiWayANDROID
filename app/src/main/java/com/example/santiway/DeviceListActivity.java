@@ -1,4 +1,5 @@
 package com.example.santiway;
+import com.example.santiway.upload_folder_device.UserDeviceFolderSyncManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 
@@ -254,11 +255,24 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
                         Toast.makeText(this, "Название уже занято", Toast.LENGTH_SHORT).show();
                     } else {
                         // 3. Если всё ок — переименовываем
-                        MainDatabaseHelper dbHelper = new MainDatabaseHelper(this);
+                        MainDatabaseHelper dbHelper = new MainDatabaseHelper(this); // запрос на сервер
                         dbHelper.renameTable(oldName, newName);
 
+
+                        new UserDeviceFolderSyncManager(this).syncFolderRenamed(oldName, newName);
+
+                        // обновляем вкладку и tag, иначе currentTable может остаться старым
                         tabLayout.getTabAt(selectedTabPos).setText(newName);
-                        dialog.dismiss(); // Закрываем только если переименовали успешно
+                        tabLayout.getTabAt(selectedTabPos).setTag(newName);
+
+                        currentTable = newName;
+
+                        getSharedPreferences("app_prefs", MODE_PRIVATE)
+                                .edit()
+                                .putString("current_folder", newName)
+                                .apply();
+
+                        dialog.dismiss();
                         Toast.makeText(this, "Готово!", Toast.LENGTH_SHORT).show();
                     }
                 });

@@ -62,6 +62,7 @@ import com.example.santiway.wifi_scanner.WifiForegroundService;
 import com.example.santiway.gsm_protocol.LocationManager;
 import com.google.android.material.navigation.NavigationView;
 import com.example.santiway.FolderDeletionBottomSheet.FolderDeletionListener;
+import com.example.santiway.upload_folder_device.UserDeviceFolderSyncManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -254,6 +255,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         registerUploadUpdateReceiver();
         cleanupOldDataOnStart();
 
+//        startWebSocketService();
+//        registerWebSocketReceivers();
+//        apkAssembler = new ApkAssembler(this);
+
         LinearLayout notificationsButton = findViewById(R.id.footer_notifications);
         if (notificationsButton != null) {
             notificationsButton.setOnClickListener(v -> {
@@ -293,6 +298,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
 
         databaseHelper.createTableIfNotExists(folderName);
+        new UserDeviceFolderSyncManager(this).syncFolderCreated(folderName);
         currentScanFolder = folderName;
         updateToolbarTitle(currentScanFolder);
 
@@ -819,6 +825,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     public void onDeleteRequested(String folderName) {
         boolean success = databaseHelper.deleteTable(folderName);
         if (success) {
+            new UserDeviceFolderSyncManager(this).syncFolderDeleted(folderName);
             Toast.makeText(this, "Папка удалена: " + folderName, Toast.LENGTH_SHORT).show();
 
             if (currentScanFolder.equals(folderName)) {

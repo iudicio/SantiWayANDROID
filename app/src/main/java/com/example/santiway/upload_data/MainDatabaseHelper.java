@@ -1106,8 +1106,8 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                     "network_type TEXT," +
                     "is_registered INTEGER," +
                     "is_neighbor INTEGER," +
-                    "latitude REAL," +
-                    "longitude REAL," +
+                    "latitude REAL NOT NULL," +
+                    "longitude REAL NOT NULL," +
                     "altitude REAL," +
                     "location_accuracy REAL," +
                     "timestamp INTEGER," +

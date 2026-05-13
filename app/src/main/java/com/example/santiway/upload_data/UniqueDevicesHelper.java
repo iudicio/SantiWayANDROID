@@ -57,8 +57,8 @@ public class UniqueDevicesHelper {
                     "network_type TEXT," +
                     "is_registered INTEGER," +
                     "is_neighbor INTEGER," +
-                    "latitude REAL," +
-                    "longitude REAL," +
+                    "latitude REAL NOT NULL," +
+                    "longitude REAL NOT NULL," +
                     "altitude REAL," +
                     "location_accuracy REAL," +
                     "first_seen LONG," +
@@ -68,7 +68,8 @@ public class UniqueDevicesHelper {
                     "folder_name TEXT DEFAULT ''," +
                     "total_scans INTEGER DEFAULT 1," +
                     "avg_signal_strength REAL DEFAULT 0," +
-                    "last_location_change LONG DEFAULT 0" +
+                    "last_location_change LONG DEFAULT 0," +
+                    "CHECK (latitude != 0 AND longitude != 0)" +
                     ");";
 
             db.execSQL(createTableQuery);
