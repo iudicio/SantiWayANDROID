@@ -80,50 +80,50 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Правая колонка круглых кнопок -->
-    <LinearLayout
-        android:id="@+id/right_map_controls"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginEnd="16dp"
-        android:layout_marginBottom="250dp"
-        android:gravity="center"
-        android:orientation="vertical"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent">
+<!--    &lt;!&ndash; Правая колонка круглых кнопок &ndash;&gt;-->
+<!--    <LinearLayout-->
+<!--        android:id="@+id/right_map_controls"-->
+<!--        android:layout_width="wrap_content"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        android:layout_marginEnd="16dp"-->
+<!--        android:layout_marginBottom="250dp"-->
+<!--        android:gravity="center"-->
+<!--        android:orientation="vertical"-->
+<!--        app:layout_constraintEnd_toEndOf="parent"-->
+<!--        app:layout_constraintBottom_toBottomOf="parent">-->
 
-        <ImageButton
-            android:id="@+id/btn_center_map"
-            android:layout_width="58dp"
-            android:layout_height="58dp"
-            android:background="@drawable/bg_map_round_action"
-            android:contentDescription="Center map"
-            android:padding="16dp"
-            android:src="@android:drawable/ic_menu_mylocation"
-            android:tint="@android:color/white" />
+<!--        <ImageButton-->
+<!--            android:id="@+id/btn_center_map"-->
+<!--            android:layout_width="58dp"-->
+<!--            android:layout_height="58dp"-->
+<!--            android:background="@drawable/bg_map_round_action"-->
+<!--            android:contentDescription="Center map"-->
+<!--            android:padding="16dp"-->
+<!--            android:src="@android:drawable/ic_menu_mylocation"-->
+<!--            android:tint="@android:color/white" />-->
 
-        <ImageButton
-            android:id="@+id/btn_filter_map"
-            android:layout_width="58dp"
-            android:layout_height="58dp"
-            android:layout_marginTop="12dp"
-            android:background="@drawable/bg_map_round_action"
-            android:contentDescription="Filter"
-            android:padding="16dp"
-            android:src="@android:drawable/ic_menu_sort_by_size"
-            android:tint="@android:color/white" />
+<!--        <ImageButton-->
+<!--            android:id="@+id/btn_filter_map"-->
+<!--            android:layout_width="58dp"-->
+<!--            android:layout_height="58dp"-->
+<!--            android:layout_marginTop="12dp"-->
+<!--            android:background="@drawable/bg_map_round_action"-->
+<!--            android:contentDescription="Filter"-->
+<!--            android:padding="16dp"-->
+<!--            android:src="@android:drawable/ic_menu_sort_by_size"-->
+<!--            android:tint="@android:color/white" />-->
 
-        <ImageButton
-            android:id="@+id/btn_refresh_map"
-            android:layout_width="58dp"
-            android:layout_height="58dp"
-            android:layout_marginTop="12dp"
-            android:background="@drawable/bg_map_round_action"
-            android:contentDescription="Refresh"
-            android:padding="16dp"
-            android:src="@android:drawable/ic_popup_sync"
-            android:tint="@android:color/white" />
-    </LinearLayout>
+<!--        <ImageButton-->
+<!--            android:id="@+id/btn_refresh_map"-->
+<!--            android:layout_width="58dp"-->
+<!--            android:layout_height="58dp"-->
+<!--            android:layout_marginTop="12dp"-->
+<!--            android:background="@drawable/bg_map_round_action"-->
+<!--            android:contentDescription="Refresh"-->
+<!--            android:padding="16dp"-->
+<!--            android:src="@android:drawable/ic_popup_sync"-->
+<!--            android:tint="@android:color/white" />-->
+<!--    </LinearLayout>-->
 
     <!-- Нижняя карточка -->
     <LinearLayout

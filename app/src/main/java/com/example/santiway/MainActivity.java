@@ -62,6 +62,7 @@ import com.example.santiway.wifi_scanner.WifiForegroundService;
 import com.example.santiway.gsm_protocol.LocationManager;
 import com.google.android.material.navigation.NavigationView;
 import com.example.santiway.FolderDeletionBottomSheet.FolderDeletionListener;
+import com.example.santiway.upload_folder_device.UserDeviceFolderSyncManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -103,6 +104,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private static final String KEY_SCAN_START_TIME = "scan_start_time";
     private static final String PREFS_APP = "app_prefs";
     private static final String KEY_CURRENT_FOLDER = "current_folder";
+    private static final String KEY_OWNER_DEVICE_SYNCED_ONCE = "owner_device_synced_once";
 
     private Runnable timerRunnable = new Runnable() {
         @Override
@@ -248,11 +250,25 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         ApiConfig.initialize(this);
         uploadManager = new DeviceUploadManager(this);
-        new UserDeviceSyncManager(this).syncOwnerDevice();
+        boolean ownerDeviceSyncedOnce = getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                .getBoolean(KEY_OWNER_DEVICE_SYNCED_ONCE, false);
+
+        if (!ownerDeviceSyncedOnce) {
+            new UserDeviceSyncManager(this).syncOwnerDevice();
+
+            getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(KEY_OWNER_DEVICE_SYNCED_ONCE, true)
+                    .apply();
+        }
         startUploadService();
         updateLastUploadDateDisplay();
         registerUploadUpdateReceiver();
         cleanupOldDataOnStart();
+
+//        startWebSocketService();
+//        registerWebSocketReceivers();
+//        apkAssembler = new ApkAssembler(this);
 
         LinearLayout notificationsButton = findViewById(R.id.footer_notifications);
         if (notificationsButton != null) {
@@ -280,6 +296,19 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+
+        String savedFolder = getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                .getString(KEY_CURRENT_FOLDER, "Основная");
+
+        if (savedFolder != null && !savedFolder.equals(currentScanFolder)) {
+            currentScanFolder = savedFolder;
+            updateToolbarTitle(currentScanFolder);
+        }
+    }
+
+    @Override
     public void onFolderCreated(String folderName) {
         if (folderName.equals("Основная")) {
             Toast.makeText(this, "Имя папки недоступно", Toast.LENGTH_SHORT).show();
@@ -293,6 +322,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
 
         databaseHelper.createTableIfNotExists(folderName);
+        new UserDeviceFolderSyncManager(this).syncFolderCreated(folderName);
         currentScanFolder = folderName;
         updateToolbarTitle(currentScanFolder);
 
@@ -819,6 +849,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     public void onDeleteRequested(String folderName) {
         boolean success = databaseHelper.deleteTable(folderName);
         if (success) {
+            new UserDeviceFolderSyncManager(this).syncFolderDeleted(folderName);
             Toast.makeText(this, "Папка удалена: " + folderName, Toast.LENGTH_SHORT).show();
 
             if (currentScanFolder.equals(folderName)) {

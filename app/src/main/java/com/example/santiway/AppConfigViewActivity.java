@@ -183,11 +183,22 @@ public class AppConfigViewActivity extends ComponentActivity {
             }
 
             // Сохраняем протокол и имя устройства
-            repository.setGeoProtocol(selectedProtocol);
-            repository.setDeviceName(deviceName);
-            new UserDeviceSyncManager(this).syncOwnerDevice();
+            String oldDeviceName = repository.getDeviceName();
+            if (oldDeviceName == null || oldDeviceName.trim().isEmpty()) {
+                oldDeviceName = "Telephone";
+            }
 
-            showToast("Настройки протокола сохранены!");
+            repository.setGeoProtocol(selectedProtocol);
+
+            if (!deviceName.equals(oldDeviceName)) {
+                repository.setDeviceName(deviceName);
+                new UserDeviceSyncManager(this).syncOwnerDevice();
+                showToast("Название устройства сохранено и отправлено на сервер!");
+            } else {
+                repository.setDeviceName(deviceName);
+                showToast("Настройки сохранены. Название устройства не изменялось.");
+            }
+
             showCurrentValues();
         });
     }
