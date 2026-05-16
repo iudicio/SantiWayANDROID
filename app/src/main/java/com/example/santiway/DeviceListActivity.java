@@ -272,6 +272,10 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
                                 .putString("current_folder", newName)
                                 .apply();
 
+                        Intent broadcastIntent = new Intent("com.example.santiway.FOLDER_SWITCHED");
+                        broadcastIntent.putExtra("newTableName", newName);
+                        sendBroadcast(broadcastIntent);
+
                         dialog.dismiss();
                         Toast.makeText(this, "Готово!", Toast.LENGTH_SHORT).show();
                     }
