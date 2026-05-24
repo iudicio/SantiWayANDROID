@@ -30,6 +30,7 @@ public class DeviceUploadService extends Service {
     private Handler handler;
     private Runnable uploadRunnable;
     private DeviceUploadManager uploadManager;
+    private PhoneLocationUploadManager phoneLocationUploadManager;
 
     @Override
     public void onCreate() {
@@ -37,6 +38,7 @@ public class DeviceUploadService extends Service {
         Log.d(TAG, "DeviceUploadService created");
 
         uploadManager = new DeviceUploadManager(this);
+        phoneLocationUploadManager = new PhoneLocationUploadManager(this);
         createNotificationChannel();
 
         Notification notification = createNotification();
@@ -74,6 +76,8 @@ public class DeviceUploadService extends Service {
         Log.d(TAG, "Checking for devices to upload.");
         new Thread(() -> {
             try {
+                phoneLocationUploadManager.uploadCurrentLocation();
+                
                 int pendingCount = uploadManager.getPendingDevicesCount();
                 Log.d(TAG, "Pending devices: " + pendingCount);
                 if (pendingCount == 0) return;

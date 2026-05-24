@@ -217,7 +217,13 @@ public class ActivityMapActivity extends AppCompatActivity {
                 return Long.compare(time1, time2);
             });
 
-            for (MainDatabaseHelper.DeviceLocation loc : sortedHistory) {
+            int pointLimit = getSharedPreferences("AppSettings", MODE_PRIVATE)
+                    .getInt("map_point_limit", 100);
+
+            int startIndex = Math.max(0, sortedHistory.size() - pointLimit);
+
+            for (int i = startIndex; i < sortedHistory.size(); i++) {
+                MainDatabaseHelper.DeviceLocation loc = sortedHistory.get(i);
                 deviceHistoryPoints.add(new GeoPoint(loc.latitude, loc.longitude));
                 deviceTimestamps.add(Long.parseLong(loc.timestamp));
             }
