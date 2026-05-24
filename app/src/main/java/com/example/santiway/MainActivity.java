@@ -266,9 +266,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         registerUploadUpdateReceiver();
         cleanupOldDataOnStart();
 
-//        startWebSocketService();
-//        registerWebSocketReceivers();
-//        apkAssembler = new ApkAssembler(this);
+        //startWebSocketService();
+        //registerWebSocketReceivers();
+        //apkAssembler = new ApkAssembler(this);
 
         LinearLayout notificationsButton = findViewById(R.id.footer_notifications);
         if (notificationsButton != null) {
@@ -911,9 +911,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
                     runOnUiThread(() -> {
                         updateLastUploadDateDisplay();
-                        Toast.makeText(MainActivity.this,
-                                "✅ Отправлено " + count + " устройств",
-                                Toast.LENGTH_SHORT).show();
                     });
                 }
             }

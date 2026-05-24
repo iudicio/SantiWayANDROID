@@ -25,7 +25,6 @@ import java.util.regex.Pattern;
 
 public class AppConfigViewActivity extends ComponentActivity {
     private AppSettingsRepository repository;
-    private TextView resultText;
     private Spinner protocolSpinner;
     private Spinner scannerSpinner;
     private EditText intervalInput;
@@ -34,6 +33,7 @@ public class AppConfigViewActivity extends ComponentActivity {
     private TextView serverIpInput;
     private TextView apiKeyDisplay;
     private EditText deviceNameInput;
+    private EditText mapPointLimitInput;
 
     // Допустимые значения для протокола
     private final String[] allowedProtocols = {"GSM", "GPS"};
@@ -49,7 +49,6 @@ public class AppConfigViewActivity extends ComponentActivity {
         setContentView(R.layout.activity_app_config);
 
         repository = new AppSettingsRepository(this);
-        resultText = findViewById(R.id.result_text);
         scannerSpinner = findViewById(R.id.scanner_spinner);
         protocolSpinner = findViewById(R.id.protocol_spinner);
         intervalInput = findViewById(R.id.interval_input);
@@ -93,6 +92,13 @@ public class AppConfigViewActivity extends ComponentActivity {
 
             return insets;
         });
+
+        mapPointLimitInput = findViewById(R.id.map_point_limit_input);
+
+        int pointLimit = getSharedPreferences("AppSettings", MODE_PRIVATE)
+                .getInt("map_point_limit", 100);
+
+        mapPointLimitInput.setText(String.valueOf(pointLimit));
     }
 
     private int dpToPx(int dp) {
@@ -187,6 +193,20 @@ public class AppConfigViewActivity extends ComponentActivity {
             if (oldDeviceName == null || oldDeviceName.trim().isEmpty()) {
                 oldDeviceName = "Telephone";
             }
+
+            int mapPointLimit = 100;
+
+            try {
+                mapPointLimit = Integer.parseInt(mapPointLimitInput.getText().toString().trim());
+                if (mapPointLimit <= 0) mapPointLimit = 100;
+            } catch (Exception e) {
+                mapPointLimit = 100;
+            }
+
+            getSharedPreferences("AppSettings", MODE_PRIVATE)
+                    .edit()
+                    .putInt("map_point_limit", mapPointLimit)
+                    .apply();
 
             repository.setGeoProtocol(selectedProtocol);
 
@@ -297,7 +317,6 @@ public class AppConfigViewActivity extends ComponentActivity {
             }
         }
 
-        resultText.setText(stringBuilder.toString());
     }
 
     private void showToast(String message) {

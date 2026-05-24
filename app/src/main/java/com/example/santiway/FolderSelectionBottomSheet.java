@@ -1,5 +1,8 @@
 package com.example.santiway;
 
+import android.app.Dialog;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -50,6 +53,18 @@ public class FolderSelectionBottomSheet extends BottomSheetDialogFragment {
         }));
 
         return view;
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+
+        Dialog dialog = getDialog();
+        if (dialog != null && dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(
+                    new ColorDrawable(Color.TRANSPARENT)
+            );
+        }
     }
 
     // --- Вложенный класс для Адаптера RecyclerView ---

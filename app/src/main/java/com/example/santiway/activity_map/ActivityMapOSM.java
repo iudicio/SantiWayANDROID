@@ -167,25 +167,7 @@ public class ActivityMapOSM extends Fragment {
         rotationOverlay.setEnabled(true);
         mapView.getOverlays().add(rotationOverlay);
 
-        // Добавляем слой текущего местоположения (если есть разрешение)
-        if (ContextCompat.checkSelfPermission(requireContext(),
-                Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-
-            myLocationOverlay = new MyLocationNewOverlay(new GpsMyLocationProvider(requireContext()), mapView);
-            myLocationOverlay.enableMyLocation();
-            mapView.getOverlays().add(myLocationOverlay);
-
-            // Когда получим местоположение, слегка подкорректируем центр
-            myLocationOverlay.runOnFirstFix(() -> requireActivity().runOnUiThread(() -> {
-                if (!deviceHistoryPoints.isEmpty()) {
-                    // Оставляем центр на устройстве, просто добавляем точку пользователя
-                    addDeviceHistoryMarkers();
-                }
-            }));
-        } else {
-            // Если нет разрешения на геолокацию, просто показываем устройство
-            addDeviceHistoryMarkers();
-        }
+        addDeviceHistoryMarkers();
     }
 
     private void addDeviceHistoryMarkers() {

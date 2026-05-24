@@ -65,7 +65,7 @@ public class BluetoothForegroundService extends Service {
 
     private long scanInterval = 15000; // интервал между циклами сканирования
     private long scanDuration = 8000;  // длительность одного активного сканирования
-    private float minRssi = -100;        // минимальный RSSI для сохранения устройства
+    private float minRssi = -120;        // минимальный RSSI для сохранения устройства
 
     // Параметры геопозиции — получаем извне через Intent
     private double currentLatitude = 0.0;

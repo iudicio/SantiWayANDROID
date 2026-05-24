@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="#172A46"
+    android:background="@drawable/botton_sheet_rounded"
     android:padding="16dp">
 
     <TextView

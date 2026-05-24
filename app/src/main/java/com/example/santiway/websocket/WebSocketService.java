@@ -52,7 +52,7 @@ public class WebSocketService extends Service {
         Log.d(TAG, "API Key: " + apiKey);
 
         // Формируем правильный WebSocket URL с путем /ws/notify/
-        String serverUrl = "ws://109.71.247.188:8000/ws/notifications/";
+        String serverUrl = "ws://device-analysis.ru/ws/notifications/";
 
         Log.d(TAG, "WebSocket URL: " + serverUrl);
 
