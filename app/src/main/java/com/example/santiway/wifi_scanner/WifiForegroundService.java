@@ -43,7 +43,7 @@ public class WifiForegroundService extends Service {
     private boolean isScanning = false;
     private long scanInterval = 15000;
     private String currentTableName = "unified_data";
-    private float minSignalStrength = -100.0f;
+    private float minSignalStrength = -120.0f;
     private Set<String> processedInCurrentScan = new HashSet<>();
 
     // Используем LocationManager вместо хранения координат

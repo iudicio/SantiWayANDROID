@@ -119,7 +119,7 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
 
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        getSupportActionBar().setTitle("Database Tables");
+        getSupportActionBar().setTitle("Список устройств");
 
         View root = findViewById(R.id.root_device_list);
         View bottomActionsCard = findViewById(R.id.bottom_actions_card);

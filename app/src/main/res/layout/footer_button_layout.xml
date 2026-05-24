@@ -5,31 +5,49 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center"
+    android:paddingStart="6dp"
+    android:paddingEnd="6dp"
     android:background="@android:color/transparent">
 
     <LinearLayout
         android:id="@+id/footer_notifications"
         style="@style/FooterActionButton"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingStart="0dp"
+        android:paddingEnd="0dp"
         android:layout_weight="1"
         android:paddingTop="8dp"
         android:paddingBottom="8dp"
         android:background="?attr/selectableItemBackgroundBorderless" android:clickable="true"
         android:focusable="true">
         <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
             android:src="@drawable/ic_notifications"
             app:tint="#FF6B6B" android:contentDescription="Notifications Icon"/>
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Уведомления"
+            android:gravity="center"
+            android:singleLine="true"
+            android:maxLines="1"
+            android:textSize="10sp"
             style="@style/FooterActionText" />
     </LinearLayout>
 
     <LinearLayout
         android:id="@+id/footer_settings"
         style="@style/FooterActionButton"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingStart="0dp"
+        android:paddingEnd="0dp"
         android:layout_weight="1"
         android:paddingTop="8dp"
         android:paddingBottom="8dp"
@@ -38,9 +56,9 @@
         android:focusable="true">
 
         <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@android:drawable/ic_menu_manage"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_settings_white"
             app:tint="@android:color/white"
             android:contentDescription="Settings Icon" />
 
@@ -48,12 +66,22 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Настройки"
+            android:gravity="center"
+            android:singleLine="true"
+            android:maxLines="1"
+            android:textSize="10sp"
             style="@style/FooterActionText" />
     </LinearLayout>
 
     <LinearLayout
         android:id="@+id/footer_device"
         style="@style/FooterActionButton"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingStart="0dp"
+        android:paddingEnd="0dp"
         android:layout_weight="1"
         android:paddingTop="8dp"
         android:paddingBottom="8dp"
@@ -61,20 +89,30 @@
         android:clickable="true"
         android:focusable="true">
         <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
             android:src="@drawable/ic_device"
             app:tint="@android:color/white" />
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Устройства"
+            android:gravity="center"
+            android:singleLine="true"
+            android:maxLines="1"
+            android:textSize="10sp"
             style="@style/FooterActionText" />
     </LinearLayout>
 
     <LinearLayout
         android:id="@+id/footer_create"
         style="@style/FooterActionButton"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingStart="0dp"
+        android:paddingEnd="0dp"
         android:layout_weight="1"
         android:paddingTop="8dp"
         android:paddingBottom="8dp"
@@ -82,20 +120,30 @@
         android:clickable="true"
         android:focusable="true">
         <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
             android:src="@drawable/ic_create"
             app:tint="@android:color/white" />
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:gravity="center"
             android:text="Создать"
+            android:singleLine="true"
+            android:maxLines="1"
+            android:textSize="10sp"
             style="@style/FooterActionText" />
     </LinearLayout>
 
     <LinearLayout
         android:id="@+id/footer_delete"
         style="@style/FooterActionButton"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingStart="0dp"
+        android:paddingEnd="0dp"
         android:layout_weight="1"
         android:paddingTop="8dp"
         android:paddingBottom="8dp"
@@ -103,14 +151,18 @@
         android:clickable="true"
         android:focusable="true">
         <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
             android:src="@drawable/ic_block"
             app:tint="@android:color/white" />
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Удалить"
+            android:gravity="center"
+            android:singleLine="true"
+            android:maxLines="1"
+            android:textSize="10sp"
             style="@style/FooterActionText" />
     </LinearLayout>
 

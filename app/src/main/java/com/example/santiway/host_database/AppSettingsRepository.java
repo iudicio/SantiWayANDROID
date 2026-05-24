@@ -63,7 +63,7 @@ public class AppSettingsRepository {
     public ScannerSettings getScannerSettings(String scannerName) {
         boolean enabled = sharedPreferences.getBoolean(scannerName + "_enabled", true);
         float interval = sharedPreferences.getFloat(scannerName + "_interval", 5.0f);
-        float signalStrength = sharedPreferences.getFloat(scannerName + "_signal_strength", -100.0f);
+        float signalStrength = sharedPreferences.getFloat(scannerName + "_signal_strength", -120.0f);
 
         return new ScannerSettings(scannerName, enabled, interval, signalStrength);
     }

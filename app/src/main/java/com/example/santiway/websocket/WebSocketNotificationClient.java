@@ -105,10 +105,6 @@ public class WebSocketNotificationClient {
                     .addHeader("User-Agent", "Android-App")
                     .addHeader("X-API-Key", apiKey)
                     .addHeader("Authorization", "Bearer " + apiKey)
-                    .addHeader("Connection", "Upgrade")  // Важно для WebSocket
-                    .addHeader("Upgrade", "websocket")    // Важно для WebSocket
-                    .addHeader("Sec-WebSocket-Version", "13")  // Версия протокола
-                    .addHeader("Sec-WebSocket-Key", createWebSocketKey())  // Случайный ключ
                     .build();
 
             Log.d(TAG, "Request headers: " + request.headers());
