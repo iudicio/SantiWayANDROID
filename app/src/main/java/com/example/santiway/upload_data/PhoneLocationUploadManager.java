@@ -50,9 +50,6 @@ public class PhoneLocationUploadManager {
             json.put("device_id", phoneId);
             json.put("latitude", location.getLatitude());
             json.put("longitude", location.getLongitude());
-            json.put("altitude", location.hasAltitude() ? location.getAltitude() : 0.0);
-            json.put("accuracy", location.getAccuracy());
-            json.put("timestamp", System.currentTimeMillis());
 
             RequestBody body = RequestBody.create(json.toString(), JSON);
 
@@ -60,8 +57,8 @@ public class PhoneLocationUploadManager {
                     .url(url)
                     .post(body)
                     .addHeader("Content-Type", "application/json")
+                    .addHeader("Authorization", "Api-Key " + apiKey)
                     .addHeader("X-API-Key", apiKey)
-                    .addHeader("Authorization", "Bearer " + apiKey)
                     .build();
 
             try (okhttp3.Response response = client.newCall(request).execute()) {

@@ -142,6 +142,16 @@
             android:popupBackground="#0B1A2C"
             android:layout_marginTop="4dp"/>
 
+        <Switch
+            android:id="@+id/target_detection_switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Обнаружение target устройств"
+            android:textColor="@android:color/white"
+            android:thumbTint="@android:color/white"
+            android:trackTint="#44FFFFFF" />
+
         <Button
             android:id="@+id/save_general_btn"
             android:layout_width="match_parent"

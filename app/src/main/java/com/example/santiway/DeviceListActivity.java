@@ -9,6 +9,7 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
+import android.view.GestureDetector;
 import android.view.MenuItem;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.Locale;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
@@ -65,6 +67,10 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
     private TextInputEditText etSearchDevice;
     private String currentSearchQuery = "";
     private boolean autoRefreshStarted = false;
+    private GestureDetector folderGestureDetector;
+    private float downX;
+    private float downY;
+    private static final int SWIPE_THRESHOLD = 120;
 
     // Хендлер для задержки
     private Handler handler = new Handler();
@@ -112,6 +118,7 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         toolbar = findViewById(R.id.toolbar);
         tabLayout = findViewById(R.id.tab_layout);
         devicesRecyclerView = findViewById(R.id.devices_recycler_view);
+
         btnFilterTarget = findViewById(R.id.btn_filter_target);
         btnFilterSafe = findViewById(R.id.btn_filter_safe);
         btnFilterAll = findViewById(R.id.btn_filter_all);
@@ -306,6 +313,7 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         // Инициализация адаптера - передаем this как слушатель
         adapter = new DeviceListAdapter(new ArrayList<>(), this, this);
         devicesRecyclerView.setAdapter(adapter);
+        setupRecyclerSwipe();
 
         // Добавление слушателя для бесконечного скроллинга
         devicesRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
@@ -720,6 +728,60 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         }
 
         adapter.updateData(filteredList);
+    }
+    private void setupRecyclerSwipe() {
+        devicesRecyclerView.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    downX = event.getX();
+                    downY = event.getY();
+                    return false;
+
+                case MotionEvent.ACTION_UP:
+                    float upX = event.getX();
+                    float upY = event.getY();
+
+                    float diffX = upX - downX;
+                    float diffY = upY - downY;
+
+                    boolean isHorizontalSwipe =
+                            Math.abs(diffX) > 160 &&
+                                    Math.abs(diffX) > Math.abs(diffY) * 2.5f;
+
+                    if (isHorizontalSwipe) {
+                        if (diffX > 0) {
+                            switchTabBySwipe(-1);
+                        } else {
+                            switchTabBySwipe(1);
+                        }
+                        return true;
+                    }
+
+                    return false;
+            }
+
+            return false;
+        });
+    }
+
+    private void switchTabBySwipe(int direction) {
+        if (tabLayout == null || tabLayout.getTabCount() == 0) return;
+
+        int currentIndex = tabLayout.getSelectedTabPosition();
+        if (currentIndex == -1) currentIndex = 0;
+
+        int newIndex = currentIndex + direction;
+
+        if (newIndex < 0) {
+            newIndex = tabLayout.getTabCount() - 1;
+        } else if (newIndex >= tabLayout.getTabCount()) {
+            newIndex = 0;
+        }
+
+        TabLayout.Tab tab = tabLayout.getTabAt(newIndex);
+        if (tab != null) {
+            tab.select();
+        }
     }
 
     private void updateFilterButtonsUI() {

@@ -21,7 +21,9 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.provider.Settings;
 import android.util.Log;
+import android.view.GestureDetector;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
@@ -105,6 +107,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private static final String PREFS_APP = "app_prefs";
     private static final String KEY_CURRENT_FOLDER = "current_folder";
     private static final String KEY_OWNER_DEVICE_SYNCED_ONCE = "owner_device_synced_once";
+    private GestureDetector folderGestureDetector;
 
     private Runnable timerRunnable = new Runnable() {
         @Override
@@ -202,8 +205,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         coordinatesTextView = findViewById(R.id.coordinates_text);
         timeLabelTextView = findViewById(R.id.time_label);
         lastUploadDateTextView = findViewById(R.id.last_upload_date);
+        toolbarFolderTitleTextView.setOnClickListener(v -> showFolderSelectionDialog());
 
         setSupportActionBar(toolbar);
+        setupFolderSwipe();
 
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(false);
@@ -1039,6 +1044,90 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 Toast.makeText(this, "WebSocket отключен", Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    //Методы для свайпа папок
+    private void setupFolderSwipe() {
+        View swipeArea = findViewById(R.id.main_swipe_area);
+
+        folderGestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            private static final int SWIPE_THRESHOLD = 120;
+            private static final int SWIPE_VELOCITY_THRESHOLD = 120;
+
+            @Override
+            public boolean onDown(MotionEvent e) {
+                return true;
+            }
+
+            @Override
+            public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                if (e1 == null || e2 == null) return false;
+
+                float diffX = e2.getX() - e1.getX();
+                float diffY = e2.getY() - e1.getY();
+
+                if (Math.abs(diffX) > Math.abs(diffY)
+                        && Math.abs(diffX) > SWIPE_THRESHOLD
+                        && Math.abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
+
+                    if (diffX > 0) {
+                        switchFolderBySwipe(-1); // вправо
+                    } else {
+                        switchFolderBySwipe(1);  // влево
+                    }
+
+                    return true;
+                }
+
+                return false;
+            }
+        });
+
+        swipeArea.setOnTouchListener((v, event) -> folderGestureDetector.onTouchEvent(event));
+    }
+
+    private void switchFolderBySwipe(int direction) {
+        List<String> folders = getAllFolders();
+        if (folders == null || folders.isEmpty()) return;
+
+        int currentIndex = folders.indexOf(currentScanFolder);
+        if (currentIndex == -1) currentIndex = 0;
+
+        int newIndex = currentIndex + direction;
+
+        if (newIndex < 0) {
+            newIndex = folders.size() - 1;
+        } else if (newIndex >= folders.size()) {
+            newIndex = 0;
+        }
+
+        String selectedFolder = folders.get(newIndex);
+        switchToFolder(selectedFolder);
+    }
+
+    private void switchToFolder(String selectedFolder) {
+        if (selectedFolder == null || selectedFolder.trim().isEmpty()) return;
+        if (selectedFolder.equals(currentScanFolder)) return;
+
+        boolean wasScanning = isScanning;
+
+        if (wasScanning) {
+            stopScanning(false);
+        }
+
+        currentScanFolder = selectedFolder;
+        updateToolbarTitle(currentScanFolder);
+
+        getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                .edit()
+                .putString(KEY_CURRENT_FOLDER, currentScanFolder)
+                .apply();
+
+        if (wasScanning) {
+            startScanning();
+        }
+
+        Toast.makeText(this, "Папка: " + currentScanFolder, Toast.LENGTH_SHORT).show();
     }
 
 }
