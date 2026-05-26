@@ -109,32 +109,79 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
     public void deleteOldRecordsFromAllTables(long maxAgeMillis) {
         SQLiteDatabase db = this.getWritableDatabase();
+        Cursor cursor = null;
+
         try {
-            // Получаем список таблиц напрямую через один запрос к базе
-            Cursor cursor = db.rawQuery(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%'",
+            cursor = db.rawQuery(
+                    "SELECT name FROM sqlite_master " +
+                            "WHERE type='table' " +
+                            "AND name NOT LIKE 'sqlite_%' " +
+                            "AND name NOT LIKE 'android_%'",
                     null
             );
 
-            if (cursor != null) {
-                try {
-                    long cutoffTime = System.currentTimeMillis() - maxAgeMillis;
+            long cutoffTime = System.currentTimeMillis() - maxAgeMillis;
 
-                    while (cursor.moveToNext()) {
-                        String table = cursor.getString(0);
-                        try {
-                            db.delete("\"" + table + "\"", "timestamp < ?", new String[]{String.valueOf(cutoffTime)});
-                        } catch (Exception e) {
-                            Log.e(TAG, "Error deleting old records from table " + table + ": " + e.getMessage());
+            while (cursor != null && cursor.moveToNext()) {
+                String table = cursor.getString(0);
+
+                if ("target_devices".equals(table)
+                        || "safe_devices".equals(table)
+                        || "unique_devices".equals(table)) {
+                    continue;
+                }
+
+                try {
+                    if (table.endsWith("_unique")) {
+                        if (hasColumn(db, table, "last_seen")) {
+                            int deleted = db.delete(
+                                    "\"" + table + "\"",
+                                    "last_seen < ?",
+                                    new String[]{String.valueOf(cutoffTime)}
+                            );
+                            Log.d(TAG, "Deleted old unique records from " + table + ": " + deleted);
+                        }
+                    } else {
+                        if (hasColumn(db, table, "timestamp")) {
+                            int deleted = db.delete(
+                                    "\"" + table + "\"",
+                                    "timestamp < ?",
+                                    new String[]{String.valueOf(cutoffTime)}
+                            );
+                            Log.d(TAG, "Deleted old records from " + table + ": " + deleted);
                         }
                     }
-                } finally {
-                    cursor.close();
+                } catch (Exception e) {
+                    Log.e(TAG, "Error deleting old records from table " + table + ": " + e.getMessage());
+                }
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error deleting old records: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+    }
+
+    private boolean hasColumn(SQLiteDatabase db, String tableName, String columnName) {
+        Cursor cursor = null;
+
+        try {
+            cursor = db.rawQuery("PRAGMA table_info(\"" + tableName + "\")", null);
+            int nameIndex = cursor.getColumnIndex("name");
+
+            while (cursor.moveToNext()) {
+                if (nameIndex >= 0 && columnName.equals(cursor.getString(nameIndex))) {
+                    return true;
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error deleting old records: " + e.getMessage());
+            Log.e(TAG, "hasColumn error for " + tableName + ": " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
         }
+
+        return false;
     }
 
     @Override
@@ -395,7 +442,11 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 }
             }
 
-            if (curLat != null && curLon != null && "GREY".equals(lastStatus)) {
+            boolean targetDetectionEnabled = mContext
+                    .getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+                    .getBoolean("target_detection_enabled", true);
+
+            if (targetDetectionEnabled && curLat != null && curLon != null && "GREY".equals(lastStatus)) {
                 try {
                     String calculatedStatus = evaluateTargetStatus(uniqueId, curLat, curLon, newTimestamp, tableName);
                     values.put("status", calculatedStatus);

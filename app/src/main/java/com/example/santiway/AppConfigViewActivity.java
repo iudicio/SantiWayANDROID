@@ -34,6 +34,7 @@ public class AppConfigViewActivity extends ComponentActivity {
     private TextView apiKeyDisplay;
     private EditText deviceNameInput;
     private EditText mapPointLimitInput;
+    private Switch targetDetectionSwitch;
 
     // Допустимые значения для протокола
     private final String[] allowedProtocols = {"GSM", "GPS"};
@@ -57,6 +58,13 @@ public class AppConfigViewActivity extends ComponentActivity {
         serverIpInput = findViewById(R.id.server_ip_input);
         apiKeyDisplay = findViewById(R.id.api_key_display);
         deviceNameInput = findViewById(R.id.device_scanner);
+
+        targetDetectionSwitch = findViewById(R.id.target_detection_switch);
+
+        boolean targetDetectionEnabled = getSharedPreferences("AppSettings", MODE_PRIVATE)
+                .getBoolean("target_detection_enabled", true);
+
+        targetDetectionSwitch.setChecked(targetDetectionEnabled);
 
         setupSpinners();
         setupAppSettingsUI();
@@ -209,6 +217,12 @@ public class AppConfigViewActivity extends ComponentActivity {
                     .apply();
 
             repository.setGeoProtocol(selectedProtocol);
+
+            getSharedPreferences("AppSettings", MODE_PRIVATE)
+                    .edit()
+                    .putInt("map_point_limit", mapPointLimit)
+                    .putBoolean("target_detection_enabled", targetDetectionSwitch.isChecked())
+                    .apply();
 
             if (!deviceName.equals(oldDeviceName)) {
                 repository.setDeviceName(deviceName);
