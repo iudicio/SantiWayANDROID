@@ -30,6 +30,8 @@ import android.widget.LinearLayout;
 import android.widget.Toast;
 import android.widget.ImageButton;
 import android.widget.TextView;
+import android.net.Uri;
+import android.os.PowerManager;
 
 import androidx.activity.EdgeToEdge;
 import androidx.activity.result.ActivityResultLauncher;
@@ -54,7 +56,6 @@ import com.example.santiway.upload_data.ApiConfig;
 import com.example.santiway.upload_data.DeviceUploadManager;
 import com.example.santiway.upload_data.DeviceUploadService;
 import com.example.santiway.upload_data.MainDatabaseHelper;
-//import com.example.santiway.upload_data.UniqueDeviceUploadWorker;
 import com.example.santiway.upload_data.UniqueDevicesHelper;
 import com.example.santiway.upload_name_device.UserDeviceSyncManager;
 import com.example.santiway.websocket.ApkAssembler;
@@ -108,6 +109,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private static final String KEY_CURRENT_FOLDER = "current_folder";
     private static final String KEY_OWNER_DEVICE_SYNCED_ONCE = "owner_device_synced_once";
     private GestureDetector folderGestureDetector;
+    private ImageButton snapshotButton;
+    private boolean isSnapshotRunning = false;
+    private String folderBeforeSnapshot = null;
+    private final Handler snapshotHandler = new Handler();
 
     private Runnable timerRunnable = new Runnable() {
         @Override
@@ -198,6 +203,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         });
 
         playPauseButton = findViewById(R.id.play_pause_button);
+        snapshotButton = findViewById(R.id.snapshot_button);
         toolbarFolderTitleTextView = findViewById(R.id.toolbar_folder_title);
         wifiStatusTextView = findViewById(R.id.wifi_status);
         bluetoothStatusTextView = findViewById(R.id.bluetooth_status);
@@ -227,10 +233,24 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         registerFolderSwitchedReceiver();
 
         checkAndRequestPermissionsStepByStep();
+        requestBatteryOptimizationDisable();
 
         playPauseButton.setOnClickListener(v -> {
+            if (isSnapshotRunning) {
+                Toast.makeText(this, "Во время снапшота нельзя запускать обычное сканирование", Toast.LENGTH_SHORT).show();
+                return;
+            }
             if (checkEssentialPermissions()) {
                 toggleScanState();
+                requestOptionalPermissions();
+            } else {
+                showInitialPermissionsExplanation();
+            }
+        });
+
+        snapshotButton.setOnClickListener(v -> {
+            if (checkEssentialPermissions()) {
+                startSnapshotScan();
                 requestOptionalPermissions();
             } else {
                 showInitialPermissionsExplanation();
@@ -274,6 +294,18 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         //startWebSocketService();
         //registerWebSocketReceivers();
         //apkAssembler = new ApkAssembler(this);
+
+        boolean updateStarted = getSharedPreferences("update_prefs", MODE_PRIVATE)
+                .getBoolean("apk_update_started", false);
+
+        if (updateStarted) {
+            getSharedPreferences("update_prefs", MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("apk_update_started", false)
+                    .apply();
+
+            Toast.makeText(this, "Обновление приложения успешно установлено", Toast.LENGTH_LONG).show();
+        }
 
         LinearLayout notificationsButton = findViewById(R.id.footer_notifications);
         if (notificationsButton != null) {
@@ -369,6 +401,92 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         } else {
             registerReceiver(folderSwitchedReceiver, filter);
         }
+    }
+
+    private String createSnapshotFolderName() {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd-HH-mm", Locale.getDefault());
+        return "snapshot-" + sdf.format(new Date());
+    }
+
+    private void startSnapshotScan() {
+        if (isSnapshotRunning) {
+            Toast.makeText(this, "Снапшот уже выполняется", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        boolean wasScanning = isScanning;
+        folderBeforeSnapshot = currentScanFolder;
+
+        if (wasScanning) {
+            stopScanning(false);
+        }
+
+        String snapshotFolder = createSnapshotFolderName();
+
+        databaseHelper.createTableIfNotExists(snapshotFolder);
+        new UserDeviceFolderSyncManager(this).syncFolderCreated(snapshotFolder);
+
+        currentScanFolder = snapshotFolder;
+        updateToolbarTitle(currentScanFolder);
+
+        getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                .edit()
+                .putString(KEY_CURRENT_FOLDER, currentScanFolder)
+                .apply();
+
+        isSnapshotRunning = true;
+        startScanning();
+
+        if (snapshotButton != null) {
+            snapshotButton.animate()
+                    .rotationBy(360f)
+                    .setDuration(700)
+                    .withEndAction(this::animateSnapshotButton)
+                    .start();
+        }
+
+        Toast.makeText(this, "Снапшот запущен на 1 минуту", Toast.LENGTH_SHORT).show();
+
+        snapshotHandler.postDelayed(() -> finishSnapshotScan(wasScanning), 60_000);
+    }
+
+    private void animateSnapshotButton() {
+        if (!isSnapshotRunning || snapshotButton == null) return;
+
+        snapshotButton.animate()
+                .rotationBy(360f)
+                .setDuration(700)
+                .withEndAction(this::animateSnapshotButton)
+                .start();
+    }
+
+    private void finishSnapshotScan(boolean restorePreviousScanning) {
+        if (!isSnapshotRunning) return;
+
+        isSnapshotRunning = false;
+
+        stopScanning(false);
+
+        if (snapshotButton != null) {
+            snapshotButton.animate().cancel();
+            snapshotButton.setRotation(0f);
+        }
+
+        if (folderBeforeSnapshot != null && !folderBeforeSnapshot.trim().isEmpty()) {
+            currentScanFolder = folderBeforeSnapshot;
+            updateToolbarTitle(currentScanFolder);
+
+            getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                    .edit()
+                    .putString(KEY_CURRENT_FOLDER, currentScanFolder)
+                    .apply();
+        }
+
+        if (restorePreviousScanning) {
+            startScanning();
+        }
+
+        Toast.makeText(this, "Снапшот завершён", Toast.LENGTH_SHORT).show();
     }
 
     private void initializeLocationManager() {
@@ -530,6 +648,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             LocalBroadcastManager.getInstance(this).unregisterReceiver(webSocketReceiver);
         }
         unregisterUploadUpdateReceiver();
+        snapshotHandler.removeCallbacksAndMessages(null);
     }
 
     // ВАЖНО: МЕТОДЫ ПРОВЕРКИ ФУНКЦИОНАЛОВ И ПРЕДУПРЕЖДЕНИЙ
@@ -797,6 +916,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     }
 
     private void showFolderSelectionDialog() {
+        if (isSnapshotRunning) {
+            Toast.makeText(this, "Во время снапшота нельзя запускать обычное сканирование", Toast.LENGTH_SHORT).show();
+            return;
+        }
         List<String> folders = getAllFolders();
 
         FolderSelectionBottomSheet bottomSheet = new FolderSelectionBottomSheet(folders, new FolderSelectionBottomSheet.FolderSelectionListener() {
@@ -1087,6 +1210,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     }
 
     private void switchFolderBySwipe(int direction) {
+        if (isSnapshotRunning) {
+            Toast.makeText(this, "Во время снапшота нельзя запускать обычное сканирование", Toast.LENGTH_SHORT).show();
+            return;
+        }
         List<String> folders = getAllFolders();
         if (folders == null || folders.isEmpty()) return;
 
@@ -1106,6 +1233,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     }
 
     private void switchToFolder(String selectedFolder) {
+        if (isSnapshotRunning) {
+            Toast.makeText(this, "Во время снапшота нельзя запускать обычное сканирование", Toast.LENGTH_SHORT).show();
+            return;
+        }
         if (selectedFolder == null || selectedFolder.trim().isEmpty()) return;
         if (selectedFolder.equals(currentScanFolder)) return;
 
@@ -1128,6 +1259,38 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         }
 
         Toast.makeText(this, "Папка: " + currentScanFolder, Toast.LENGTH_SHORT).show();
+    }
+
+    private void requestBatteryOptimizationDisable() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+
+            PowerManager powerManager =
+                    (PowerManager) getSystemService(Context.POWER_SERVICE);
+
+            String packageName = getPackageName();
+
+            if (powerManager != null
+                    && !powerManager.isIgnoringBatteryOptimizations(packageName)) {
+
+                try {
+                    Intent intent = new Intent(
+                            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                            Uri.parse("package:" + packageName)
+                    );
+
+                    startActivity(intent);
+
+                } catch (Exception e) {
+                    Log.e(TAG, "Battery optimization request error: " + e.getMessage());
+
+                    Intent intent = new Intent(
+                            Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS
+                    );
+
+                    startActivity(intent);
+                }
+            }
+        }
     }
 
 }

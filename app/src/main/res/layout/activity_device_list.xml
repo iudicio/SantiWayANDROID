@@ -19,7 +19,7 @@
         app:contentInsetStartWithNavigation="0dp"
         app:title="Список устройств"
         app:titleTextColor="@android:color/white"
-        app:navigationIcon="@android:drawable/ic_menu_revert"
+        app:navigationIcon="?attr/homeAsUpIndicator"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
