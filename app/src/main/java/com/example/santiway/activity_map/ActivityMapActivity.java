@@ -167,7 +167,7 @@ public class ActivityMapActivity extends AppCompatActivity {
 
         // Получаем историю устройства
         List<MainDatabaseHelper.DeviceLocation> history =
-                dbHelper.getDeviceHistoryByMac(tableName, deviceMac);
+                dbHelper.getDeviceHistoryByKey(tableName, deviceMac, deviceType);
 
         if (!history.isEmpty()) {
             detectionCount = history.size();

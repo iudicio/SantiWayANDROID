@@ -1243,34 +1243,61 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         }
     }
 
-    // Метод для получения всех записей устройства по MAC адресу (bssid)
-    public List<DeviceLocation> getDeviceHistoryByMac(String tableName, String mac) {
+    // Метод для получения всех записей устройства по MAC адресу (bssid) и cell_id
+    public List<DeviceLocation> getDeviceHistoryByKey(String tableName, String deviceKey, String deviceType) {
         List<DeviceLocation> history = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = null;
 
         try {
-            String query = "SELECT * FROM \"" + tableName + "\" " +
-                    "WHERE bssid = ? AND type IN ('Wi-Fi', 'Bluetooth') " +
-                    "ORDER BY timestamp DESC";
-            cursor = db.rawQuery(query, new String[]{mac});
+            boolean isCell = deviceType != null && deviceType.equalsIgnoreCase("Cell");
 
-            while (cursor.moveToNext()) {
+            String query;
+            String[] args;
+
+            if (isCell) {
+                if (deviceKey.contains("_")) {
+                    query = "SELECT name, latitude, longitude, timestamp, cell_id " +
+                            "FROM \"" + tableName + "\" " +
+                            "WHERE type = 'Cell' AND " +
+                            "CAST(mcc AS TEXT) || '_' || CAST(mnc AS TEXT) || '_' || " +
+                            "CASE WHEN network_type IN ('LTE', '5G') " +
+                            "THEN CAST(tac AS TEXT) ELSE CAST(lac AS TEXT) END || '_' || " +
+                            "CAST(cell_id AS TEXT) = ? " +
+                            "ORDER BY timestamp ASC";
+                    args = new String[]{deviceKey};
+                } else {
+                    query = "SELECT name, latitude, longitude, timestamp, cell_id " +
+                            "FROM \"" + tableName + "\" " +
+                            "WHERE type = 'Cell' AND CAST(cell_id AS TEXT) = ? " +
+                            "ORDER BY timestamp ASC";
+                    args = new String[]{deviceKey};
+                }
+            } else {
+                query = "SELECT name, latitude, longitude, timestamp, bssid " +
+                        "FROM \"" + tableName + "\" " +
+                        "WHERE bssid = ? AND type IN ('Wi-Fi', 'Bluetooth') " +
+                        "ORDER BY timestamp ASC";
+                args = new String[]{deviceKey};
+            }
+
+            cursor = db.rawQuery(query, args);
+
+            while (cursor != null && cursor.moveToNext()) {
+                String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
                 double latitude = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
                 double longitude = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
-                long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
-                String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
+                String timestamp = cursor.getString(cursor.getColumnIndexOrThrow("timestamp"));
 
-                DeviceLocation location = new DeviceLocation(name, latitude, longitude,
-                        String.valueOf(timestamp), mac);
-                history.add(location);
+                history.add(new DeviceLocation(name, latitude, longitude, timestamp, deviceKey));
             }
+
         } catch (Exception e) {
-            Log.e(TAG, "Error getting device history: " + e.getMessage());
+            Log.e(TAG, "Error getting device history by key: " + e.getMessage());
         } finally {
             if (cursor != null) cursor.close();
-            db.close();
         }
+
         return history;
     }
 

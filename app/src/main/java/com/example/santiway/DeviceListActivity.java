@@ -411,7 +411,7 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
 
         MainDatabaseHelper dbHelper = new MainDatabaseHelper(this);
         List<MainDatabaseHelper.DeviceLocation> history =
-                dbHelper.getDeviceHistoryByMac(tableName, deviceKey);
+                dbHelper.getDeviceHistoryByKey(tableName, deviceKey, device.getType());
 
         if (history == null || history.isEmpty()) {
             Toast.makeText(this, "Нет данных о местоположении устройства", Toast.LENGTH_SHORT).show();
