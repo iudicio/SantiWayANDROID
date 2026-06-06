@@ -18,6 +18,8 @@ public class WebSocketService extends Service {
     private static final String TAG = "WebSocketService";
     private static final String CHANNEL_ID = "websocket_channel";
     private static final int NOTIFICATION_ID = 1001;
+    private ApkAssembler apkAssembler;
+    private android.content.BroadcastReceiver apkReceiver;
 
     private WebSocketNotificationClient webSocketClient;
     private final IBinder binder = new WebSocketBinder();
@@ -52,13 +54,15 @@ public class WebSocketService extends Service {
         Log.d(TAG, "API Key: " + apiKey);
 
         // Формируем правильный WebSocket URL с путем /ws/notify/
-        String serverUrl = "ws://device-analysis.ru/ws/notifications/";
+        String serverUrl = "ws://192.168.1.205:1411/ws/notify/";
 
         Log.d(TAG, "WebSocket URL: " + serverUrl);
 
         // Создаем и подключаем WebSocket клиент
         webSocketClient = new WebSocketNotificationClient(this, serverUrl, apiKey);
         webSocketClient.connect();
+        apkAssembler = new ApkAssembler(this);
+        registerApkReceiver();
     }
 
     @Override
@@ -80,6 +84,11 @@ public class WebSocketService extends Service {
         super.onDestroy();
         if (webSocketClient != null) {
             webSocketClient.disconnect();
+        }
+        if (apkReceiver != null) {
+            androidx.localbroadcastmanager.content.LocalBroadcastManager
+                    .getInstance(this)
+                    .unregisterReceiver(apkReceiver);
         }
     }
 
@@ -108,5 +117,63 @@ public class WebSocketService extends Service {
                 .setOngoing(true);
 
         return builder.build();
+    }
+
+    private void registerApkReceiver() {
+        apkReceiver = new android.content.BroadcastReceiver() {
+            @Override
+            public void onReceive(android.content.Context context, Intent intent) {
+                String action = intent.getAction();
+
+                if (WebSocketNotificationClient.ACTION_APK_CHUNK_RECEIVED.equals(action)) {
+                    String buildId = intent.getStringExtra(WebSocketNotificationClient.EXTRA_BUILD_ID);
+                    int chunkIndex = intent.getIntExtra(WebSocketNotificationClient.EXTRA_CHUNK_INDEX, -1);
+                    int chunkCount = intent.getIntExtra(WebSocketNotificationClient.EXTRA_CHUNK_COUNT, -1);
+                    String filename = intent.getStringExtra(WebSocketNotificationClient.EXTRA_FILENAME);
+                    byte[] data = intent.getByteArrayExtra(WebSocketNotificationClient.EXTRA_CHUNK_DATA);
+
+                    if (buildId != null && data != null && chunkIndex >= 0 && chunkCount > 0) {
+                        apkAssembler.addChunk(buildId, chunkIndex, chunkCount, filename, data);
+                    }
+                }
+
+                if (WebSocketNotificationClient.ACTION_APK_COMPLETE.equals(action)) {
+                    String apkPath = intent.getStringExtra(WebSocketNotificationClient.EXTRA_APK_PATH);
+                    if (apkPath != null) {
+                        installApk(apkPath);
+                    }
+                }
+            }
+        };
+
+        android.content.IntentFilter filter = new android.content.IntentFilter();
+        filter.addAction(WebSocketNotificationClient.ACTION_APK_CHUNK_RECEIVED);
+        filter.addAction(WebSocketNotificationClient.ACTION_APK_COMPLETE);
+
+        androidx.localbroadcastmanager.content.LocalBroadcastManager
+                .getInstance(this)
+                .registerReceiver(apkReceiver, filter);
+    }
+
+    private void installApk(String apkPath) {
+        java.io.File apkFile = new java.io.File(apkPath);
+
+        if (!apkFile.exists()) {
+            Log.e(TAG, "APK file not found: " + apkPath);
+            return;
+        }
+
+        android.net.Uri apkUri = androidx.core.content.FileProvider.getUriForFile(
+                this,
+                getPackageName() + ".fileprovider",
+                apkFile
+        );
+
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+        startActivity(intent);
     }
 }

@@ -3,10 +3,15 @@ package com.example.santiway.upload_data;
 import android.content.Context;
 import android.location.Location;
 import android.util.Log;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.TimeZone;
 
 import com.example.santiway.gsm_protocol.LocationManager;
 
 import org.json.JSONObject;
+
+import java.util.Locale;
 
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -46,26 +51,34 @@ public class PhoneLocationUploadManager {
 
             String url = ApiConfig.getBaseUrl(context) + "api/device-locations/";
 
+            SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
+            isoFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+
             JSONObject json = new JSONObject();
             json.put("device_id", phoneId);
             json.put("latitude", location.getLatitude());
             json.put("longitude", location.getLongitude());
+            json.put("located_at", isoFormat.format(new Date()));
 
             RequestBody body = RequestBody.create(json.toString(), JSON);
 
             Request request = new Request.Builder()
                     .url(url)
                     .post(body)
-                    .addHeader("Content-Type", "application/json")
                     .addHeader("Authorization", "Api-Key " + apiKey)
-                    .addHeader("X-API-Key", apiKey)
+                    .addHeader("Content-Type", "application/json")
+                    .addHeader("X-Device-MAC", phoneId)
                     .build();
 
             try (okhttp3.Response response = client.newCall(request).execute()) {
+                String responseBody = response.body() != null ? response.body().string() : "";
                 if (response.isSuccessful()) {
                     Log.d(TAG, "Геопозиция телефона отправлена: " + json);
                 } else {
-                    Log.e(TAG, "Ошибка отправки геопозиции: " + response.code() + " " + response.message());
+                    Log.e(TAG, "Ошибка отправки геопозиции: "
+                            + response.code() + " "
+                            + response.message()
+                            + "\nBODY: " + responseBody);
                 }
             }
 
