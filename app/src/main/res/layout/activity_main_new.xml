@@ -74,17 +74,35 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent">
 
-                <ImageButton
-                    android:id="@+id/play_pause_button"
+                <FrameLayout
+                    android:id="@+id/scan_button_container"
                     android:layout_width="96dp"
                     android:layout_height="96dp"
-                    android:background="@drawable/rounded_button_with_stroke"
-                    android:elevation="6dp"
-                    android:src="@drawable/ic_starts"
-                    android:scaleType="fitCenter"
-                    android:padding="24dp"
-                    android:contentDescription="Start/Stop Scanning"
-                    app:tint="#3DDC84" />
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="@android:color/transparent"
+                    app:layout_constraintTop_toTopOf="@id/play_pause_button"
+                    app:layout_constraintBottom_toBottomOf="@id/play_pause_button"
+                    app:layout_constraintStart_toStartOf="@id/play_pause_button"
+                    app:layout_constraintEnd_toEndOf="@id/play_pause_button">
+
+                    <ImageView
+                        android:id="@+id/scan_arrows_icon"
+                        android:layout_width="96dp"
+                        android:layout_height="96dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_scan_arrows" />
+
+                    <ImageButton
+                        android:id="@+id/play_pause_button"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:layout_gravity="center"
+                        android:background="@android:color/transparent"
+                        android:src="@drawable/ic_play_scan"
+                        android:scaleType="center"
+                        android:contentDescription="Start/Pause" />
+                </FrameLayout>
 
                 <ImageButton
                     android:id="@+id/snapshot_button"
@@ -97,6 +115,16 @@
                     android:scaleType="fitCenter"
                     android:padding="24dp"
                     android:contentDescription="Snapshot"
+                    app:tint="#3DDC84" />
+
+                <ImageButton
+                    android:id="@+id/target_detection_button"
+                    android:layout_width="86dp"
+                    android:layout_height="86dp"
+                    android:layout_marginStart="12dp"
+                    android:background="@drawable/rounded_button_with_stroke"
+                    android:src="@drawable/ic_target_bell"
+                    android:padding="22dp"
                     app:tint="#3DDC84" />
 
             </LinearLayout>

@@ -26,6 +26,7 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 import android.widget.ImageButton;
@@ -81,6 +82,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private Toolbar toolbar;
 
     private ImageButton playPauseButton;
+
+    private ImageView scanArrowsIcon;
     private TextView wifiStatusTextView;
     private TextView bluetoothStatusTextView;
     private TextView cellularStatusTextView;
@@ -113,6 +116,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private boolean isSnapshotRunning = false;
     private String folderBeforeSnapshot = null;
     private final Handler snapshotHandler = new Handler();
+    private ImageButton targetDetectionButton;
 
     private Runnable timerRunnable = new Runnable() {
         @Override
@@ -203,7 +207,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         });
 
         playPauseButton = findViewById(R.id.play_pause_button);
+        scanArrowsIcon = findViewById(R.id.scan_arrows_icon);
         snapshotButton = findViewById(R.id.snapshot_button);
+        targetDetectionButton = findViewById(R.id.target_detection_button);
         toolbarFolderTitleTextView = findViewById(R.id.toolbar_folder_title);
         wifiStatusTextView = findViewById(R.id.wifi_status);
         bluetoothStatusTextView = findViewById(R.id.bluetooth_status);
@@ -248,6 +254,16 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             }
         });
 
+        View scanButtonContainer = findViewById(R.id.scan_button_container);
+        scanButtonContainer.setOnClickListener(v -> {
+            if (checkEssentialPermissions()) {
+                toggleScanState();
+                requestOptionalPermissions();
+            } else {
+                showInitialPermissionsExplanation();
+            }
+        });
+
         snapshotButton.setOnClickListener(v -> {
             if (checkEssentialPermissions()) {
                 startSnapshotScan();
@@ -255,6 +271,21 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             } else {
                 showInitialPermissionsExplanation();
             }
+        });
+
+        targetDetectionButton.setOnClickListener(v -> {
+            SharedPreferences prefs = getSharedPreferences("AppSettings", MODE_PRIVATE);
+            boolean enabled = prefs.getBoolean("target_detection_enabled", true);
+
+            prefs.edit()
+                    .putBoolean("target_detection_enabled", !enabled)
+                    .apply();
+
+            Toast.makeText(this,
+                    !enabled ? "Обнаружение TARGET включено" : "Обнаружение TARGET выключено",
+                    Toast.LENGTH_SHORT).show();
+
+            updateTargetDetectionButton();
         });
 
         findViewById(R.id.footer_device).setOnClickListener(v -> openDeviceListActivity());
@@ -489,6 +520,13 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         Toast.makeText(this, "Снапшот завершён", Toast.LENGTH_SHORT).show();
     }
 
+    private void updateTargetDetectionButton() {
+        boolean enabled = getSharedPreferences("AppSettings", MODE_PRIVATE)
+                .getBoolean("target_detection_enabled", true);
+
+        targetDetectionButton.setAlpha(enabled ? 1.0f : 0.45f);
+    }
+
     private void initializeLocationManager() {
         if (locationManager == null) {
             locationManager = LocationManager.getInstance(this);
@@ -599,7 +637,23 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     private void updateScanStatusUI(boolean scanning) {
         int textRes = scanning ? R.string.scanning_status : R.string.stopped_status;
-        playPauseButton.setImageResource(scanning ? R.drawable.ic_pause : R.drawable.ic_starts);
+
+        playPauseButton.setImageResource(scanning
+                ? R.drawable.ic_pause_scan
+                : R.drawable.ic_play_scan);
+
+        if (scanArrowsIcon != null) {
+            if (scanning) {
+                scanArrowsIcon.animate()
+                        .rotationBy(360f)
+                        .setDuration(900)
+                        .withEndAction(() -> updateScanStatusUI(true))
+                        .start();
+            } else {
+                scanArrowsIcon.animate().cancel();
+                scanArrowsIcon.setRotation(0f);
+            }
+        }
 
         wifiStatusTextView.setText(textRes);
         bluetoothStatusTextView.setText(textRes);
