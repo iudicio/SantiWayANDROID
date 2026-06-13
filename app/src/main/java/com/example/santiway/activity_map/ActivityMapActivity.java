@@ -5,6 +5,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -46,6 +47,8 @@ public class ActivityMapActivity extends AppCompatActivity {
     private TextView tvFirstDetected;
     private TextView tvLastDetected;
     private TextView tvDetectionCount;
+    private TextView btnZoomInMap;
+    private TextView btnZoomOutMap;
     private Button btnMakeTarget;
     private Button btnMakeSafe;
 
@@ -68,6 +71,7 @@ public class ActivityMapActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_map_activity);
+        applyNavigationBarColor();
 
         // Инициализация UI
         initViews();
@@ -139,6 +143,8 @@ public class ActivityMapActivity extends AppCompatActivity {
         // Настройка кнопок
         setupButtons();
 
+        setupMapZoomButtons();
+
         // Отображение данных
         displayDeviceInfo();
 
@@ -156,10 +162,27 @@ public class ActivityMapActivity extends AppCompatActivity {
         tvDetectionCount = findViewById(R.id.tv_detection_count);
         btnMakeTarget = findViewById(R.id.btn_make_target);
         btnMakeSafe = findViewById(R.id.btn_make_safe);
+
+        btnZoomInMap = findViewById(R.id.btn_zoom_in_map);
+        btnZoomOutMap = findViewById(R.id.btn_zoom_out_map);
     }
 
     private int dpToPx(int dp) {
         return Math.round(dp * getResources().getDisplayMetrics().density);
+    }
+
+    private void applyNavigationBarColor() {
+        getWindow().setNavigationBarColor(Color.parseColor("#172A46"));
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            int flags = getWindow().getDecorView().getSystemUiVisibility();
+            flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            getWindow().getDecorView().setSystemUiVisibility(flags);
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            getWindow().setNavigationBarContrastEnforced(false);
+        }
     }
 
     private void loadDeviceData() {
@@ -238,6 +261,7 @@ public class ActivityMapActivity extends AppCompatActivity {
     private void setupToolbar() {
         Toolbar toolbar = findViewById(R.id.toolbar_map);
         setSupportActionBar(toolbar);
+        toolbar.getNavigationIcon().setTint(Color.WHITE);
         if (getSupportActionBar() != null) {
             String title = (deviceName != null && !deviceName.isEmpty())
                     ? deviceName
@@ -251,6 +275,24 @@ public class ActivityMapActivity extends AppCompatActivity {
 
     private void setupButtons() {
         updateStatusToggle();
+    }
+
+    private void setupMapZoomButtons() {
+        if (btnZoomInMap != null) {
+            btnZoomInMap.setOnClickListener(v -> {
+                if (mapFragment != null) {
+                    mapFragment.zoomIn();
+                }
+            });
+        }
+
+        if (btnZoomOutMap != null) {
+            btnZoomOutMap.setOnClickListener(v -> {
+                if (mapFragment != null) {
+                    mapFragment.zoomOut();
+                }
+            });
+        }
     }
 
     private void updateStatusToggle() {

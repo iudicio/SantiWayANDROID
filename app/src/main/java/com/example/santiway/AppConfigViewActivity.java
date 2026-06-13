@@ -2,7 +2,14 @@ package com.example.santiway;
 
 import com.example.santiway.host_database.*;
 import com.example.santiway.upload_name_device.UserDeviceSyncManager;
+import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
 
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
@@ -35,6 +42,10 @@ public class AppConfigViewActivity extends ComponentActivity {
     private EditText deviceNameInput;
     private EditText mapPointLimitInput;
     private Switch targetDetectionSwitch;
+    private Switch staticLocationSwitch;
+    private EditText staticLatitudeInput;
+    private EditText staticLongitudeInput;
+    private Button selectStaticLocationBtn;
 
     // Допустимые значения для протокола
     private final String[] allowedProtocols = {"GSM", "GPS"};
@@ -48,6 +59,7 @@ public class AppConfigViewActivity extends ComponentActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_app_config);
+        applyNavigationBarColor();
 
         repository = new AppSettingsRepository(this);
         scannerSpinner = findViewById(R.id.scanner_spinner);
@@ -60,6 +72,21 @@ public class AppConfigViewActivity extends ComponentActivity {
         deviceNameInput = findViewById(R.id.device_scanner);
 
         targetDetectionSwitch = findViewById(R.id.target_detection_switch);
+        staticLocationSwitch = findViewById(R.id.static_location_switch);
+        staticLatitudeInput = findViewById(R.id.static_latitude_input);
+        staticLongitudeInput = findViewById(R.id.static_longitude_input);
+        selectStaticLocationBtn = findViewById(R.id.select_static_location_btn);
+
+        SharedPreferences prefs = getSharedPreferences("AppSettings", MODE_PRIVATE);
+
+        staticLocationSwitch.setChecked(prefs.getBoolean("static_location_enabled", false));
+        staticLatitudeInput.setText(String.valueOf(prefs.getFloat("static_latitude", 0f)));
+        staticLongitudeInput.setText(String.valueOf(prefs.getFloat("static_longitude", 0f)));
+
+        selectStaticLocationBtn.setOnClickListener(v -> {
+            Intent intent = new Intent(this, StaticLocationMapActivity.class);
+            startActivity(intent);
+        });
 
         boolean targetDetectionEnabled = getSharedPreferences("AppSettings", MODE_PRIVATE)
                 .getBoolean("target_detection_enabled", true);
@@ -77,6 +104,16 @@ public class AppConfigViewActivity extends ComponentActivity {
         Toolbar toolbar = findViewById(R.id.toolbar);
         View content = findViewById(R.id.content_container);
 
+        styleAllTextInputs(root);
+
+        toolbar.setNavigationIcon(androidx.appcompat.R.drawable.abc_ic_ab_back_material);
+
+        if (toolbar.getNavigationIcon() != null) {
+            toolbar.getNavigationIcon().setTint(Color.WHITE);
+        }
+
+        toolbar.setNavigationOnClickListener(v -> finish());
+
         ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
 
@@ -91,11 +128,18 @@ public class AppConfigViewActivity extends ComponentActivity {
                     toolbar.getPaddingBottom()
             );
 
+            v.setPadding(
+                    v.getPaddingLeft(),
+                    v.getPaddingTop(),
+                    v.getPaddingRight(),
+                    bars.bottom
+            );
+
             content.setPadding(
                     content.getPaddingLeft(),
                     content.getPaddingTop(),
                     content.getPaddingRight(),
-                    bars.bottom
+                    content.getPaddingBottom()
             );
 
             return insets;
@@ -109,17 +153,75 @@ public class AppConfigViewActivity extends ComponentActivity {
         mapPointLimitInput.setText(String.valueOf(pointLimit));
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        if (staticLatitudeInput != null && staticLongitudeInput != null && staticLocationSwitch != null) {
+            SharedPreferences prefs = getSharedPreferences("AppSettings", MODE_PRIVATE);
+
+            staticLocationSwitch.setChecked(
+                    prefs.getBoolean("static_location_enabled", false)
+            );
+
+            staticLatitudeInput.setText(String.valueOf(
+                    prefs.getFloat("static_latitude", 0f)
+            ));
+
+            staticLongitudeInput.setText(String.valueOf(
+                    prefs.getFloat("static_longitude", 0f)
+            ));
+        }
+    }
+
+    private void applyNavigationBarColor() {
+        getWindow().setNavigationBarColor(Color.parseColor("#172A46"));
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            int flags = getWindow().getDecorView().getSystemUiVisibility();
+            flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            getWindow().getDecorView().setSystemUiVisibility(flags);
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            getWindow().setNavigationBarContrastEnforced(false);
+        }
+    }
+
     private int dpToPx(int dp) {
         return Math.round(dp * getResources().getDisplayMetrics().density);
     }
 
     private void setupSpinners() {
         // Настройка Spinner для протоколов
-        ArrayAdapter<String> protocolAdapter = new ArrayAdapter<>(
+        ArrayAdapter<String> protocolAdapter = new ArrayAdapter<String>(
                 this,
                 android.R.layout.simple_spinner_item,
                 allowedProtocols
-        );
+        ) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                TextView text = view.findViewById(android.R.id.text1);
+                if (text != null) {
+                    text.setTextColor(Color.WHITE);
+                    text.setTextSize(16);
+                }
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                TextView text = view.findViewById(android.R.id.text1);
+                if (text != null) {
+                    text.setTextColor(Color.WHITE);
+                    text.setBackgroundColor(Color.parseColor("#0B1A2C"));
+                }
+                return view;
+            }
+        };
+
         protocolAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         protocolSpinner.setAdapter(protocolAdapter);
 
@@ -233,8 +335,77 @@ public class AppConfigViewActivity extends ComponentActivity {
                 showToast("Настройки сохранены. Название устройства не изменялось.");
             }
 
+            float staticLat = 0f;
+            float staticLon = 0f;
+
+            try {
+                staticLat = Float.parseFloat(staticLatitudeInput.getText().toString().trim());
+                staticLon = Float.parseFloat(staticLongitudeInput.getText().toString().trim());
+            } catch (Exception ignored) {}
+
+            getSharedPreferences("AppSettings", MODE_PRIVATE)
+                    .edit()
+                    .putInt("map_point_limit", mapPointLimit)
+                    .putBoolean("target_detection_enabled", targetDetectionSwitch.isChecked())
+                    .putBoolean("static_location_enabled", staticLocationSwitch.isChecked())
+                    .putFloat("static_latitude", staticLat)
+                    .putFloat("static_longitude", staticLon)
+                    .apply();
+
             showCurrentValues();
         });
+    }
+
+    private void styleAllTextInputs(View view) {
+        int[][] states = new int[][]{
+                new int[]{android.R.attr.state_focused},
+                new int[]{android.R.attr.state_hovered},
+                new int[]{android.R.attr.state_enabled},
+                new int[]{}
+        };
+
+        int[] colors = new int[]{
+                Color.WHITE,
+                Color.WHITE,
+                Color.WHITE,
+                Color.WHITE
+        };
+
+        ColorStateList whiteStateList = new ColorStateList(states, colors);
+
+        if (view instanceof TextInputLayout) {
+            TextInputLayout inputLayout = (TextInputLayout) view;
+
+            inputLayout.setBoxBackgroundMode(TextInputLayout.BOX_BACKGROUND_OUTLINE);
+            inputLayout.setBoxBackgroundColor(Color.parseColor("#172A46"));
+
+            inputLayout.setBoxStrokeColorStateList(whiteStateList);
+            inputLayout.setBoxStrokeColor(Color.WHITE);
+            inputLayout.setBoxStrokeWidth(dpToPx(1));
+            inputLayout.setBoxStrokeWidthFocused(dpToPx(1));
+
+            inputLayout.setHintTextColor(whiteStateList);
+            inputLayout.setDefaultHintTextColor(whiteStateList);
+
+            inputLayout.setStartIconTintList(whiteStateList);
+            inputLayout.setEndIconTintList(whiteStateList);
+        }
+
+        if (view instanceof TextInputEditText) {
+            TextInputEditText editText = (TextInputEditText) view;
+
+            editText.setTextColor(Color.WHITE);
+            editText.setHintTextColor(Color.WHITE);
+            editText.setBackgroundColor(Color.TRANSPARENT);
+        }
+
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+
+            for (int i = 0; i < group.getChildCount(); i++) {
+                styleAllTextInputs(group.getChildAt(i));
+            }
+        }
     }
 
     private void setupScannerSettingsUI() {
@@ -334,7 +505,17 @@ public class AppConfigViewActivity extends ComponentActivity {
     }
 
     private void showToast(String message) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        Toast toast = Toast.makeText(this, message, Toast.LENGTH_SHORT);
+        View view = toast.getView();
+
+        if (view != null) {
+            TextView text = view.findViewById(android.R.id.message);
+            if (text != null) {
+                text.setTextColor(android.graphics.Color.WHITE);
+            }
+        }
+
+        toast.show();
     }
 
     private boolean isAllowedProtocol(String protocol) {

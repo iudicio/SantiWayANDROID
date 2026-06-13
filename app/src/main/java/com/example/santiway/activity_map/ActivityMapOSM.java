@@ -371,4 +371,16 @@ public class ActivityMapOSM extends Fragment {
             myLocationOverlay.disableMyLocation();
         }
     }
+
+    public void zoomIn() {
+        if (mapView != null) {
+            mapView.getController().zoomIn();
+        }
+    }
+
+    public void zoomOut() {
+        if (mapView != null) {
+            mapView.getController().zoomOut();
+        }
+    }
 }
