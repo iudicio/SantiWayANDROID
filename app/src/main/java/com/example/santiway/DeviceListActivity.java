@@ -5,7 +5,9 @@ import com.google.android.material.textfield.TextInputEditText;
 
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
@@ -32,6 +34,8 @@ import com.example.santiway.activity_map.ActivityMapActivity;
 import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.example.santiway.upload_data.UniqueDevicesHelper;
 import com.google.android.material.tabs.TabLayout;
+import com.google.android.material.textfield.TextInputLayout;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -114,6 +118,7 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_device_list);
+        applyNavigationBarColor();
 
         toolbar = findViewById(R.id.toolbar);
         tabLayout = findViewById(R.id.tab_layout);
@@ -124,8 +129,40 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         btnFilterAll = findViewById(R.id.btn_filter_all);
         etSearchDevice = findViewById(R.id.et_search_device);
 
+        TextInputLayout searchInputLayout = findViewById(R.id.search_input_layout);
+
+        int[][] states = new int[][]{
+                new int[]{android.R.attr.state_focused},
+                new int[]{android.R.attr.state_hovered},
+                new int[]{android.R.attr.state_enabled},
+                new int[]{}
+        };
+
+        int[] colors = new int[]{
+                Color.WHITE,
+                Color.WHITE,
+                Color.WHITE,
+                Color.WHITE
+        };
+
+        ColorStateList whiteStateList = new ColorStateList(states, colors);
+
+        searchInputLayout.setBoxStrokeColorStateList(whiteStateList);
+        searchInputLayout.setBoxStrokeColor(Color.WHITE);
+        searchInputLayout.setBoxStrokeWidth(dpToPx(1));
+        searchInputLayout.setBoxStrokeWidthFocused(dpToPx(1));
+        searchInputLayout.setHintTextColor(whiteStateList);
+        searchInputLayout.setDefaultHintTextColor(whiteStateList);
+        searchInputLayout.setBoxCornerRadii(
+                dpToPx(8),
+                dpToPx(8),
+                dpToPx(8),
+                dpToPx(8)
+        );
+
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        toolbar.getNavigationIcon().setTint(Color.WHITE);
         getSupportActionBar().setTitle("Список устройств");
 
         View root = findViewById(R.id.root_device_list);
@@ -340,6 +377,20 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         setupTabLayout();
         setupFilterButtons();
         setupSearch();
+    }
+
+    private void applyNavigationBarColor() {
+        getWindow().setNavigationBarColor(Color.parseColor("#172A46"));
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            int flags = getWindow().getDecorView().getSystemUiVisibility();
+            flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            getWindow().getDecorView().setSystemUiVisibility(flags);
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            getWindow().setNavigationBarContrastEnforced(false);
+        }
     }
 
     private int dpToPx(int dp) {

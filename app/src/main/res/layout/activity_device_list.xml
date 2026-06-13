@@ -99,14 +99,10 @@
         android:hint="Поиск по имени или MAC"
         app:boxBackgroundMode="outline"
         app:boxBackgroundColor="@android:color/transparent"
-        app:boxStrokeColor="#FFFFFF"
+        app:boxStrokeColor="@color/search_box_stroke_white"
         app:boxStrokeWidth="1dp"
         app:boxStrokeWidthFocused="1dp"
-        app:boxCornerRadiusTopStart="8dp"
-        app:boxCornerRadiusTopEnd="8dp"
-        app:boxCornerRadiusBottomStart="8dp"
-        app:boxCornerRadiusBottomEnd="8dp"
-        app:hintTextColor="#FFFFFF"
+        app:hintTextColor="@android:color/white"
         app:startIconDrawable="@drawable/in_search_white"
         app:startIconTint="@android:color/white"
         app:layout_constraintTop_toBottomOf="@id/status_filter_container"
@@ -119,9 +115,10 @@
             android:layout_height="wrap_content"
             android:inputType="text"
             android:maxLines="1"
+            android:singleLine="true"
             android:textColor="@android:color/white"
-            android:textColorHint="#80FFFFFF"
-            android:background="@null" />
+            android:textColorHint="@android:color/white" />
+
     </com.google.android.material.textfield.TextInputLayout>
 
     <androidx.cardview.widget.CardView

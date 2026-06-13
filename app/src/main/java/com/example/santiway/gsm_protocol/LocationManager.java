@@ -2,6 +2,7 @@ package com.example.santiway.gsm_protocol;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Looper;
@@ -69,6 +70,20 @@ public class LocationManager {
     }
 
     public void startLocationUpdates() {
+        SharedPreferences prefs = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE);
+
+        if (prefs.getBoolean("static_location_enabled", false)) {
+            Location staticLocation = new Location("static");
+            staticLocation.setLatitude(prefs.getFloat("static_latitude", 0f));
+            staticLocation.setLongitude(prefs.getFloat("static_longitude", 0f));
+            staticLocation.setAccuracy(1f);
+            staticLocation.setTime(System.currentTimeMillis());
+
+            updateLocation(staticLocation);
+            Log.d(TAG, "Static location enabled");
+            return;
+        }
+
         if (!hasLocationPermission()) {
             Log.w(TAG, "Location permissions not granted");
             if (onLocationUpdateListener != null) {
@@ -116,6 +131,19 @@ public class LocationManager {
 
     // НОВЫЙ МЕТОД: принудительное получение координат (синхронное)
     public Location getFreshLocation() {
+        SharedPreferences prefs = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE);
+
+        if (prefs.getBoolean("static_location_enabled", false)) {
+            Location staticLocation = new Location("static");
+            staticLocation.setLatitude(prefs.getFloat("static_latitude", 0f));
+            staticLocation.setLongitude(prefs.getFloat("static_longitude", 0f));
+            staticLocation.setAccuracy(1f);
+            staticLocation.setTime(System.currentTimeMillis());
+
+            updateLocation(staticLocation);
+            return staticLocation;
+        }
+
         if (!hasLocationPermission()) {
             Log.w(TAG, "Cannot get fresh location: permissions not granted");
             return null;

@@ -103,6 +103,10 @@
             android:name=".activity_map.ActivityMapActivity"
             android:screenOrientation="portrait" />
 
+        <activity
+            android:name=".StaticLocationMapActivity"
+            android:screenOrientation="portrait" />
+
         <!-- FileProvider -->
         <provider
             android:name="androidx.core.content.FileProvider"

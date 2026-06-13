@@ -6,7 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#172A46">
+    android:background="#0B1A2C">
 
     <androidx.appcompat.widget.Toolbar
     android:id="@+id/toolbar"
@@ -15,7 +15,7 @@
     android:background="#0B1A2C"
     app:title="Настройки приложения"
     app:titleTextColor="@android:color/white"
-    app:navigationIcon="@drawable/ic_cloud" />
+    app:navigationIcon="?attr/homeAsUpIndicator" />
 
     <ScrollView
         android:id="@+id/content_container"
@@ -44,7 +44,7 @@
             android:layout_marginTop="8dp"
             android:hint="IPv4 адрес сервера"
             app:boxBackgroundMode="outline"
-            app:boxBackgroundColor="#0B1A2C"
+            app:boxBackgroundColor="#172A46"
             app:boxStrokeWidth="1dp"
             app:boxStrokeWidthFocused="1dp">
 
@@ -57,8 +57,7 @@
                 android:clickable="false"
                 android:longClickable="false"
                 android:textColor="@android:color/white"
-                android:textColorHint="#80FFFFFF"
-                android:background="@null" />
+                android:textColorHint="#FFFFFF" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
@@ -68,7 +67,7 @@
             android:layout_marginTop="16dp"
             android:hint="API Ключ"
             app:boxBackgroundMode="outline"
-            app:boxBackgroundColor="#0B1A2C"
+            app:boxBackgroundColor="#172A46"
             app:boxStrokeWidth="1dp"
             app:boxStrokeWidthFocused="1dp">
 
@@ -81,8 +80,7 @@
                 android:clickable="false"
                 android:longClickable="false"
                 android:textColor="@android:color/white"
-                android:textColorHint="#80FFFFFF"
-                android:background="@null" />
+                android:textColorHint="#FFFFFF" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
@@ -92,7 +90,7 @@
             android:layout_marginTop="16dp"
             android:hint="Название устройства"
             app:boxBackgroundMode="outline"
-            app:boxBackgroundColor="#0B1A2C"
+            app:boxBackgroundColor="#172A46"
             app:boxStrokeWidth="1dp"
             app:boxStrokeWidthFocused="1dp">
 
@@ -102,8 +100,7 @@
                 android:layout_height="wrap_content"
                 android:inputType="text"
                 android:textColor="@android:color/white"
-                android:textColorHint="#80FFFFFF"
-                android:background="@null" />
+                android:textColorHint="#FFFFFF" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
@@ -113,7 +110,7 @@
             android:layout_marginTop="16dp"
             android:hint="Количество точек на карте"
             app:boxBackgroundMode="outline"
-            app:boxBackgroundColor="#0B1A2C"
+            app:boxBackgroundColor="#172A46"
             app:boxStrokeWidth="1dp"
             app:boxStrokeWidthFocused="1dp">
 
@@ -123,8 +120,7 @@
                 android:layout_height="wrap_content"
                 android:inputType="number"
                 android:textColor="@android:color/white"
-                android:textColorHint="#80FFFFFF"
-                android:background="@null" />
+                android:textColorHint="#FFFFFF" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <TextView
@@ -139,7 +135,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:backgroundTint="@android:color/white"
-            android:popupBackground="#0B1A2C"
+            android:popupBackground="#172A46"
             android:layout_marginTop="4dp"/>
 
         <Switch
@@ -150,16 +146,73 @@
             android:text="Обнаружение target устройств"
             android:textColor="@android:color/white"
             android:thumbTint="@android:color/white"
-            android:trackTint="#44FFFFFF" />
+            android:trackTint="#FFFFFF"
+            android:visibility="gone"/>
 
-        <Button
-            android:id="@+id/save_general_btn"
+        <Switch
+            android:id="@+id/static_location_switch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Сохранить общие настройки"
+            android:layout_marginTop="16dp"
+            android:text="Использовать статические координаты"
             android:textColor="@android:color/white"
-            android:backgroundTint="#2C4872"
-            android:layout_marginTop="16dp"/>
+            android:thumbTint="@android:color/white"
+            android:trackTint="#FFFFFF" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/SantiWayTextInputLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:hint="Широта">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/static_latitude_input"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="numberDecimal|numberSigned"
+                android:textColor="@android:color/white"
+                android:textColorHint="@android:color/white" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/SantiWayTextInputLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:hint="Долгота">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/static_longitude_input"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="numberDecimal|numberSigned"
+                android:textColor="@android:color/white"
+                android:textColorHint="@android:color/white"
+                android:background="@null" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/select_static_location_btn"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="12dp"
+            android:text="Выбрать точку на карте"
+            android:textAllCaps="false"
+            android:textColor="@android:color/white"
+            app:backgroundTint="#172A46"
+            app:cornerRadius="16dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/save_general_btn"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="16dp"
+            android:text="Сохранить общие настройки"
+            android:textAllCaps="false"
+            android:textColor="@android:color/white"
+            app:backgroundTint="#172A46"
+            app:cornerRadius="16dp" />
 
         <TextView
             android:layout_width="match_parent"
@@ -169,13 +222,15 @@
             android:textColor="@android:color/white"
             android:textSize="18sp"
             android:layout_marginTop="32dp"
-            android:layout_marginBottom="8dp"/>
+            android:layout_marginBottom="8dp"
+            android:visibility="gone"/>
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Выберите сканер:"
-            android:textColor="@android:color/white"/>
+            android:textColor="@android:color/white"
+            android:visibility="gone"/>
 
         <Spinner
             android:id="@+id/scanner_spinner"
@@ -183,14 +238,16 @@
             android:layout_height="wrap_content"
             android:backgroundTint="@android:color/white"
             android:popupBackground="#0B1A2C"
-            android:layout_marginTop="4dp"/>
+            android:layout_marginTop="4dp"
+            android:visibility="gone"/>
 
         <com.google.android.material.textfield.TextInputLayout
             style="@style/SantiWayTextInputLayout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:hint="Интервал сканирования (сек)">
+            android:hint="Интервал сканирования (сек)"
+            android:visibility="gone">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/interval_input"
@@ -199,7 +256,8 @@
                 android:inputType="numberDecimal"
                 android:textColor="@android:color/white"
                 android:textColorHint="@android:color/white"
-                android:background="@null" />
+                android:background="@null"
+                android:visibility="gone"/>
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.textfield.TextInputLayout
@@ -207,7 +265,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:hint="Сила сигнала обнаружения">
+            android:hint="Сила сигнала обнаружения"
+            android:visibility="gone">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/signal_strength_input"
@@ -216,7 +275,8 @@
                 android:inputType="numberDecimal|numberSigned"
                 android:textColor="@android:color/white"
                 android:textColorHint="@android:color/white"
-                android:background="@null" />
+                android:background="@null"
+                android:visibility="gone"/>
         </com.google.android.material.textfield.TextInputLayout>
 
         <Switch
@@ -226,8 +286,9 @@
             android:text="Включен"
             android:textColor="@android:color/white"
             android:thumbTint="@android:color/white"
-            android:trackTint="#44FFFFFF"
-            android:layout_marginTop="16dp"/>
+            android:trackTint="#FFFFFF"
+            android:layout_marginTop="16dp"
+            android:visibility="gone"/>
 
         <Button
             android:id="@+id/save_scanner_btn"
@@ -236,7 +297,8 @@
             android:text="Сохранить настройки сканера"
             android:textColor="@android:color/white"
             android:backgroundTint="#2C4872"
-            android:layout_marginTop="16dp"/>
+            android:layout_marginTop="16dp"
+            android:visibility="gone"/>
 
 <!--        <TextView-->
 <!--            android:id="@+id/result_text"-->

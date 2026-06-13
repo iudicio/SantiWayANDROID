@@ -80,7 +80,42 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-<!--    &lt;!&ndash; Правая колонка круглых кнопок &ndash;&gt;-->
+    <LinearLayout
+        android:id="@+id/custom_zoom_container_map"
+        android:layout_width="48dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginEnd="16dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <TextView
+            android:id="@+id/btn_zoom_in_map"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_map_zoom_button"
+            android:gravity="center"
+            android:text="+"
+            android:textColor="@android:color/white"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btn_zoom_out_map"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_map_zoom_button"
+            android:gravity="center"
+            android:text="−"
+            android:textColor="@android:color/white"
+            android:textSize="30sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+<!--     Правая колонка круглых кнопок -->
 <!--    <LinearLayout-->
 <!--        android:id="@+id/right_map_controls"-->
 <!--        android:layout_width="wrap_content"-->
