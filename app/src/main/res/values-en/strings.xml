@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_config_title">Application Settings</string>
+    <string name="general_settings_title">General Settings</string>
+    <string name="server_ipv4_hint">Server IPv4 address</string>
+    <string name="device_name_hint">Device name</string>
+    <string name="api_key_hint">API Key</string>
+    <string name="map_points_count_hint">Number of points on the map</string>
+    <string name="geolocation_protocol_label">Geolocation protocol:</string>
+    <string name="target_detection_label">Detect target devices</string>
+    <string name="use_static_coordinates">Use static coordinates</string>
+    <string name="latitude_hint">Latitude</string>
+    <string name="longitude_hint">Longitude</string>
+    <string name="select_point_on_map">Select point on map</string>
+    <string name="save_general_settings">Save general settings</string>
+    <string name="scanner_settings_title">Scanner Settings</string>
+    <string name="select_scanner_label">Select scanner:</string>
+    <string name="scan_interval_hint">Scan interval (sec)</string>
+    <string name="signal_strength_hint">Detection signal strength</string>
+    <string name="enabled_label">Enabled</string>
+    <string name="save_scanner_settings">Save scanner settings</string>
+
+    <string name="status_target">TARGET</string>
+    <string name="status_all">ALL</string>
+    <string name="status_safe">SAFE</string>
+    <string name="search_by_name_or_mac_hint">Search by name or MAC</string>
+
+    <string name="default_folder_unified_data">Main</string>
+    <string name="timer_zero">00:00:00</string>
+    <string name="content_desc_start_pause">Start/Pause</string>
+    <string name="content_desc_snapshot">Snapshot</string>
+    <string name="content_desc_wifi_icon">Wi-Fi Icon</string>
+    <string name="content_desc_bluetooth_icon">Bluetooth Icon</string>
+    <string name="content_desc_cellular_icon">Cellular Icon</string>
+    <string name="last_sent_label">Last sent</string>
+    <string name="datetime_placeholder">--:--:-- --.--.----</string>
+
+    <string name="status_target_en">Target</string>
+    <string name="status_safe_en">Safe</string>
+    <string name="zoom_in">+</string>
+    <string name="zoom_out">−</string>
+    <string name="content_desc_center_map">Center map</string>
+    <string name="content_desc_filter">Filter</string>
+    <string name="content_desc_refresh">Refresh</string>
+    <string name="device_label">Device</string>
+    <string name="device_operator_placeholder">MTS RUS [31]</string>
+    <string name="mac_address_label">MAC address:</string>
+    <string name="mac_address_placeholder">C2:18:03:00:3D:7E</string>
+    <string name="type_label">Type:</string>
+    <string name="type_cell_placeholder">Cell</string>
+    <string name="cid_label">CID:</string>
+    <string name="cid_placeholder">18168328 (LTE)</string>
+    <string name="first_detection_label">First detection:</string>
+    <string name="first_detection_placeholder">01.04.2026 13:47:25</string>
+    <string name="last_detection_label">Last detection:</string>
+    <string name="last_detection_placeholder">01.04.2026 13:48:54</string>
+    <string name="detections_label">Detections:</string>
+    <string name="count_placeholder">20</string>
+
+    <string name="notification_details_title">Notification details</string>
+    <string name="notification_title_preview">Unauthorized MAC detected</string>
+    <string name="notification_datetime_preview">Date and time: 2025-12-13 09:19:18</string>
+    <string name="notification_body_preview">An unknown Bluetooth address marked as ALARM was detected in the area. Verification is required.</string>
+    <string name="attached_files_label">Attached files:</string>
+
+    <string name="notifications_title">Notifications</string>
+    <string name="no_notifications">No notifications</string>
+    <string name="clear_all">Clear all</string>
+
+    <string name="content_desc_selected_point">Selected point</string>
+    <string name="select_this_point">Select this point</string>
+
+    <string name="select_folder_title">Select folder</string>
+    <string name="select_folder_for_scan_title">Select folder for scanning</string>
+
+    <string name="content_desc_rename_icon">Rename Icon</string>
+    <string name="rename_action">Rename</string>
+    <string name="content_desc_clear_icon">Clear Icon</string>
+    <string name="clear_action">Clear</string>
+    <string name="grey_action">Grey</string>
+    <string name="content_desc_alarm_icon">Alarm Icon</string>
+    <string name="content_desc_safe_icon">Safe Icon</string>
+
+    <string name="create_new_folder_title">Create new folder</string>
+    <string name="enter_folder_name_hint">Enter folder name</string>
+
+    <string name="content_desc_notifications_icon">Notifications Icon</string>
+    <string name="content_desc_settings_icon">Settings Icon</string>
+    <string name="settings_title">Settings</string>
+    <string name="devices_title">Devices</string>
+    <string name="create_action">Create</string>
+    <string name="delete_action">Delete</string>
+
+    <string name="network_scanner_title">Network Scanner</string>
+    <string name="mac_sample_placeholder">00:11:22:33:44:55</string>
+    <string name="type_placeholder">Type</string>
+    <string name="time_placeholder">Time</string>
+    <string name="content_desc_share_json">Share JSON</string>
+    <string name="info_action">Info</string>
+
+    <string name="content_desc_delete_icon">Delete icon</string>
+    <string name="folder_name_placeholder">Folder name</string>
+    <string name="content_desc_select">Select</string>
+    <string name="folder_name_placeholder2">Folder name</string>
+
+    <string name="notification_title_placeholder">Notification title</string>
+    <string name="notification_date_placeholder">2025-12-13 09:19:18</string>
+    <string name="content_desc_delete_notification">Delete notification</string>
+    <string name="startScan">Start scanning</string>
+    <string name="stopScan">Stop scanning</string>
+    <string name="database">Go to database</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="app_name">Network Scanner</string>
+    <string name="time_label_initial">Working time: 00:00:00</string>
+    <string name="bluetooth_text">Bluetooth</string>
+    <string name="wifi_text">Wi-Fi</string>
+    <string name="cellular_text">Cellular</string>
+    <string name="scanning_status">Scanning…</string>
+    <string name="stopped_status">Stopped</string>
+    <string name="coordinates_text">Valid coordinates: 51.5074, -0.1278</string>
+    <string name="button_start">START</string>
+    <string name="button_stop">STOP</string>
+
+    <string name="nav_create_folder">Clear folder</string>
+    <string name="nav_delete">Delete</string>
+    <string name="nav_make_safe">Make safe</string>
+    <string name="nav_clear_status">Clear status</string>
+    <string name="nav_clear_triggers">Clear triggers</string>
+
+    <string name="logo_description">Application logo</string>
+    <string name="toolbar_title">Network Scanner</string>
+    <string name="nav_open">Open navigation drawer</string>
+    <string name="nav_close">Close navigation drawer</string>
+    <string name="status_standby">Standby</string>
+    <string name="status_scanning">Scanning</string>
+    <string name="status_connected">Connected</string>
+    <string name="wifi_status_label">Wi-Fi Status:</string>
+    <string name="cellular_status_label">Cellular Status:</string>
+    <string name="coordinates_label">Coordinates:</string>
+    <string name="user_name_placeholder">User name</string>
+    <string name="device_list_title">Device list</string>
+
+    <string name="title_wifi_status">Wi-Fi Status</string>
+    <string name="title_cellular_status">Cellular Status</string>
+    <string name="title_bluetooth_status">Bluetooth Status</string>
+    <string name="title_coordinates">Coordinates</string>
+    <string name="status_off">Offline</string>
+
+    <string name="folder_name_hint">Enter folder name</string>
+
+    <string name="nav_open_folder">Open folder</string>
+    <string name="nav_delete_folder">Delete folder</string>
+
+    <string name="create_folder_dialog_title">Create new folder</string>
+    <string name="delete_folder_dialog_title">Delete folder</string>
+    <string name="folder_name_empty_toast">Folder name cannot be empty.</string>
+    <string name="folder_created_toast">Folder \'%1$s\' created.</string>
+    <string name="folder_exists_toast">A folder with this name already exists.</string>
+    <string name="no_folders_to_delete_toast">No folders to delete.</string>
+    <string name="folder_deleted_toast">Folder \'%1$s\' deleted.</string>
+    <string name="dialog_create">Create</string>
+    <string name="dialog_cancel">Cancel</string>
+    <string name="dialog_delete">Delete</string>
+
+    <string name="device_unknown">Unknown</string>
+    <string name="device_list_screen_name">Device list</string>
+
+    <string name="permission_not_granted_message">Not all permissions were granted.</string>
+    <string name="all_permissions_granted_message">All permissions were granted.</string>
+
+    <string name="language_label">Application language:</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_english">English</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">中文</string>
+    <string name="spinner_arrow">▼</string>
+
+    <string name="toast_scanner_settings_saved">Scanner settings "%1$s" saved!</string>
+    <string name="error_api_key_not_configured">API key is not configured in the app</string>
+    <string name="toast_device_name_saved">Device name saved and sent to the server!</string>
+    <string name="toast_settings_saved_device_name_not_changed">Settings saved. Device name was not changed.</string>
+
+    <string name="dialog_clear_title">Clear</string>
+    <string name="dialog_clear_folder_message">Delete all records from %1$s?</string>
+    <string name="dialog_delete_upper">DELETE</string>
+    <string name="dialog_cancel_upper">CANCEL</string>
+    <string name="toast_folder_data_deleted">Data in %1$s deleted</string>
+    <string name="dialog_rename_title">Rename</string>
+    <string name="dialog_save_upper">SAVE</string>
+    <string name="error_name_empty">Name cannot be empty</string>
+    <string name="error_folder_already_exists">A folder with this name already exists!</string>
+    <string name="toast_name_already_taken">Name is already taken</string>
+    <string name="toast_done">Done!</string>
+    <string name="error_table_name_missing">Error: table name is missing</string>
+    <string name="error_device_identifier_missing">Failed to get device identifier</string>
+    <string name="error_no_device_location_data">No device location data</string>
+    <string name="error_no_export_data">No data to export</string>
+    <string name="share_json_title">Send JSON</string>
+    <string name="error_with_message">Error: %1$s</string>
+    <string name="main_folder_name">Main</string>
+    <string name="error_no_selected_tab">No tab selected</string>
+    <string name="toast_devices_status_updated">%1$d devices are now %2$s</string>
+
+    <string name="working_time_format">Working time: %1$s</string>
+    <string name="toast_some_permissions_denied">Some permissions were not granted</string>
+    <string name="toast_snapshot_blocks_scan">Normal scanning cannot be started during a snapshot</string>
+    <string name="toast_target_detection_enabled">TARGET detection enabled</string>
+    <string name="toast_target_detection_disabled">TARGET detection disabled</string>
+    <string name="toast_update_installed">App update installed successfully</string>
+    <string name="error_folder_name_unavailable">Folder name is unavailable</string>
+    <string name="toast_folder_created">Folder created: %1$s</string>
+    <string name="toast_scan_folder_switched">Scan folder switched to: %1$s</string>
+    <string name="toast_snapshot_already_running">Snapshot is already running</string>
+    <string name="toast_snapshot_started">Snapshot started for 1 minute</string>
+    <string name="toast_snapshot_finished">Snapshot finished</string>
+    <string name="coordinates_unavailable">Coordinates unavailable</string>
+    <string name="toast_scan_started">Scanning started: %1$s</string>
+    <string name="toast_scan_stopped">Scanning stopped</string>
+    <string name="dialog_permissions_missing_title">Insufficient permissions</string>
+    <string name="dialog_permissions_missing_message">All requested permissions are required for the app to work correctly. Without them, scanning and location detection will not be possible.</string>
+    <string name="dialog_request_again">Request again</string>
+    <string name="dialog_limited_functionality_title">Warning: limited functionality</string>
+    <string name="limited_functionality_intro">Enable the following features for the app to work correctly:\n\n</string>
+    <string name="limited_functionality_network">• Mobile internet or Wi-Fi (for sending data)\n</string>
+    <string name="limited_functionality_location">• Geolocation (GPS and network-based location)\n</string>
+    <string name="limited_functionality_wifi">• Wi-Fi (for scanning Wi-Fi networks)\n</string>
+    <string name="limited_functionality_bluetooth">• Bluetooth (for scanning Bluetooth devices)\n</string>
+    <string name="limited_functionality_outro">\nWithout these features, data may be collected incompletely or incorrectly.</string>
+    <string name="dialog_open_settings">Go to settings</string>
+    <string name="dialog_continue">Continue</string>
+    <string name="error_cannot_open_settings">Unable to open settings</string>
+    <string name="dialog_required_permissions_title">Required permissions</string>
+    <string name="dialog_required_permissions_message">To scan Wi-Fi and Bluetooth devices, the app needs:\n\n• Location access (for device detection)\n• Bluetooth scan permission (Android 12+)\n\nThese permissions are required for the main app functionality.</string>
+    <string name="dialog_request">Request</string>
+    <string name="dialog_later">Later</string>
+    <string name="dialog_notifications_title">Notifications</string>
+    <string name="dialog_notifications_permission_message">Allow notifications to receive scanning information?</string>
+    <string name="dialog_allow">Allow</string>
+    <string name="toast_devices_in_folder_marked">%1$d devices in "%2$s" marked as %3$s.</string>
+    <string name="error_current_scan_folder_unknown">Current scan folder is not defined.</string>
+    <string name="toast_folder_selected">Selected folder: %1$s</string>
+    <string name="toast_no_folders_to_delete">No folders to delete except "%1$s"</string>
+    <string name="toast_folder_deleted">Folder deleted: %1$s</string>
+    <string name="error_folder_delete">Error deleting folder</string>
+    <string name="toast_apk_received">APK received: %1$s</string>
+    <string name="toast_websocket_connected">WebSocket connected</string>
+    <string name="toast_websocket_disconnected">WebSocket disconnected</string>
+    <string name="toast_folder_short">Folder: %1$s</string>
+    <string name="select_folder_for_delete_title">Select folder to delete</string>
+    <string name="dialog_confirm_delete_title">Confirm deletion</string>
+    <string name="dialog_confirm_delete_folder_message">Are you sure you want to delete the folder «%1$s»? All data will be lost!</string>
+    <string name="error_location_permission_denied">Location permission denied</string>
+    <string name="error_location_error">Location error: %1$s</string>
+
+    <string name="time_label_short">Time:</string>
+    <string name="map_point_title">Point %1$d</string>
+    <string name="map_record_number">Record №%1$d</string>
+    <string name="map_last_location_title">%1$s (last location)</string>
+
+    <string name="error_loading_data">Error loading data</string>
+    <string name="datetime_format_label">Date and time: %1$s</string>
+    <string name="install_apk">Install APK</string>
+    <string name="unknown_file_type_message">File: %1$s (%2$d bytes). The type is not recognized for direct display. If this text is visible, the MIME type does not match "image/*" or "application/vnd.android.package-archive".</string>
+    <string name="error_installing_apk">Error installing APK: %1$s</string>
+
+    <string name="toast_all_notifications_cleared">All notifications cleared</string>
+    <string name="error_opening_map">Error opening map</string>
+    <string name="toast_deleted">Deleted</string>
+
+    <string name="device_map_title">Device map</string>
+    <string name="toast_device_marked_target">Device marked as TARGET</string>
+    <string name="toast_device_marked_safe">Device marked as SAFE</string>
+    <string name="toast_device_marked_grey">Device marked as GREY</string>
+    <string name="error_status_update">Error updating status</string>
+    <string name="unknown_value">Unknown</string>
+
+    <string name="toast_coordinate_selected">Coordinate selected</string>
+
+    <string name="default_api_key"></string>
+    <string name="domen_server">https://device-analysis.ru</string>
+</resources>

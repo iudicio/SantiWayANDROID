@@ -1,4 +1,110 @@
 <resources>
+    <string name="app_config_title">Настройки приложения</string>
+    <string name="general_settings_title">Общие настройки</string>
+    <string name="server_ipv4_hint">IPv4 адрес сервера</string>
+    <string name="device_name_hint">Название устройства</string>
+    <string name="api_key_hint">API Ключ</string>
+    <string name="map_points_count_hint">Количество точек на карте</string>
+    <string name="geolocation_protocol_label">Протокол геолокации:</string>
+    <string name="target_detection_label">Обнаружение target устройств</string>
+    <string name="use_static_coordinates">Использовать статические координаты</string>
+    <string name="latitude_hint">Широта</string>
+    <string name="longitude_hint">Долгота</string>
+    <string name="select_point_on_map">Выбрать точку на карте</string>
+    <string name="save_general_settings">Сохранить общие настройки</string>
+    <string name="scanner_settings_title">Настройки сканера</string>
+    <string name="select_scanner_label">Выберите сканер:</string>
+    <string name="scan_interval_hint">Интервал сканирования (сек)</string>
+    <string name="signal_strength_hint">Сила сигнала обнаружения</string>
+    <string name="enabled_label">Включен</string>
+    <string name="save_scanner_settings">Сохранить настройки сканера</string>
+
+    <string name="status_target">TARGET</string>
+    <string name="status_all">ВСЕ</string>
+    <string name="status_safe">SAFE</string>
+    <string name="search_by_name_or_mac_hint">Поиск по имени или MAC</string>
+
+    <string name="default_folder_unified_data">Основная</string>
+    <string name="timer_zero">00:00:00</string>
+    <string name="content_desc_start_pause">Start/Pause</string>
+    <string name="content_desc_snapshot">Snapshot</string>
+    <string name="content_desc_wifi_icon">Wi-Fi Icon</string>
+    <string name="content_desc_bluetooth_icon">Bluetooth Icon</string>
+    <string name="content_desc_cellular_icon">Cellular Icon</string>
+    <string name="last_sent_label">Последняя отправка</string>
+    <string name="datetime_placeholder">--:--:-- --.--.----</string>
+
+    <string name="status_target_en">Target</string>
+    <string name="status_safe_en">Safe</string>
+    <string name="zoom_in">+</string>
+    <string name="zoom_out">−</string>
+    <string name="content_desc_center_map">Center map</string>
+    <string name="content_desc_filter">Filter</string>
+    <string name="content_desc_refresh">Refresh</string>
+    <string name="device_label">Устройство</string>
+    <string name="device_operator_placeholder">MTS RUS [31]</string>
+    <string name="mac_address_label">MAC адрес:</string>
+    <string name="mac_address_placeholder">C2:18:03:00:3D:7E</string>
+    <string name="type_label">Тип:</string>
+    <string name="type_cell_placeholder">Cell</string>
+    <string name="cid_label">CID:</string>
+    <string name="cid_placeholder">18168328 (LTE)</string>
+    <string name="first_detection_label">Первое обнаружение:</string>
+    <string name="first_detection_placeholder">01.04.2026 13:47:25</string>
+    <string name="last_detection_label">Последнее обнаружение:</string>
+    <string name="last_detection_placeholder">01.04.2026 13:48:54</string>
+    <string name="detections_label">Обнаружения:</string>
+    <string name="count_placeholder">20</string>
+
+    <string name="notification_details_title">Детали уведомления</string>
+    <string name="notification_title_preview">Обнаружен неавторизованный MAC</string>
+    <string name="notification_datetime_preview">Дата и время: 2025-12-13 09:19:18</string>
+    <string name="notification_body_preview">В области обнаружен неизвестный Bluetooth-адрес, помеченный как ALARM. Требуется проверка.</string>
+    <string name="attached_files_label">Прикрепленные файлы:</string>
+
+    <string name="notifications_title">Уведомления</string>
+    <string name="no_notifications">Нет уведомлений</string>
+    <string name="clear_all">Очистить все</string>
+
+    <string name="content_desc_selected_point">Выбранная точка</string>
+    <string name="select_this_point">Выбрать эту точку</string>
+
+    <string name="select_folder_title">Выберите папку</string>
+    <string name="select_folder_for_scan_title">Выберите папку для сканирования</string>
+
+    <string name="content_desc_rename_icon">Rename Icon</string>
+    <string name="rename_action">Переименовать</string>
+    <string name="content_desc_clear_icon">Clear Icon</string>
+    <string name="clear_action">Очистить</string>
+    <string name="grey_action">Grey</string>
+    <string name="content_desc_alarm_icon">Alarm Icon</string>
+    <string name="content_desc_safe_icon">Safe Icon</string>
+
+    <string name="create_new_folder_title">Создать новую папку</string>
+    <string name="enter_folder_name_hint">Введите название папки</string>
+
+    <string name="content_desc_notifications_icon">Notifications Icon</string>
+    <string name="content_desc_settings_icon">Settings Icon</string>
+    <string name="settings_title">Настройки</string>
+    <string name="devices_title">Устройства</string>
+    <string name="create_action">Создать</string>
+    <string name="delete_action">Удалить</string>
+
+    <string name="network_scanner_title">Сетевой сканнер</string>
+    <string name="mac_sample_placeholder">00:11:22:33:44:55</string>
+    <string name="type_placeholder">Тип</string>
+    <string name="time_placeholder">Time</string>
+    <string name="content_desc_share_json">Share JSON</string>
+    <string name="info_action">Info</string>
+
+    <string name="content_desc_delete_icon">Удалить иконку</string>
+    <string name="folder_name_placeholder">Имя папки</string>
+    <string name="content_desc_select">Select</string>
+    <string name="folder_name_placeholder2">Название папки</string>
+
+    <string name="notification_title_placeholder">Заголовок уведомления</string>
+    <string name="notification_date_placeholder">2025-12-13 09:19:18</string>
+    <string name="content_desc_delete_notification">Удалить уведомление</string>
     <string name="startScan">Начать сканирование</string>
     <string name="stopScan">Остановить сканирование</string>
     <string name="database">Перейти в базу данных</string>
@@ -63,6 +169,126 @@
 
     <string name="permission_not_granted_message">Не все разрешения были приняты.</string>
     <string name="all_permissions_granted_message">Все разрешения приняты.</string>
+
+    <string name="language_label">Язык приложения:</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_english">English</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">中文</string>
+    <string name="spinner_arrow">▼</string>
+
+    <string name="error_api_key_not_configured">API ключ не настроен в приложении</string>
+    <string name="error_select_gsm_or_gps">Ошибка: выберите GSM или GPS</string>
+    <string name="default_device_name">Telephone</string>
+    <string name="toast_device_name_saved">Название устройства сохранено и отправлено на сервер!</string>
+    <string name="toast_settings_saved_device_name_not_changed">Настройки сохранены. Название устройства не изменялось.</string>
+    <string name="error_enter_correct_interval">Ошибка: введите корректный интервал</string>
+    <string name="error_signal_strength_range">Ошибка: сила сигнала должна быть в диапазоне от -120 до 0 дБм</string>
+    <string name="error_saving_settings">Ошибка при сохранении настроек</string>
+
+    <!-- Java UI messages: AppConfigViewActivity -->
+    <string name="toast_scanner_settings_saved">Настройки сканера "%1$s" сохранены!</string>
+
+    <!-- Java UI messages: DeviceListActivity -->
+    <string name="dialog_clear_title">Очистка</string>
+    <string name="dialog_clear_folder_message">Удалить все записи из %1$s?</string>
+    <string name="dialog_delete_upper">УДАЛИТЬ</string>
+    <string name="dialog_cancel_upper">ОТМЕНА</string>
+    <string name="toast_folder_data_deleted">Данные в %1$s удалены</string>
+    <string name="dialog_rename_title">Переименовать</string>
+    <string name="dialog_save_upper">СОХРАНИТЬ</string>
+    <string name="error_name_empty">Имя не может быть пустым</string>
+    <string name="error_folder_already_exists">Папка с таким именем уже есть!</string>
+    <string name="toast_name_already_taken">Название уже занято</string>
+    <string name="toast_done">Готово!</string>
+    <string name="error_table_name_missing">Ошибка: имя таблицы не указано</string>
+    <string name="error_device_identifier_missing">Не удалось получить идентификатор устройства</string>
+    <string name="error_no_device_location_data">Нет данных о местоположении устройства</string>
+    <string name="error_no_export_data">Нет данных для экспорта</string>
+    <string name="share_json_title">Отправить JSON</string>
+    <string name="error_with_message">Ошибка: %1$s</string>
+    <string name="main_folder_name">Основная</string>
+    <string name="error_no_selected_tab">Вкладка не выбрана</string>
+    <string name="toast_devices_status_updated">%1$d устройств теперь %2$s</string>
+
+    <!-- Java UI messages: MainActivity -->
+    <string name="working_time_format">Время работы: %1$s</string>
+    <string name="toast_some_permissions_denied">Некоторые разрешения не предоставлены</string>
+    <string name="toast_snapshot_blocks_scan">Во время снапшота нельзя запускать обычное сканирование</string>
+    <string name="toast_target_detection_enabled">Обнаружение TARGET включено</string>
+    <string name="toast_target_detection_disabled">Обнаружение TARGET выключено</string>
+    <string name="toast_update_installed">Обновление приложения успешно установлено</string>
+    <string name="error_folder_name_unavailable">Имя папки недоступно</string>
+    <string name="toast_folder_created">Создана папка: %1$s</string>
+    <string name="toast_scan_folder_switched">Папка сканирования переключена на: %1$s</string>
+    <string name="toast_snapshot_already_running">Снапшот уже выполняется</string>
+    <string name="toast_snapshot_started">Снапшот запущен на 1 минуту</string>
+    <string name="toast_snapshot_finished">Снапшот завершён</string>
+    <string name="coordinates_unavailable">Координаты недоступны</string>
+    <string name="toast_scan_started">Сканирование запущено: %1$s</string>
+    <string name="toast_scan_stopped">Сканирование остановлено</string>
+    <string name="dialog_permissions_missing_title">Недостаточно разрешений</string>
+    <string name="dialog_permissions_missing_message">Для корректной работы приложения необходимы все запрошенные разрешения. Без них сканирование и определение местоположения будут невозможны.</string>
+    <string name="dialog_request_again">Повторно запросить</string>
+    <string name="dialog_limited_functionality_title">Внимание: ограниченная функциональность</string>
+    <string name="limited_functionality_intro">Включите следующие функции для корректной работы приложения:\n\n</string>
+    <string name="limited_functionality_network">• Мобильный интернет или Wi-Fi (для отправки данных)\n</string>
+    <string name="limited_functionality_location">• Геолокация (GPS и сетевое определение местоположения)\n</string>
+    <string name="limited_functionality_wifi">• Wi-Fi (для сканирования Wi-Fi сетей)\n</string>
+    <string name="limited_functionality_bluetooth">• Bluetooth (для сканирования Bluetooth устройств)\n</string>
+    <string name="limited_functionality_outro">\nБез этих функций данные могут собираться неполно или некорректно.</string>
+    <string name="dialog_open_settings">Перейти к настройкам</string>
+    <string name="dialog_continue">Продолжить</string>
+    <string name="error_cannot_open_settings">Не удается открыть настройки</string>
+    <string name="dialog_required_permissions_title">Необходимые разрешения</string>
+    <string name="dialog_required_permissions_message">Для сканирования Wi-Fi и Bluetooth устройств приложению нужны:\n\n• Доступ к местоположению (для обнаружения устройств)\n• Разрешение на сканирование Bluetooth (Android 12+)\n\nЭти разрешения необходимы для основной работы приложения.</string>
+    <string name="dialog_request">Запросить</string>
+    <string name="dialog_later">Позже</string>
+    <string name="dialog_notifications_title">Уведомления</string>
+    <string name="dialog_notifications_permission_message">Разрешить уведомления для получения информации о сканировании?</string>
+    <string name="dialog_allow">Разрешить</string>
+    <string name="toast_devices_in_folder_marked">%1$d устройств в "%2$s" помечены как %3$s.</string>
+    <string name="error_current_scan_folder_unknown">Текущая папка для сканирования не определена.</string>
+    <string name="toast_folder_selected">Выбрана папка: %1$s</string>
+    <string name="toast_no_folders_to_delete">Нет папок для удаления (кроме "%1$s")</string>
+    <string name="toast_folder_deleted">Папка удалена: %1$s</string>
+    <string name="error_folder_delete">Ошибка при удалении папки</string>
+    <string name="toast_apk_received">APK получен: %1$s</string>
+    <string name="toast_websocket_connected">WebSocket подключен</string>
+    <string name="toast_websocket_disconnected">WebSocket отключен</string>
+    <string name="toast_folder_short">Папка: %1$s</string>
+    <string name="select_folder_for_delete_title">Выберите папку для удаления</string>
+    <string name="dialog_confirm_delete_title">Подтверждение удаления</string>
+    <string name="dialog_confirm_delete_folder_message">Вы уверены, что хотите удалить папку «%1$s»? Все данные будут потеряны!</string>
+    <string name="error_location_permission_denied">Разрешение на геолокацию отклонено</string>
+    <string name="error_location_error">Ошибка геолокации: %1$s</string>
+
+    <!-- Java UI messages: NotificationDetailActivity -->
+    <string name="error_loading_data">Ошибка загрузки данных</string>
+    <string name="datetime_format_label">Дата и время: %1$s</string>
+    <string name="install_apk">Установить APK</string>
+    <string name="unknown_file_type_message">Файл: %1$s (%2$d байт). Тип не распознан для прямого отображения. Если этот текст виден, MIME-тип не соответствует "image/*" или "application/vnd.android.package-archive".</string>
+    <string name="error_installing_apk">Ошибка при установке APK: %1$s</string>
+
+    <!-- Java UI messages: NotificationsActivity -->
+    <string name="toast_all_notifications_cleared">Все уведомления очищены</string>
+    <string name="error_opening_map">Ошибка при открытии карты</string>
+    <string name="toast_deleted">Удалено</string>
+
+    <!-- Java UI messages: ActivityMapActivity -->
+    <string name="device_map_title">Карта устройства</string>
+    <string name="toast_device_marked_target">Устройство помечено как TARGET</string>
+    <string name="toast_device_marked_safe">Устройство помечено как SAFE</string>
+    <string name="toast_device_marked_grey">Устройство помечено как GREY</string>
+    <string name="error_status_update">Ошибка обновления статуса</string>
+    <string name="unknown_value">Неизвестно</string>
+    <string name="time_label_short">Время:</string>
+    <string name="map_point_title">Точка %1$d</string>
+    <string name="map_record_number">Запись №%1$d</string>
+    <string name="map_last_location_title">%1$s (последнее местоположение)</string>
+
+    <!-- Java UI messages: StaticLocationMapActivity -->
+    <string name="toast_coordinate_selected">Координата выбрана</string>
 
     <string name="default_api_key"></string>
     <string name="domen_server">https://device-analysis.ru</string>

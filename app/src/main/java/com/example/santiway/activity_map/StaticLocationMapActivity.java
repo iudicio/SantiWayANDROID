@@ -1,24 +1,30 @@
 package com.example.santiway;
 
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+import com.example.santiway.BaseLocalizedActivity;
 
-import androidx.appcompat.app.AppCompatActivity;
 
 import org.osmdroid.config.Configuration;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.CustomZoomButtonsController;
 import org.osmdroid.views.MapView;
 
-public class StaticLocationMapActivity extends AppCompatActivity {
+public class StaticLocationMapActivity extends BaseLocalizedActivity {
 
     private MapView mapView;
     private Button selectButton;
     private TextView zoomInButton;
     private TextView zoomOutButton;
+
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase));
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,7 +77,7 @@ public class StaticLocationMapActivity extends AppCompatActivity {
                 .putFloat("static_longitude", (float) point.getLongitude())
                 .apply();
 
-        Toast.makeText(this, "Координата выбрана", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, getString(R.string.toast_coordinate_selected), Toast.LENGTH_SHORT).show();
 
         finish();
     }

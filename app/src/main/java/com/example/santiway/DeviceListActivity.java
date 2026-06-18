@@ -21,7 +21,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.graphics.Insets;
@@ -49,7 +48,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
-public class DeviceListActivity extends AppCompatActivity implements DeviceListAdapter.OnDeviceClickListener, StatusUpdateListener {
+public class DeviceListActivity extends BaseLocalizedActivity implements DeviceListAdapter.OnDeviceClickListener, StatusUpdateListener {
 
     private Toolbar toolbar;
     private TabLayout tabLayout;
@@ -78,6 +77,11 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
 
     // Хендлер для задержки
     private Handler handler = new Handler();
+
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase));
+    }
     private final BroadcastReceiver devicesChangedReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -163,7 +167,7 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
         setSupportActionBar(toolbar);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         toolbar.getNavigationIcon().setTint(Color.WHITE);
-        getSupportActionBar().setTitle("Список устройств");
+        getSupportActionBar().setTitle(getString(R.string.device_list_title));
 
         View root = findViewById(R.id.root_device_list);
         View bottomActionsCard = findViewById(R.id.bottom_actions_card);
@@ -212,9 +216,9 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
 
                 // 2. Создаем диалог подтверждения
                 AlertDialog dialog = new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
-                        .setTitle("Очистка")
-                        .setMessage("Удалить все записи из " + currentFolder + "?")
-                        .setPositiveButton("УДАЛИТЬ", (d, which) -> {
+                        .setTitle(getString(R.string.dialog_clear_title))
+                        .setMessage(getString(R.string.dialog_clear_folder_message, currentFolder))
+                        .setPositiveButton(getString(R.string.dialog_delete_upper), (d, which) -> {
 
                             // --- ЛОГИКА ОЧИСТКИ ---
 
@@ -233,9 +237,9 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
                             currentOffset = 0;
                             hasMoreData = false;
 
-                            Toast.makeText(this, "Данные в " + currentFolder + " удалены", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, getString(R.string.toast_folder_data_deleted, currentFolder), Toast.LENGTH_SHORT).show();
                         })
-                        .setNegativeButton("ОТМЕНА", null)
+                        .setNegativeButton(getString(R.string.dialog_cancel_upper), null)
                         .create();
 
                 dialog.show();
@@ -267,10 +271,10 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
                 container.addView(input);
 
                 AlertDialog dialog = new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
-                        .setTitle("Переименовать")
+                        .setTitle(getString(R.string.dialog_rename_title))
                         .setView(container)
-                        .setPositiveButton("СОХРАНИТЬ", null) // Ставим null, чтобы диалог не закрылся сам при ошибке
-                        .setNegativeButton("ОТМЕНА", null)
+                        .setPositiveButton(getString(R.string.dialog_save_upper), null)
+                        .setNegativeButton(getString(R.string.dialog_cancel_upper), null)
                         .create();
 
                 dialog.show();
@@ -281,7 +285,7 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
 
                     // 1. Проверка на пустое имя
                     if (newName.isEmpty()) {
-                        input.setError("Имя не может быть пустым");
+                        input.setError(getString(R.string.error_name_empty));
                         return;
                     }
 
@@ -295,8 +299,8 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
                     }
 
                     if (alreadyExists && !newName.equalsIgnoreCase(oldName)) {
-                        input.setError("Папка с таким именем уже есть!");
-                        Toast.makeText(this, "Название уже занято", Toast.LENGTH_SHORT).show();
+                        input.setError(getString(R.string.error_folder_already_exists));
+                        Toast.makeText(this, getString(R.string.toast_name_already_taken), Toast.LENGTH_SHORT).show();
                     } else {
                         // 3. Если всё ок — переименовываем
                         MainDatabaseHelper dbHelper = new MainDatabaseHelper(this); // запрос на сервер
@@ -321,7 +325,7 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
                         sendBroadcast(broadcastIntent);
 
                         dialog.dismiss();
-                        Toast.makeText(this, "Готово!", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, getString(R.string.toast_done), Toast.LENGTH_SHORT).show();
                     }
                 });
 
@@ -448,12 +452,12 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
     // Метод для открытия карты устройства
     private void openDeviceMap(Device device, String tableName, int position) {
         if (tableName == null || tableName.isEmpty()) {
-            Toast.makeText(this, "Ошибка: имя таблицы не указано", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.error_table_name_missing), Toast.LENGTH_SHORT).show();
             return;
         }
 
         if (device == null || device.getMac() == null || device.getMac().trim().isEmpty()) {
-            Toast.makeText(this, "Не удалось получить идентификатор устройства", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.error_device_identifier_missing), Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -465,7 +469,7 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
                 dbHelper.getDeviceHistoryByKey(tableName, deviceKey, device.getType());
 
         if (history == null || history.isEmpty()) {
-            Toast.makeText(this, "Нет данных о местоположении устройства", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.error_no_device_location_data), Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -483,11 +487,10 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
     }
 
     public void shareDeviceAsJson(Device device) {
-        // Исправлено: используем currentTable (твоя глобальная переменная)
         String jsonString = databaseHelper.getDeviceExportJson(currentTable, device.getMac());
 
         if (jsonString == null || jsonString.isEmpty()) {
-            Toast.makeText(this, "Нет данных для экспорта", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.error_no_export_data), Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -507,9 +510,9 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
             shareIntent.setType("application/json");
             shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
             shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(Intent.createChooser(shareIntent, "Отправить JSON"));
+            startActivity(Intent.createChooser(shareIntent, getString(R.string.share_json_title)));
         } catch (Exception e) {
-            Toast.makeText(this, "Ошибка: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.error_with_message, e.getMessage()), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -672,7 +675,7 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
     private void updateAllDevicesStatus(String status) {
         int pos = tabLayout.getSelectedTabPosition();
         if (pos == -1) {
-            Toast.makeText(this, "Вкладка не выбрана", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.error_no_selected_tab), Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -686,7 +689,7 @@ public class DeviceListActivity extends AppCompatActivity implements DeviceListA
             runOnUiThread(() -> {
                 Toast.makeText(
                         DeviceListActivity.this,
-                        count + " устройств теперь " + status,
+                        getString(R.string.toast_devices_status_updated, count, status),
                         Toast.LENGTH_SHORT
                 ).show();
 

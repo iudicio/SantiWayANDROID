@@ -30,7 +30,7 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
 
-public class NotificationDetailActivity extends AppCompatActivity implements OnMapReadyCallback {
+public class NotificationDetailActivity extends BaseLocalizedActivity implements OnMapReadyCallback {
 
     private NotificationData notification;
     private SupportMapFragment mapFragment;
@@ -45,13 +45,13 @@ public class NotificationDetailActivity extends AppCompatActivity implements OnM
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setTitle("Детали уведомления");
+            getSupportActionBar().setTitle(getString(R.string.notification_details_title));
         }
 
         notification = (NotificationData) getIntent().getSerializableExtra("notification_data");
 
         if (notification == null) {
-            Toast.makeText(this, "Ошибка загрузки данных", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.error_loading_data), Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
@@ -70,7 +70,7 @@ public class NotificationDetailActivity extends AppCompatActivity implements OnM
         text.setText(notification.getText());
 
         SimpleDateFormat dateFormat = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.getDefault());
-        timestamp.setText("Дата и время: " + dateFormat.format(notification.getTimestamp()));
+        timestamp.setText(getString(R.string.datetime_format_label, dateFormat.format(notification.getTimestamp())));
 
         // --- Обработка Бинарного контента ---
         if (notification.getBinaryContents() != null && !notification.getBinaryContents().isEmpty()) {
@@ -107,7 +107,7 @@ public class NotificationDetailActivity extends AppCompatActivity implements OnM
                 } else if (finalMimeType.equals("application/vnd.android.package-archive")) {
                     // Кнопка для установки APK
                     Button installButton = new Button(this);
-                    installButton.setText("Установить APK");
+                    installButton.setText(getString(R.string.install_apk));
                     installButton.setTextColor(getResources().getColor(android.R.color.white));
                     installButton.setBackgroundColor(notification.getType().getColor());
                     binaryContainer.addView(installButton);
@@ -122,11 +122,7 @@ public class NotificationDetailActivity extends AppCompatActivity implements OnM
                     // !!! УСИЛЕННЫЙ БЛОК ДЛЯ ДИАГНОСТИКИ !!!
                     // Общий случай: если тип не совпал, отображаем текстовое предупреждение
                     TextView fileInfo = new TextView(this);
-                    fileInfo.setText(String.format(
-                            "Файл: %s (%d байт). Тип не распознан для прямого отображения. Если этот текст виден, MIME-тип не соответствует 'image/*' или 'application/vnd.android.package-archive'.",
-                            finalMimeType,
-                            finalContent.length
-                    ));
+                    fileInfo.setText(getString(R.string.unknown_file_type_message, finalMimeType, finalContent.length));
                     fileInfo.setTextColor(getResources().getColor(android.R.color.white));
                     fileInfo.setPadding(0, 16, 0, 16);
                     binaryContainer.addView(fileInfo);
@@ -172,7 +168,7 @@ public class NotificationDetailActivity extends AppCompatActivity implements OnM
 
         } catch (IOException e) {
             Log.e(TAG, "Error saving/installing APK", e);
-            Toast.makeText(this, "Ошибка при установке APK: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, getString(R.string.error_installing_apk, e.getMessage()), Toast.LENGTH_LONG).show();
         }
     }
 

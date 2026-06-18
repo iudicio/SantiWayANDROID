@@ -17,13 +17,13 @@
         android:layout_weight="1"
         android:textColor="@color/white"
         android:textSize="16sp"
-        android:text="Название папки" />
+        android:text="@string/folder_name_placeholder2" />
 
     <ImageView
         android:layout_width="24dp"
         android:layout_height="24dp"
         android:src="@drawable/ic_device"
-        android:contentDescription="Select"
+        android:contentDescription="@string/content_desc_select"
         app:tint="#3DDC84" />
 
 </LinearLayout>

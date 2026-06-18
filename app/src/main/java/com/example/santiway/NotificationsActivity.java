@@ -29,7 +29,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-public class NotificationsActivity extends AppCompatActivity implements NotificationsAdapter.NotificationActionListener {
+public class NotificationsActivity extends BaseLocalizedActivity implements NotificationsAdapter.NotificationActionListener {
 
     private RecyclerView recyclerView;
     private NotificationsAdapter adapter;
@@ -46,7 +46,7 @@ public class NotificationsActivity extends AppCompatActivity implements Notifica
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setTitle("Уведомления");
+            getSupportActionBar().setTitle(getString(R.string.notifications_title));
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
@@ -184,7 +184,7 @@ public class NotificationsActivity extends AppCompatActivity implements Notifica
             }
         }
 
-        Toast.makeText(this, "Все уведомления очищены", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, getString(R.string.toast_all_notifications_cleared), Toast.LENGTH_SHORT).show();
     }
 
     private void openDeviceMap(String deviceId) {
@@ -203,15 +203,14 @@ public class NotificationsActivity extends AppCompatActivity implements Notifica
                 intent.putExtra("device_status", deviceInfo.status);
                 startActivity(intent);
             } else {
-                // Если не нашли координаты, показываем детали уведомления
-                Toast.makeText(this, "Нет данных о местоположении устройства", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.error_no_device_location_data), Toast.LENGTH_SHORT).show();
                 Intent intent = new Intent(this, NotificationDetailActivity.class);
                 intent.putExtra("notification_data", currentNotification);
                 startActivity(intent);
             }
         } catch (Exception e) {
             e.printStackTrace();
-            Toast.makeText(this, "Ошибка при открытии карты", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.error_opening_map), Toast.LENGTH_SHORT).show();
             Intent intent = new Intent(this, NotificationDetailActivity.class);
             intent.putExtra("notification_data", currentNotification);
             startActivity(intent);
@@ -224,7 +223,7 @@ public class NotificationsActivity extends AppCompatActivity implements Notifica
             NotificationDatabaseHelper dbHelper = new NotificationDatabaseHelper(this);
             dbHelper.deleteNotification(notification.getId());
             loadNotificationsFromDb();
-            Toast.makeText(this, "Удалено", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.toast_deleted), Toast.LENGTH_SHORT).show();
         }
     }
 

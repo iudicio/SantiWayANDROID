@@ -13,7 +13,7 @@
     android:layout_width="match_parent"
     android:layout_height="?attr/actionBarSize"
     android:background="#0B1A2C"
-    app:title="Настройки приложения"
+    app:title="@string/app_config_title"
     app:titleTextColor="@android:color/white"
     app:navigationIcon="?attr/homeAsUpIndicator" />
 
@@ -31,7 +31,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Общие настройки"
+            android:text="@string/general_settings_title"
             android:textStyle="bold"
             android:textColor="@android:color/white"
             android:textSize="18sp"
@@ -42,7 +42,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:hint="IPv4 адрес сервера"
+            android:hint="@string/server_ipv4_hint"
             app:boxBackgroundMode="outline"
             app:boxBackgroundColor="#172A46"
             app:boxStrokeWidth="1dp"
@@ -65,7 +65,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:hint="API Ключ"
+            android:hint="@string/api_key_hint"
             app:boxBackgroundMode="outline"
             app:boxBackgroundColor="#172A46"
             app:boxStrokeWidth="1dp"
@@ -88,7 +88,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:hint="Название устройства"
+            android:hint="@string/device_name_hint"
             app:boxBackgroundMode="outline"
             app:boxBackgroundColor="#172A46"
             app:boxStrokeWidth="1dp"
@@ -108,7 +108,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:hint="Количество точек на карте"
+            android:hint="@string/map_points_count_hint"
             app:boxBackgroundMode="outline"
             app:boxBackgroundColor="#172A46"
             app:boxStrokeWidth="1dp"
@@ -126,24 +126,99 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Протокол геолокации:"
+            android:text="@string/language_label"
+            android:textColor="@android:color/white"
+            android:layout_marginTop="16dp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="6dp"
+            app:cardBackgroundColor="#172A46"
+            app:cardCornerRadius="12dp"
+            app:strokeColor="@android:color/white"
+            app:strokeWidth="1dp"
+            app:cardElevation="0dp">
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <Spinner
+                    android:id="@+id/language_spinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="44dp"
+                    android:background="@android:color/transparent"
+                    android:popupBackground="#172A46" />
+
+                <TextView
+                    android:layout_width="44dp"
+                    android:layout_height="match_parent"
+                    android:layout_gravity="end|center_vertical"
+                    android:gravity="center"
+                    android:text="@string/spinner_arrow"
+                    android:textColor="@android:color/white"
+                    android:textSize="18sp"
+                    android:clickable="false"
+                    android:focusable="false" />
+
+            </FrameLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/geolocation_protocol_label"
             android:textColor="@android:color/white"
             android:layout_marginTop="16dp"/>
 
-        <Spinner
-            android:id="@+id/protocol_spinner"
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:backgroundTint="@android:color/white"
-            android:popupBackground="#172A46"
-            android:layout_marginTop="4dp"/>
+            android:layout_height="52dp"
+            android:layout_marginTop="6dp"
+            app:cardBackgroundColor="#172A46"
+            app:cardCornerRadius="12dp"
+            app:strokeColor="@android:color/white"
+            app:strokeWidth="1dp"
+            app:cardElevation="0dp">
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <Spinner
+                    android:id="@+id/protocol_spinner"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="44dp"
+                    android:background="@android:color/transparent"
+                    android:popupBackground="#172A46" />
+
+                <TextView
+                    android:layout_width="44dp"
+                    android:layout_height="match_parent"
+                    android:layout_gravity="end|center_vertical"
+                    android:gravity="center"
+                    android:text="@string/spinner_arrow"
+                    android:textColor="@android:color/white"
+                    android:textSize="18sp"
+                    android:clickable="false"
+                    android:focusable="false" />
+
+            </FrameLayout>
+
+        </com.google.android.material.card.MaterialCardView>
 
         <Switch
             android:id="@+id/target_detection_switch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Обнаружение target устройств"
+            android:text="@string/target_detection_label"
             android:textColor="@android:color/white"
             android:thumbTint="@android:color/white"
             android:trackTint="#FFFFFF"
@@ -154,7 +229,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Использовать статические координаты"
+            android:text="@string/use_static_coordinates"
             android:textColor="@android:color/white"
             android:thumbTint="@android:color/white"
             android:trackTint="#FFFFFF" />
@@ -164,7 +239,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:hint="Широта">
+            android:hint="@string/latitude_hint">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/static_latitude_input"
@@ -180,7 +255,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:hint="Долгота">
+            android:hint="@string/longitude_hint">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/static_longitude_input"
@@ -197,7 +272,7 @@
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:layout_marginTop="12dp"
-            android:text="Выбрать точку на карте"
+            android:text="@string/select_point_on_map"
             android:textAllCaps="false"
             android:textColor="@android:color/white"
             app:backgroundTint="#172A46"
@@ -208,7 +283,7 @@
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:layout_marginTop="16dp"
-            android:text="Сохранить общие настройки"
+            android:text="@string/save_general_settings"
             android:textAllCaps="false"
             android:textColor="@android:color/white"
             app:backgroundTint="#172A46"
@@ -217,7 +292,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Настройки сканера"
+            android:text="@string/scanner_settings_title"
             android:textStyle="bold"
             android:textColor="@android:color/white"
             android:textSize="18sp"
@@ -228,7 +303,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Выберите сканер:"
+            android:text="@string/select_scanner_label"
             android:textColor="@android:color/white"
             android:visibility="gone"/>
 
@@ -246,7 +321,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:hint="Интервал сканирования (сек)"
+            android:hint="@string/scan_interval_hint"
             android:visibility="gone">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -265,7 +340,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:hint="Сила сигнала обнаружения"
+            android:hint="@string/signal_strength_hint"
             android:visibility="gone">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -283,7 +358,7 @@
             android:id="@+id/enabled_switch"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Включен"
+            android:text="@string/enabled_label"
             android:textColor="@android:color/white"
             android:thumbTint="@android:color/white"
             android:trackTint="#FFFFFF"
@@ -294,7 +369,7 @@
             android:id="@+id/save_scanner_btn"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Сохранить настройки сканера"
+            android:text="@string/save_scanner_settings"
             android:textColor="@android:color/white"
             android:backgroundTint="#2C4872"
             android:layout_marginTop="16dp"

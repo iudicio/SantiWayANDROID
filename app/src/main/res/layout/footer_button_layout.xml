@@ -27,11 +27,12 @@
             android:layout_width="22dp"
             android:layout_height="22dp"
             android:src="@drawable/ic_notifications"
-            app:tint="#FF6B6B" android:contentDescription="Notifications Icon"/>
+            app:tint="#FF6B6B"
+            android:contentDescription="@string/content_desc_notifications_icon"/>
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Уведомления"
+            android:text="@string/notifications_title"
             android:gravity="center"
             android:singleLine="true"
             android:maxLines="1"
@@ -60,12 +61,12 @@
             android:layout_height="22dp"
             android:src="@drawable/ic_settings_white"
             app:tint="@android:color/white"
-            android:contentDescription="Settings Icon" />
+            android:contentDescription="@string/content_desc_settings_icon" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Настройки"
+            android:text="@string/settings_title"
             android:gravity="center"
             android:singleLine="true"
             android:maxLines="1"
@@ -96,7 +97,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Устройства"
+            android:text="@string/devices_title"
             android:gravity="center"
             android:singleLine="true"
             android:maxLines="1"
@@ -128,7 +129,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:text="Создать"
+            android:text="@string/create_action"
             android:singleLine="true"
             android:maxLines="1"
             android:textSize="10sp"
@@ -158,7 +159,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Удалить"
+            android:text="@string/delete_action"
             android:gravity="center"
             android:singleLine="true"
             android:maxLines="1"

@@ -22,11 +22,11 @@
             android:layout_height="22dp"
             android:src="@drawable/ic_create"
             app:tint="@android:color/white"
-            android:contentDescription="Rename Icon"/>
+            android:contentDescription="@string/content_desc_rename_icon"/>
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Переименовать"
+            android:text="@string/rename_action"
             android:textSize="10sp"
             style="@style/FooterActionText" />
     </LinearLayout>
@@ -45,11 +45,11 @@
             android:layout_height="22dp"
             android:src="@drawable/ic_block"
             app:tint="@android:color/white"
-            android:contentDescription="Clear Icon"/>
+            android:contentDescription="@string/content_desc_clear_icon"/>
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Очистить"
+            android:text="@string/clear_action"
             android:textSize="10sp"
             style="@style/FooterActionText" />
     </LinearLayout>
@@ -73,7 +73,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="Grey"
+            android:text="@string/grey_action"
             android:textColor="@android:color/white"
             android:textSize="10sp" />
     </LinearLayout>
@@ -92,11 +92,11 @@
             android:layout_height="22dp"
             android:src="@drawable/ic_notifications"
             app:tint="#FF6B6B"
-            android:contentDescription="Alarm Icon"/>
+            android:contentDescription="@string/content_desc_alarm_icon"/>
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Target"
+            android:text="@string/status_target_en"
             android:textSize="10sp"
             style="@style/FooterActionText" />
     </LinearLayout>
@@ -115,11 +115,11 @@
             android:layout_height="22dp"
             android:src="@drawable/ic_device"
             app:tint="#3DDC84"
-            android:contentDescription="Safe Icon"/>
+            android:contentDescription="@string/content_desc_safe_icon"/>
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Safe"
+            android:text="@string/status_safe_en"
             android:textSize="10sp"
             style="@style/FooterActionText" />
     </LinearLayout>
