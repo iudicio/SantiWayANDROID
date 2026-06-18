@@ -57,7 +57,7 @@
             android:gravity="center"
             android:paddingStart="12dp"
             android:paddingEnd="12dp"
-            android:text="Target"
+            android:text="@string/status_target_en"
             android:textAllCaps="false"
             android:textColor="@android:color/white"
             android:textSize="12sp"
@@ -73,7 +73,7 @@
             android:gravity="center"
             android:paddingStart="12dp"
             android:paddingEnd="12dp"
-            android:text="Safe"
+            android:text="@string/status_safe_en"
             android:textAllCaps="false"
             android:textColor="@android:color/white"
             android:textSize="12sp"
@@ -96,7 +96,7 @@
             android:layout_height="48dp"
             android:background="@drawable/bg_map_zoom_button"
             android:gravity="center"
-            android:text="+"
+            android:text="@string/zoom_in"
             android:textColor="@android:color/white"
             android:textSize="28sp"
             android:textStyle="bold" />
@@ -108,7 +108,7 @@
             android:layout_marginTop="10dp"
             android:background="@drawable/bg_map_zoom_button"
             android:gravity="center"
-            android:text="−"
+            android:text="@string/zoom_out"
             android:textColor="@android:color/white"
             android:textSize="30sp"
             android:textStyle="bold" />
@@ -132,7 +132,7 @@
 <!--            android:layout_width="58dp"-->
 <!--            android:layout_height="58dp"-->
 <!--            android:background="@drawable/bg_map_round_action"-->
-<!--            android:contentDescription="Center map"-->
+<!--            android:contentDescription="@string/content_desc_center_map"-->
 <!--            android:padding="16dp"-->
 <!--            android:src="@android:drawable/ic_menu_mylocation"-->
 <!--            android:tint="@android:color/white" />-->
@@ -143,7 +143,7 @@
 <!--            android:layout_height="58dp"-->
 <!--            android:layout_marginTop="12dp"-->
 <!--            android:background="@drawable/bg_map_round_action"-->
-<!--            android:contentDescription="Filter"-->
+<!--            android:contentDescription="@string/content_desc_filter"-->
 <!--            android:padding="16dp"-->
 <!--            android:src="@android:drawable/ic_menu_sort_by_size"-->
 <!--            android:tint="@android:color/white" />-->
@@ -154,7 +154,7 @@
 <!--            android:layout_height="58dp"-->
 <!--            android:layout_marginTop="12dp"-->
 <!--            android:background="@drawable/bg_map_round_action"-->
-<!--            android:contentDescription="Refresh"-->
+<!--            android:contentDescription="@string/content_desc_refresh"-->
 <!--            android:padding="16dp"-->
 <!--            android:src="@android:drawable/ic_popup_sync"-->
 <!--            android:tint="@android:color/white" />-->
@@ -183,7 +183,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="5dp"
-            android:text="Устройство"
+            android:text="@string/device_label"
             android:textColor="@android:color/white"
             android:textSize="14sp"
             android:textStyle="bold" />
@@ -193,7 +193,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="MTS RUS [31]"
+            android:text="@string/device_operator_placeholder"
             android:textColor="#FFFFFF"
             android:textSize="10sp" />
 
@@ -219,7 +219,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="MAC адрес:"
+                    android:text="@string/mac_address_label"
                     android:textColor="#FFFFFF"
                     android:textSize="10sp" />
 
@@ -229,7 +229,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:gravity="end"
-                    android:text="C2:18:03:00:3D:7E"
+                    android:text="@string/mac_address_placeholder"
                     android:textColor="@android:color/white"
                     android:textSize="10sp"
                     android:textStyle="bold" />
@@ -246,7 +246,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Тип:"
+                    android:text="@string/type_label"
                     android:textColor="#FFFFFF"
                     android:textSize="10sp" />
 
@@ -256,7 +256,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:gravity="end"
-                    android:text="Cell"
+                    android:text="@string/type_cell_placeholder"
                     android:textColor="@android:color/white"
                     android:textSize="10sp"
                     android:textStyle="bold" />
@@ -274,7 +274,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="CID:"
+                    android:text="@string/cid_label"
                     android:textColor="#FFFFFF"
                     android:textSize="10sp" />
 
@@ -284,7 +284,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:gravity="end"
-                    android:text="18168328 (LTE)"
+                    android:text="@string/cid_placeholder"
                     android:textColor="@android:color/white"
                     android:textSize="10sp"
                     android:textStyle="bold" />
@@ -301,7 +301,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Первое обнаружение:"
+                    android:text="@string/first_detection_label"
                     android:textColor="#FFFFFF"
                     android:textSize="10sp" />
 
@@ -311,7 +311,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:gravity="end"
-                    android:text="01.04.2026 13:47:25"
+                    android:text="@string/first_detection_placeholder"
                     android:textColor="@android:color/white"
                     android:textSize="10sp"
                     android:textStyle="bold" />
@@ -328,7 +328,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="Последнее обнаружение:"
+                    android:text="@string/last_detection_label"
                     android:textColor="#FFFFFF"
                     android:textSize="10sp" />
 
@@ -338,7 +338,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:gravity="end"
-                    android:text="01.04.2026 13:48:54"
+                    android:text="@string/last_detection_placeholder"
                     android:textColor="@android:color/white"
                     android:textSize="10sp"
                     android:textStyle="bold" />
@@ -363,7 +363,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Обнаружения:"
+                android:text="@string/detections_label"
                 android:textColor="#FFFFFF"
                 android:textSize="10sp" />
 
@@ -376,7 +376,7 @@
                 android:paddingTop="5dp"
                 android:paddingEnd="8dp"
                 android:paddingBottom="5dp"
-                android:text="20"
+                android:text="@string/count_placeholder"
                 android:textColor="@android:color/white"
                 android:textSize="10sp"
                 android:textStyle="bold" />

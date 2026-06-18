@@ -39,7 +39,6 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
@@ -74,7 +73,7 @@ import java.util.Locale;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener, CreateFolderDialogFragment.CreateFolderListener, FolderDeletionListener {
+public class MainActivity extends BaseLocalizedActivity implements NavigationView.OnNavigationItemSelectedListener, CreateFolderDialogFragment.CreateFolderListener, FolderDeletionListener {
     private TextView timeLabelTextView;
     private static final String TAG = "MainActivity";
     private BroadcastReceiver folderSwitchedReceiver;
@@ -93,7 +92,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private MainDatabaseHelper databaseHelper;
     private LocationManager locationManager;
     private boolean isScanning = false;
-    private String currentScanFolder = "Основная";
+    private static final String DEFAULT_FOLDER_INTERNAL = "Основная";
+    private String currentScanFolder = DEFAULT_FOLDER_INTERNAL;
     private DeviceUploadManager uploadManager;
 
     private Handler timerHandler = new Handler();
@@ -129,7 +129,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             minutes = minutes % 60;
 
             String timeString = String.format("%02d:%02d:%02d", hours, minutes, seconds);
-            timeLabelTextView.setText("Время работы : " + timeString);
+            timeLabelTextView.setText(getString(R.string.working_time_format, timeString));
             timerHandler.postDelayed(this, 1000);
         }
     };
@@ -163,11 +163,16 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                         } else {
                             // Не все разрешения даны
                             Toast.makeText(MainActivity.this,
-                                    "Некоторые разрешения не предоставлены",
+                                    getString(R.string.toast_some_permissions_denied),
                                     Toast.LENGTH_SHORT).show();
                             showMissingPermissionsWarning();
                         }
                     });
+
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase));
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -230,7 +235,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         databaseHelper = new MainDatabaseHelper(this);
 
         SharedPreferences appPrefs = getSharedPreferences(PREFS_APP, MODE_PRIVATE);
-        currentScanFolder = appPrefs.getString(KEY_CURRENT_FOLDER, "Основная");
+        currentScanFolder = appPrefs.getString(KEY_CURRENT_FOLDER, DEFAULT_FOLDER_INTERNAL);
         databaseHelper.createTableIfNotExists(currentScanFolder);
         updateToolbarTitle(currentScanFolder);
 
@@ -243,7 +248,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         playPauseButton.setOnClickListener(v -> {
             if (isSnapshotRunning) {
-                Toast.makeText(this, "Во время снапшота нельзя запускать обычное сканирование", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.toast_snapshot_blocks_scan), Toast.LENGTH_SHORT).show();
                 return;
             }
             if (checkEssentialPermissions()) {
@@ -282,7 +287,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     .apply();
 
             Toast.makeText(this,
-                    !enabled ? "Обнаружение TARGET включено" : "Обнаружение TARGET выключено",
+                    !enabled
+                            ? getString(R.string.toast_target_detection_enabled)
+                            : getString(R.string.toast_target_detection_disabled),
                     Toast.LENGTH_SHORT).show();
 
             updateTargetDetectionButton();
@@ -335,7 +342,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     .putBoolean("apk_update_started", false)
                     .apply();
 
-            Toast.makeText(this, "Обновление приложения успешно установлено", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, getString(R.string.toast_update_installed), Toast.LENGTH_LONG).show();
         }
 
         LinearLayout notificationsButton = findViewById(R.id.footer_notifications);
@@ -368,7 +375,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         super.onResume();
 
         String savedFolder = getSharedPreferences(PREFS_APP, MODE_PRIVATE)
-                .getString(KEY_CURRENT_FOLDER, "Основная");
+                .getString(KEY_CURRENT_FOLDER, DEFAULT_FOLDER_INTERNAL);
 
         if (savedFolder != null && !savedFolder.equals(currentScanFolder)) {
             currentScanFolder = savedFolder;
@@ -378,8 +385,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     @Override
     public void onFolderCreated(String folderName) {
-        if (folderName.equals("Основная")) {
-            Toast.makeText(this, "Имя папки недоступно", Toast.LENGTH_SHORT).show();
+        if (folderName.equals(DEFAULT_FOLDER_INTERNAL)) {
+            Toast.makeText(this, getString(R.string.error_folder_name_unavailable), Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -403,7 +410,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             startScanning();
         }
 
-        Toast.makeText(this, "Создана папка: " + folderName, Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, getString(R.string.toast_folder_created, folderName), Toast.LENGTH_SHORT).show();
     }
 
     private void registerFolderSwitchedReceiver() {
@@ -420,7 +427,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                                 .putString(KEY_CURRENT_FOLDER, currentScanFolder)
                                 .apply();
                         runOnUiThread(() -> Toast.makeText(MainActivity.this,
-                                "Папка сканирования переключена на: " + newTableName, Toast.LENGTH_LONG).show());
+                                getString(R.string.toast_scan_folder_switched, newTableName),
+                                Toast.LENGTH_LONG).show());
                     }
                 }
             }
@@ -441,7 +449,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     private void startSnapshotScan() {
         if (isSnapshotRunning) {
-            Toast.makeText(this, "Снапшот уже выполняется", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.toast_snapshot_already_running), Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -476,7 +484,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     .start();
         }
 
-        Toast.makeText(this, "Снапшот запущен на 1 минуту", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, getString(R.string.toast_snapshot_started), Toast.LENGTH_SHORT).show();
 
         snapshotHandler.postDelayed(() -> finishSnapshotScan(wasScanning), 60_000);
     }
@@ -517,7 +525,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             startScanning();
         }
 
-        Toast.makeText(this, "Снапшот завершён", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, getString(R.string.toast_snapshot_finished), Toast.LENGTH_SHORT).show();
     }
 
     private void updateTargetDetectionButton() {
@@ -538,12 +546,12 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
                 @Override
                 public void onPermissionDenied() {
-                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "Location permission denied", Toast.LENGTH_SHORT).show());
+                    runOnUiThread(() -> Toast.makeText(MainActivity.this, getString(R.string.error_location_permission_denied), Toast.LENGTH_SHORT).show());
                 }
 
                 @Override
                 public void onLocationError(String error) {
-                    runOnUiThread(() -> Toast.makeText(MainActivity.this, "Location error: " + error, Toast.LENGTH_SHORT).show());
+                    runOnUiThread(() -> Toast.makeText(MainActivity.this, getString(R.string.error_location_error, error), Toast.LENGTH_SHORT).show());
                 }
             });
             locationManager.startLocationUpdates();
@@ -552,10 +560,15 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     private void updateCoordinatesDisplay(Location location) {
         if (location != null) {
-            String coords = String.format("Lat: %.6f, Lon: %.6f", location.getLatitude(), location.getLongitude());
+            String coords = String.format(
+                    Locale.getDefault(),
+                    "Lat: %.6f, Lon: %.6f",
+                    location.getLatitude(),
+                    location.getLongitude()
+            );
             coordinatesTextView.setText(coords);
         } else {
-            coordinatesTextView.setText("Координаты недоступны");
+            coordinatesTextView.setText(getString(R.string.coordinates_unavailable));
         }
     }
 
@@ -604,7 +617,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         timerHandler.removeCallbacks(timerRunnable);
         timerHandler.postDelayed(timerRunnable, 0);
 
-        Toast.makeText(this, "Сканирование запущено: " + currentScanFolder, Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, getString(R.string.toast_scan_started, currentScanFolder), Toast.LENGTH_SHORT).show();
     }
 
     private void stopScanning() {
@@ -628,10 +641,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         stopScannerService(BluetoothForegroundService.class);
 
         timerHandler.removeCallbacks(timerRunnable);
-        timeLabelTextView.setText("Время работы : 00:00:00");
+        timeLabelTextView.setText(getString(R.string.working_time_format, "00:00:00"));
 
         if (showToast) {
-            Toast.makeText(this, "Сканирование остановлено", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.toast_scan_stopped), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -720,38 +733,37 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     private void showMissingPermissionsWarning() {
         new AlertDialog.Builder(this)
-                .setTitle("Недостаточно разрешений")
-                .setMessage("Для корректной работы приложения необходимы все запрошенные разрешения. " +
-                        "Без них сканирование и определение местоположения будут невозможны.")
-                .setPositiveButton("Повторно запросить", (dialog, which) -> requestNecessaryPermissions())
-                .setNegativeButton("Отмена", null)
+                .setTitle(getString(R.string.dialog_permissions_missing_title))
+                .setMessage(getString(R.string.dialog_permissions_missing_message))
+                .setPositiveButton(getString(R.string.dialog_request_again), (dialog, which) -> requestNecessaryPermissions())
+                .setNegativeButton(getString(R.string.dialog_cancel), null)
                 .show();
     }
 
     private void showMissingFunctionalityWarning() {
         StringBuilder warningMessage = new StringBuilder();
-        warningMessage.append("Включите следующие функции для корректной работы приложения:\n\n");
+        warningMessage.append(getString(R.string.limited_functionality_intro));
 
         if (!isNetworkAvailable) {
-            warningMessage.append("• Мобильный интернет или Wi-Fi (для отправки данных)\n");
+            warningMessage.append(getString(R.string.limited_functionality_network));
         }
         if (!isLocationEnabled) {
-            warningMessage.append("• Геолокация (GPS и сетевое определение местоположения)\n");
+            warningMessage.append(getString(R.string.limited_functionality_location));
         }
         if (!isWifiEnabled) {
-            warningMessage.append("• Wi-Fi (для сканирования Wi-Fi сетей)\n");
+            warningMessage.append(getString(R.string.limited_functionality_wifi));
         }
         if (!isBluetoothEnabled) {
-            warningMessage.append("• Bluetooth (для сканирования Bluetooth устройств)\n");
+            warningMessage.append(getString(R.string.limited_functionality_bluetooth));
         }
 
-        warningMessage.append("\nБез этих функций данные могут собираться неполно или некорректно.");
+        warningMessage.append(getString(R.string.limited_functionality_outro));
 
         new AlertDialog.Builder(this)
-                .setTitle("Внимание: ограниченная функциональность")
+                .setTitle(getString(R.string.dialog_limited_functionality_title))
                 .setMessage(warningMessage.toString())
-                .setPositiveButton("Перейти к настройкам", (dialog, which) -> openSettings())
-                .setNegativeButton("Продолжить", null)
+                .setPositiveButton(getString(R.string.dialog_open_settings), (dialog, which) -> openSettings())
+                .setNegativeButton(getString(R.string.dialog_continue), null)
                 .show();
     }
 
@@ -807,20 +819,16 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         if (intent.resolveActivity(getPackageManager()) != null) {
             startActivity(intent);
         } else {
-            Toast.makeText(this, "Не удается открыть настройки", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.error_cannot_open_settings), Toast.LENGTH_SHORT).show();
         }
     }
 
     private void showInitialPermissionsExplanation() {
         new AlertDialog.Builder(this)
-                .setTitle("Необходимые разрешения")
-                .setMessage("Для сканирования Wi-Fi и Bluetooth устройств приложению нужны:\n\n" +
-                        "• Доступ к местоположению (для обнаружения устройств)\n" +
-                        "• Разрешение на сканирование Bluetooth (Android 12+)\n\n" +
-                        "Эти разрешения необходимы для основной работы приложения.")
-                .setPositiveButton("Запросить", (dialog, which) -> requestEssentialPermissions())
-                .setNegativeButton("Позже", (dialog, which) -> {
-                    // Показываем предупреждение о ограниченной функциональности
+                .setTitle(getString(R.string.dialog_required_permissions_title))
+                .setMessage(getString(R.string.dialog_required_permissions_message))
+                .setPositiveButton(getString(R.string.dialog_request), (dialog, which) -> requestEssentialPermissions())
+                .setNegativeButton(getString(R.string.dialog_later), (dialog, which) -> {
                     showMissingPermissionsWarning();
                 })
                 .setCancelable(false)
@@ -902,15 +910,15 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
                 if (!prefs.getBoolean("notifications_asked", false)) {
                     new AlertDialog.Builder(this)
-                            .setTitle("Уведомления")
-                            .setMessage("Разрешить уведомления для получения информации о сканировании?")
-                            .setPositiveButton("Разрешить", (d, w) -> {
+                            .setTitle(getString(R.string.dialog_notifications_title))
+                            .setMessage(getString(R.string.dialog_notifications_permission_message))
+                            .setPositiveButton(getString(R.string.dialog_allow), (d, w) -> {
                                 requestPermissionLauncher.launch(
                                         new String[]{Manifest.permission.POST_NOTIFICATIONS}
                                 );
                                 prefs.edit().putBoolean("notifications_asked", true).apply();
                             })
-                            .setNegativeButton("Позже", null)
+                            .setNegativeButton(getString(R.string.dialog_later), null)
                             .show();
                 }
             }
@@ -928,17 +936,21 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         if (id == R.id.nav_make_safe) {
             if (currentScanFolder != null && !currentScanFolder.isEmpty()) {
                 int affectedRows = databaseHelper.updateAllDeviceStatusForTable(currentScanFolder, "SAFE");
-                Toast.makeText(this, affectedRows + " устройств в '" + currentScanFolder + "' помечены как SAFE.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this,
+                        getString(R.string.toast_devices_in_folder_marked, affectedRows, currentScanFolder, "SAFE"),
+                        Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(this, "Текущая папка для сканирования не определена.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.error_current_scan_folder_unknown), Toast.LENGTH_SHORT).show();
             }
         }
         if (id == R.id.nav_clear_triggers) {
             if (currentScanFolder != null && !currentScanFolder.isEmpty()) {
                 int affectedRows = databaseHelper.updateAllDeviceStatusForTable(currentScanFolder, "GREY");
-                Toast.makeText(this, affectedRows + " устройств в '" + currentScanFolder + "' помечены как GREY.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this,
+                        getString(R.string.toast_devices_in_folder_marked, affectedRows, currentScanFolder, "GREY"),
+                        Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(this, "Текущая папка для сканирования не определена.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.error_current_scan_folder_unknown), Toast.LENGTH_SHORT).show();
             }
         }
 
@@ -963,15 +975,15 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     private List<String> getAllFolders() {
         List<String> tables = databaseHelper.getAllTables();
-        if (!tables.contains("Основная")) {
-            tables.add("Основная");
+        if (!tables.contains(DEFAULT_FOLDER_INTERNAL)) {
+            tables.add(DEFAULT_FOLDER_INTERNAL);
         }
         return tables;
     }
 
     private void showFolderSelectionDialog() {
         if (isSnapshotRunning) {
-            Toast.makeText(this, "Во время снапшота нельзя запускать обычное сканирование", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.toast_snapshot_blocks_scan), Toast.LENGTH_SHORT).show();
             return;
         }
         List<String> folders = getAllFolders();
@@ -997,7 +1009,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     startScanning();
                 }
 
-                Toast.makeText(MainActivity.this, "Выбрана папка: " + currentScanFolder, Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, getString(R.string.toast_folder_selected, currentScanFolder), Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -1009,13 +1021,13 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         List<String> deletableFolders = new ArrayList<>();
 
         for (String folder : folders) {
-            if (!folder.isEmpty() && !folder.equals("Основная")) {
+            if (!folder.isEmpty() && !folder.equals(DEFAULT_FOLDER_INTERNAL)) {
                 deletableFolders.add(folder);
             }
         }
 
         if (deletableFolders.isEmpty()) {
-            Toast.makeText(this, "Нет папок для удаления (кроме 'Основная')", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.toast_no_folders_to_delete, getString(R.string.main_folder_name)), Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -1032,11 +1044,11 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         boolean success = databaseHelper.deleteTable(folderName);
         if (success) {
             new UserDeviceFolderSyncManager(this).syncFolderDeleted(folderName);
-            Toast.makeText(this, "Папка удалена: " + folderName, Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.toast_folder_deleted, folderName), Toast.LENGTH_SHORT).show();
 
             if (currentScanFolder.equals(folderName)) {
                 stopScanning();
-                currentScanFolder = "Основная";
+                currentScanFolder = DEFAULT_FOLDER_INTERNAL;
                 updateToolbarTitle(currentScanFolder);
 
                 getSharedPreferences(PREFS_APP, MODE_PRIVATE)
@@ -1047,7 +1059,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 startScanning();
             }
         } else {
-            Toast.makeText(this, "Ошибка при удалении папки", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.error_folder_delete), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -1184,7 +1196,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                     String apkPath = intent.getStringExtra(WebSocketNotificationClient.EXTRA_APK_PATH);
 
                     Toast.makeText(MainActivity.this,
-                            "APK получен: " + apkPath, Toast.LENGTH_LONG).show();
+                            getString(R.string.toast_apk_received, apkPath), Toast.LENGTH_LONG).show();
                 }
             }
         };
@@ -1216,9 +1228,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         // Например, добавить иконку в тулбар
         runOnUiThread(() -> {
             if (connected) {
-                Toast.makeText(this, "WebSocket подключен", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.toast_websocket_connected), Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(this, "WebSocket отключен", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.toast_websocket_disconnected), Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -1265,7 +1277,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     private void switchFolderBySwipe(int direction) {
         if (isSnapshotRunning) {
-            Toast.makeText(this, "Во время снапшота нельзя запускать обычное сканирование", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.toast_snapshot_blocks_scan), Toast.LENGTH_SHORT).show();
             return;
         }
         List<String> folders = getAllFolders();
@@ -1288,7 +1300,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     private void switchToFolder(String selectedFolder) {
         if (isSnapshotRunning) {
-            Toast.makeText(this, "Во время снапшота нельзя запускать обычное сканирование", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.toast_snapshot_blocks_scan), Toast.LENGTH_SHORT).show();
             return;
         }
         if (selectedFolder == null || selectedFolder.trim().isEmpty()) return;
@@ -1312,7 +1324,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             startScanning();
         }
 
-        Toast.makeText(this, "Папка: " + currentScanFolder, Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, getString(R.string.toast_folder_short, currentScanFolder), Toast.LENGTH_SHORT).show();
     }
 
     private void requestBatteryOptimizationDisable() {

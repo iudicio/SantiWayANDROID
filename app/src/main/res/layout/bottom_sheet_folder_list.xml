@@ -9,7 +9,7 @@
         android:id="@+id/bottom_sheet_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Выберите папку"
+        android:text="@string/select_folder_title"
         android:textColor="@android:color/white"
         android:textSize="20sp"
         android:textStyle="bold"

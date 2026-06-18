@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_config_title">إعدادات التطبيق</string>
+    <string name="general_settings_title">الإعدادات العامة</string>
+    <string name="server_ipv4_hint">عنوان IPv4 للخادم</string>
+    <string name="device_name_hint">اسم الجهاز</string>
+    <string name="api_key_hint">مفتاح API</string>
+    <string name="map_points_count_hint">عدد النقاط على الخريطة</string>
+    <string name="geolocation_protocol_label">بروتوكول تحديد الموقع:</string>
+    <string name="target_detection_label">اكتشاف أجهزة target</string>
+    <string name="use_static_coordinates">استخدام الإحداثيات الثابتة</string>
+    <string name="latitude_hint">خط العرض</string>
+    <string name="longitude_hint">خط الطول</string>
+    <string name="select_point_on_map">اختيار نقطة على الخريطة</string>
+    <string name="save_general_settings">حفظ الإعدادات العامة</string>
+    <string name="scanner_settings_title">إعدادات الماسح</string>
+    <string name="select_scanner_label">اختر الماسح:</string>
+    <string name="scan_interval_hint">فاصل المسح (ثانية)</string>
+    <string name="signal_strength_hint">قوة إشارة الاكتشاف</string>
+    <string name="enabled_label">مفعّل</string>
+    <string name="save_scanner_settings">حفظ إعدادات الماسح</string>
+
+    <string name="status_target">TARGET</string>
+    <string name="status_all">الكل</string>
+    <string name="status_safe">SAFE</string>
+    <string name="search_by_name_or_mac_hint">البحث بالاسم أو MAC</string>
+
+    <string name="default_folder_unified_data">الرئيسية</string>
+    <string name="timer_zero">00:00:00</string>
+    <string name="content_desc_start_pause">بدء/إيقاف مؤقت</string>
+    <string name="content_desc_snapshot">لقطة</string>
+    <string name="content_desc_wifi_icon">أيقونة Wi-Fi</string>
+    <string name="content_desc_bluetooth_icon">أيقونة Bluetooth</string>
+    <string name="content_desc_cellular_icon">أيقونة الشبكة الخلوية</string>
+    <string name="last_sent_label">آخر إرسال</string>
+    <string name="datetime_placeholder">--:--:-- --.--.----</string>
+
+    <string name="status_target_en">Target</string>
+    <string name="status_safe_en">Safe</string>
+    <string name="zoom_in">+</string>
+    <string name="zoom_out">−</string>
+    <string name="content_desc_center_map">توسيط الخريطة</string>
+    <string name="content_desc_filter">فلتر</string>
+    <string name="content_desc_refresh">تحديث</string>
+    <string name="device_label">الجهاز</string>
+    <string name="device_operator_placeholder">MTS RUS [31]</string>
+    <string name="mac_address_label">عنوان MAC:</string>
+    <string name="mac_address_placeholder">C2:18:03:00:3D:7E</string>
+    <string name="type_label">النوع:</string>
+    <string name="type_cell_placeholder">Cell</string>
+    <string name="cid_label">CID:</string>
+    <string name="cid_placeholder">18168328 (LTE)</string>
+    <string name="first_detection_label">أول اكتشاف:</string>
+    <string name="first_detection_placeholder">01.04.2026 13:47:25</string>
+    <string name="last_detection_label">آخر اكتشاف:</string>
+    <string name="last_detection_placeholder">01.04.2026 13:48:54</string>
+    <string name="detections_label">الاكتشافات:</string>
+    <string name="count_placeholder">20</string>
+
+    <string name="notification_details_title">تفاصيل الإشعار</string>
+    <string name="notification_title_preview">تم اكتشاف MAC غير مصرح به</string>
+    <string name="notification_datetime_preview">التاريخ والوقت: 2025-12-13 09:19:18</string>
+    <string name="notification_body_preview">تم اكتشاف عنوان Bluetooth غير معروف وموسوم كـ ALARM في المنطقة. يلزم التحقق.</string>
+    <string name="attached_files_label">الملفات المرفقة:</string>
+
+    <string name="notifications_title">الإشعارات</string>
+    <string name="no_notifications">لا توجد إشعارات</string>
+    <string name="clear_all">مسح الكل</string>
+
+    <string name="content_desc_selected_point">النقطة المحددة</string>
+    <string name="select_this_point">اختيار هذه النقطة</string>
+
+    <string name="select_folder_title">اختر مجلداً</string>
+    <string name="select_folder_for_scan_title">اختر مجلداً للمسح</string>
+
+    <string name="content_desc_rename_icon">أيقونة إعادة التسمية</string>
+    <string name="rename_action">إعادة تسمية</string>
+    <string name="content_desc_clear_icon">أيقونة المسح</string>
+    <string name="clear_action">مسح</string>
+    <string name="grey_action">رمادي</string>
+    <string name="content_desc_alarm_icon">أيقونة الإنذار</string>
+    <string name="content_desc_safe_icon">أيقونة Safe</string>
+
+    <string name="create_new_folder_title">إنشاء مجلد جديد</string>
+    <string name="enter_folder_name_hint">أدخل اسم المجلد</string>
+
+    <string name="content_desc_notifications_icon">أيقونة الإشعارات</string>
+    <string name="content_desc_settings_icon">أيقونة الإعدادات</string>
+    <string name="settings_title">الإعدادات</string>
+    <string name="devices_title">الأجهزة</string>
+    <string name="create_action">إنشاء</string>
+    <string name="delete_action">حذف</string>
+
+    <string name="network_scanner_title">ماسح الشبكة</string>
+    <string name="mac_sample_placeholder">00:11:22:33:44:55</string>
+    <string name="type_placeholder">النوع</string>
+    <string name="time_placeholder">الوقت</string>
+    <string name="content_desc_share_json">مشاركة JSON</string>
+    <string name="info_action">معلومات</string>
+
+    <string name="content_desc_delete_icon">أيقونة الحذف</string>
+    <string name="folder_name_placeholder">اسم المجلد</string>
+    <string name="content_desc_select">اختيار</string>
+    <string name="folder_name_placeholder2">اسم المجلد</string>
+
+    <string name="notification_title_placeholder">عنوان الإشعار</string>
+    <string name="notification_date_placeholder">2025-12-13 09:19:18</string>
+    <string name="content_desc_delete_notification">حذف الإشعار</string>
+    <string name="startScan">بدء المسح</string>
+    <string name="stopScan">إيقاف المسح</string>
+    <string name="database">الانتقال إلى قاعدة البيانات</string>
+    <string name="navigation_drawer_open">فتح لوحة التنقل</string>
+    <string name="navigation_drawer_close">إغلاق لوحة التنقل</string>
+    <string name="app_name">Network Scanner</string>
+    <string name="time_label_initial">وقت العمل: 00:00:00</string>
+    <string name="bluetooth_text">Bluetooth</string>
+    <string name="wifi_text">Wi-Fi</string>
+    <string name="cellular_text">الشبكة الخلوية</string>
+    <string name="scanning_status">جارٍ المسح…</string>
+    <string name="stopped_status">متوقف</string>
+    <string name="coordinates_text">إحداثيات صحيحة: 51.5074, -0.1278</string>
+    <string name="button_start">بدء</string>
+    <string name="button_stop">إيقاف</string>
+
+    <string name="nav_create_folder">مسح المجلد</string>
+    <string name="nav_delete">حذف</string>
+    <string name="nav_make_safe">جعل الجهاز آمناً</string>
+    <string name="nav_clear_status">مسح الحالة</string>
+    <string name="nav_clear_triggers">مسح المشغلات</string>
+
+    <string name="logo_description">شعار التطبيق</string>
+    <string name="toolbar_title">Network Scanner</string>
+    <string name="nav_open">فتح لوحة التنقل</string>
+    <string name="nav_close">إغلاق لوحة التنقل</string>
+    <string name="status_standby">وضع الانتظار</string>
+    <string name="status_scanning">جارٍ المسح</string>
+    <string name="status_connected">متصل</string>
+    <string name="wifi_status_label">حالة Wi-Fi:</string>
+    <string name="cellular_status_label">حالة الشبكة الخلوية:</string>
+    <string name="coordinates_label">الإحداثيات:</string>
+    <string name="user_name_placeholder">اسم المستخدم</string>
+    <string name="device_list_title">قائمة الأجهزة</string>
+
+    <string name="title_wifi_status">حالة Wi-Fi</string>
+    <string name="title_cellular_status">حالة الشبكة الخلوية</string>
+    <string name="title_bluetooth_status">حالة Bluetooth</string>
+    <string name="title_coordinates">الإحداثيات</string>
+    <string name="status_off">غير متصل</string>
+
+    <string name="folder_name_hint">أدخل اسم المجلد</string>
+
+    <string name="nav_open_folder">فتح المجلد</string>
+    <string name="nav_delete_folder">حذف المجلد</string>
+
+    <string name="create_folder_dialog_title">إنشاء مجلد جديد</string>
+    <string name="delete_folder_dialog_title">حذف المجلد</string>
+    <string name="folder_name_empty_toast">لا يمكن أن يكون اسم المجلد فارغاً.</string>
+    <string name="folder_created_toast">تم إنشاء المجلد \'%1$s\'.</string>
+    <string name="folder_exists_toast">يوجد مجلد بهذا الاسم بالفعل.</string>
+    <string name="no_folders_to_delete_toast">لا توجد مجلدات للحذف.</string>
+    <string name="folder_deleted_toast">تم حذف المجلد \'%1$s\'.</string>
+    <string name="dialog_create">إنشاء</string>
+    <string name="dialog_cancel">إلغاء</string>
+    <string name="dialog_delete">حذف</string>
+
+    <string name="device_unknown">غير معروف</string>
+    <string name="device_list_screen_name">قائمة الأجهزة</string>
+
+    <string name="permission_not_granted_message">لم يتم منح جميع الأذونات.</string>
+    <string name="all_permissions_granted_message">تم منح جميع الأذونات.</string>
+
+    <string name="language_label">لغة التطبيق:</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_english">English</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">中文</string>
+    <string name="spinner_arrow">▼</string>
+
+    <string name="toast_scanner_settings_saved">تم حفظ إعدادات الماسح "%1$s"!</string>
+    <string name="error_api_key_not_configured">لم يتم إعداد مفتاح API في التطبيق</string>
+    <string name="toast_device_name_saved">تم حفظ اسم الجهاز وإرساله إلى الخادم!</string>
+    <string name="toast_settings_saved_device_name_not_changed">تم حفظ الإعدادات. لم يتم تغيير اسم الجهاز.</string>
+
+    <string name="dialog_clear_title">مسح</string>
+    <string name="dialog_clear_folder_message">هل تريد حذف جميع السجلات من %1$s؟</string>
+    <string name="dialog_delete_upper">حذف</string>
+    <string name="dialog_cancel_upper">إلغاء</string>
+    <string name="toast_folder_data_deleted">تم حذف البيانات في %1$s</string>
+    <string name="dialog_rename_title">إعادة تسمية</string>
+    <string name="dialog_save_upper">حفظ</string>
+    <string name="error_name_empty">لا يمكن أن يكون الاسم فارغاً</string>
+    <string name="error_folder_already_exists">يوجد مجلد بهذا الاسم بالفعل!</string>
+    <string name="toast_name_already_taken">الاسم مستخدم بالفعل</string>
+    <string name="toast_done">تم!</string>
+    <string name="error_table_name_missing">خطأ: اسم الجدول غير محدد</string>
+    <string name="error_device_identifier_missing">تعذر الحصول على معرف الجهاز</string>
+    <string name="error_no_device_location_data">لا توجد بيانات عن موقع الجهاز</string>
+    <string name="error_no_export_data">لا توجد بيانات للتصدير</string>
+    <string name="share_json_title">إرسال JSON</string>
+    <string name="error_with_message">خطأ: %1$s</string>
+    <string name="main_folder_name">الرئيسية</string>
+    <string name="error_no_selected_tab">لم يتم اختيار تبويب</string>
+    <string name="toast_devices_status_updated">أصبحت %1$d أجهزة الآن %2$s</string>
+
+    <string name="working_time_format">وقت العمل: %1$s</string>
+    <string name="toast_some_permissions_denied">لم يتم منح بعض الأذونات</string>
+    <string name="toast_snapshot_blocks_scan">لا يمكن تشغيل المسح العادي أثناء اللقطة</string>
+    <string name="toast_target_detection_enabled">تم تفعيل اكتشاف TARGET</string>
+    <string name="toast_target_detection_disabled">تم تعطيل اكتشاف TARGET</string>
+    <string name="toast_update_installed">تم تثبيت تحديث التطبيق بنجاح</string>
+    <string name="error_folder_name_unavailable">اسم المجلد غير متاح</string>
+    <string name="toast_folder_created">تم إنشاء المجلد: %1$s</string>
+    <string name="toast_scan_folder_switched">تم تبديل مجلد المسح إلى: %1$s</string>
+    <string name="toast_snapshot_already_running">اللقطة قيد التنفيذ بالفعل</string>
+    <string name="toast_snapshot_started">تم تشغيل اللقطة لمدة دقيقة واحدة</string>
+    <string name="toast_snapshot_finished">انتهت اللقطة</string>
+    <string name="coordinates_unavailable">الإحداثيات غير متوفرة</string>
+    <string name="toast_scan_started">بدأ المسح: %1$s</string>
+    <string name="toast_scan_stopped">تم إيقاف المسح</string>
+    <string name="dialog_permissions_missing_title">الأذونات غير كافية</string>
+    <string name="dialog_permissions_missing_message">جميع الأذونات المطلوبة ضرورية لكي يعمل التطبيق بشكل صحيح. بدونها لن يكون المسح وتحديد الموقع ممكنين.</string>
+    <string name="dialog_request_again">طلب مرة أخرى</string>
+    <string name="dialog_limited_functionality_title">تنبيه: وظائف محدودة</string>
+    <string name="limited_functionality_intro">قم بتفعيل الوظائف التالية لكي يعمل التطبيق بشكل صحيح:\n\n</string>
+    <string name="limited_functionality_network">• الإنترنت المحمول أو Wi-Fi (لإرسال البيانات)\n</string>
+    <string name="limited_functionality_location">• تحديد الموقع الجغرافي (GPS وتحديد الموقع عبر الشبكة)\n</string>
+    <string name="limited_functionality_wifi">• Wi-Fi (لمسح شبكات Wi-Fi)\n</string>
+    <string name="limited_functionality_bluetooth">• Bluetooth (لمسح أجهزة Bluetooth)\n</string>
+    <string name="limited_functionality_outro">\nبدون هذه الوظائف قد يتم جمع البيانات بشكل غير كامل أو غير صحيح.</string>
+    <string name="dialog_open_settings">الانتقال إلى الإعدادات</string>
+    <string name="dialog_continue">متابعة</string>
+    <string name="error_cannot_open_settings">تعذر فتح الإعدادات</string>
+    <string name="dialog_required_permissions_title">الأذونات المطلوبة</string>
+    <string name="dialog_required_permissions_message">لمسح أجهزة Wi-Fi و Bluetooth، يحتاج التطبيق إلى:\n\n• الوصول إلى الموقع (لاكتشاف الأجهزة)\n• إذن مسح Bluetooth (Android 12+)\n\nهذه الأذونات ضرورية للوظيفة الأساسية للتطبيق.</string>
+    <string name="dialog_request">طلب</string>
+    <string name="dialog_later">لاحقاً</string>
+    <string name="dialog_notifications_title">الإشعارات</string>
+    <string name="dialog_notifications_permission_message">هل تريد السماح بالإشعارات للحصول على معلومات عن المسح؟</string>
+    <string name="dialog_allow">السماح</string>
+    <string name="toast_devices_in_folder_marked">تم وضع علامة %3$s على %1$d أجهزة في "%2$s".</string>
+    <string name="error_current_scan_folder_unknown">مجلد المسح الحالي غير محدد.</string>
+    <string name="toast_folder_selected">المجلد المحدد: %1$s</string>
+    <string name="toast_no_folders_to_delete">لا توجد مجلدات للحذف باستثناء "%1$s"</string>
+    <string name="toast_folder_deleted">تم حذف المجلد: %1$s</string>
+    <string name="error_folder_delete">حدث خطأ أثناء حذف المجلد</string>
+    <string name="toast_apk_received">تم استلام APK: %1$s</string>
+    <string name="toast_websocket_connected">تم الاتصال بـ WebSocket</string>
+    <string name="toast_websocket_disconnected">تم قطع اتصال WebSocket</string>
+    <string name="toast_folder_short">المجلد: %1$s</string>
+    <string name="select_folder_for_delete_title">اختر المجلد المراد حذفه</string>
+    <string name="dialog_confirm_delete_title">تأكيد الحذف</string>
+    <string name="dialog_confirm_delete_folder_message">هل أنت متأكد أنك تريد حذف المجلد «%1$s»؟ سيتم فقدان جميع البيانات!</string>
+    <string name="error_location_permission_denied">تم رفض إذن الموقع</string>
+    <string name="error_location_error">خطأ في الموقع: %1$s</string>
+
+    <string name="time_label_short">الوقت:</string>
+    <string name="map_point_title">النقطة %1$d</string>
+    <string name="map_record_number">السجل رقم %1$d</string>
+    <string name="map_last_location_title">%1$s (آخر موقع)</string>
+
+    <string name="error_loading_data">حدث خطأ أثناء تحميل البيانات</string>
+    <string name="datetime_format_label">التاريخ والوقت: %1$s</string>
+    <string name="install_apk">تثبيت APK</string>
+    <string name="unknown_file_type_message">الملف: %1$s (%2$d بايت). لم يتم التعرف على النوع للعرض المباشر. إذا كان هذا النص ظاهراً، فإن نوع MIME لا يطابق "image/*" أو "application/vnd.android.package-archive".</string>
+    <string name="error_installing_apk">حدث خطأ أثناء تثبيت APK: %1$s</string>
+
+    <string name="toast_all_notifications_cleared">تم مسح جميع الإشعارات</string>
+    <string name="error_opening_map">حدث خطأ أثناء فتح الخريطة</string>
+    <string name="toast_deleted">تم الحذف</string>
+
+    <string name="device_map_title">خريطة الجهاز</string>
+    <string name="toast_device_marked_target">تم وضع علامة TARGET على الجهاز</string>
+    <string name="toast_device_marked_safe">تم وضع علامة SAFE على الجهاز</string>
+    <string name="toast_device_marked_grey">تم وضع علامة GREY على الجهاز</string>
+    <string name="error_status_update">حدث خطأ أثناء تحديث الحالة</string>
+    <string name="unknown_value">غير معروف</string>
+
+    <string name="toast_coordinate_selected">تم اختيار الإحداثية</string>
+
+    <string name="default_api_key"></string>
+    <string name="domen_server">https://device-analysis.ru</string>
+</resources>

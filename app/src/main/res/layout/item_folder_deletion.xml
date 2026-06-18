@@ -12,7 +12,7 @@
         android:layout_width="24dp"
         android:layout_height="24dp"
         android:src="@drawable/ic_device"
-        android:contentDescription="Удалить иконку"
+        android:contentDescription="@string/content_desc_delete_icon"
         app:tint="#FF4081" />
 
     <TextView
@@ -23,6 +23,6 @@
         android:layout_marginStart="16dp"
         android:textColor="@android:color/white"
         android:textSize="18sp"
-        android:text="Имя папки" />
+        android:text="@string/folder_name_placeholder" />
 
 </LinearLayout>

@@ -16,7 +16,7 @@
         android:background="#0B1A2C"
         app:titleTextColor="@android:color/white"
         app:navigationIcon="?attr/homeAsUpIndicator"
-        app:title="Детали уведомления"/>
+        app:title="@string/notification_details_title"/>
 
     <ScrollView
         android:layout_width="match_parent"
@@ -36,7 +36,7 @@
                 android:textSize="24sp"
                 android:textStyle="bold"
                 android:layout_marginBottom="8dp"
-                tools:text="Обнаружен неавторизованный MAC" />
+                tools:text="@string/notification_title_preview" />
 
             <TextView
                 android:id="@+id/detail_timestamp"
@@ -45,7 +45,7 @@
                 android:textColor="#3DDC84"
                 android:textSize="14sp"
                 android:layout_marginBottom="16dp"
-                tools:text="Дата и время: 2025-12-13 09:19:18" />
+                tools:text="@string/notification_datetime_preview" />
 
             <TextView
                 android:id="@+id/detail_text"
@@ -54,13 +54,13 @@
                 android:textColor="#CCCCCC"
                 android:textSize="16sp"
                 android:layout_marginBottom="24dp"
-                tools:text="В области обнаружен неизвестный Bluetooth-адрес, помеченный как 'ALARM'. Требуется проверка." />
+                tools:text="@string/notification_body_preview" />
 
             <TextView
                 android:id="@+id/binary_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Прикрепленные файлы:"
+                android:text="@string/attached_files_label"
                 android:textColor="@color/white"
                 android:textSize="16sp"
                 android:textStyle="bold"

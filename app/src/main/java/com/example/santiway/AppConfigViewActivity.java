@@ -5,6 +5,7 @@ import com.example.santiway.upload_name_device.UserDeviceSyncManager;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
@@ -13,6 +14,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -30,10 +32,11 @@ import androidx.core.view.WindowInsetsCompat;
 import java.util.List;
 import java.util.regex.Pattern;
 
-public class AppConfigViewActivity extends ComponentActivity {
+public class AppConfigViewActivity extends BaseLocalizedActivity {
     private AppSettingsRepository repository;
     private Spinner protocolSpinner;
     private Spinner scannerSpinner;
+    private Spinner languageSpinner;
     private EditText intervalInput;
     private Switch enabledSwitch;
     private EditText signalStrengthInput;
@@ -64,6 +67,7 @@ public class AppConfigViewActivity extends ComponentActivity {
         repository = new AppSettingsRepository(this);
         scannerSpinner = findViewById(R.id.scanner_spinner);
         protocolSpinner = findViewById(R.id.protocol_spinner);
+        languageSpinner = findViewById(R.id.language_spinner);
         intervalInput = findViewById(R.id.interval_input);
         enabledSwitch = findViewById(R.id.enabled_switch);
         signalStrengthInput = findViewById(R.id.signal_strength_input);
@@ -98,7 +102,7 @@ public class AppConfigViewActivity extends ComponentActivity {
         setupScannerSettingsUI();
 
         // Показать текущие значения
-        showCurrentValues();
+        //showCurrentValues();
 
         View root = findViewById(R.id.root_app_config);
         Toolbar toolbar = findViewById(R.id.toolbar);
@@ -193,6 +197,8 @@ public class AppConfigViewActivity extends ComponentActivity {
     }
 
     private void setupSpinners() {
+        setupLanguageSpinner();
+
         // Настройка Spinner для протоколов
         ArrayAdapter<String> protocolAdapter = new ArrayAdapter<String>(
                 this,
@@ -272,7 +278,7 @@ public class AppConfigViewActivity extends ComponentActivity {
             String maskedApiKey = maskApiKey(defaultApiKey);
             apiKeyDisplay.setText(maskedApiKey);
         } else {
-            apiKeyDisplay.setText("API ключ не настроен в приложении");
+            apiKeyDisplay.setText(getString(R.string.error_api_key_not_configured));
         }
 
         // Отображаем IP сервера из strings.xml (только для чтения)
@@ -287,21 +293,21 @@ public class AppConfigViewActivity extends ComponentActivity {
             // ПРОВЕРКА: Выбран ли допустимый протокол
             String selectedProtocol = (String) protocolSpinner.getSelectedItem();
             if (!isAllowedProtocol(selectedProtocol)) {
-                showToast("Ошибка: выберите GSM или GPS");
+                showToast(getString(R.string.error_select_gsm_or_gps));
                 return;
             }
 
             // Получаем и проверяем имя устройства
             String deviceName = deviceNameInput.getText().toString().trim();
             if (deviceName.isEmpty()) {
-                deviceName = "Telephone"; // Если пустое, устанавливаем по умолчанию
+                deviceName = getString(R.string.default_device_name); // Если пустое, устанавливаем по умолчанию
                 deviceNameInput.setText(deviceName);
             }
 
             // Сохраняем протокол и имя устройства
             String oldDeviceName = repository.getDeviceName();
             if (oldDeviceName == null || oldDeviceName.trim().isEmpty()) {
-                oldDeviceName = "Telephone";
+                oldDeviceName = getString(R.string.default_device_name);
             }
 
             int mapPointLimit = 100;
@@ -329,10 +335,10 @@ public class AppConfigViewActivity extends ComponentActivity {
             if (!deviceName.equals(oldDeviceName)) {
                 repository.setDeviceName(deviceName);
                 new UserDeviceSyncManager(this).syncOwnerDevice();
-                showToast("Название устройства сохранено и отправлено на сервер!");
+                showToast(getString(R.string.toast_device_name_saved));
             } else {
                 repository.setDeviceName(deviceName);
-                showToast("Настройки сохранены. Название устройства не изменялось.");
+                showToast(getString(R.string.toast_settings_saved_device_name_not_changed));
             }
 
             float staticLat = 0f;
@@ -352,7 +358,7 @@ public class AppConfigViewActivity extends ComponentActivity {
                     .putFloat("static_longitude", staticLon)
                     .apply();
 
-            showCurrentValues();
+            //showCurrentValues();
         });
     }
 
@@ -419,14 +425,14 @@ public class AppConfigViewActivity extends ComponentActivity {
             // ПРОВЕРКА: Корректный ли интервал
             Float interval = parseFloat(intervalText);
             if (interval == null || interval < 0) {
-                showToast("Ошибка: введите корректный интервал");
+                showToast(getString(R.string.error_enter_correct_interval));
                 return;
             }
 
             // ПРОВЕРКА: корректность силы сигнала
             Float strength = parseFloat(signalStrength);
             if (strength == null || strength > 0 || strength < -120) {
-                showToast("Ошибка: сила сигнала должна быть в диапазоне от -120 до 0 дБм");
+                showToast(getString(R.string.error_signal_strength_range));;
                 return;
             }
 
@@ -438,11 +444,11 @@ public class AppConfigViewActivity extends ComponentActivity {
             );
 
             if (repository.updateScannerSettings(newSettings)) {
-                showToast("Настройки сканера '" + selectedScanner + "' сохранены!");
+                showToast(getString(R.string.toast_scanner_settings_saved, selectedScanner));
                 updateScanningStatus();
-                showCurrentValues();
+                //showCurrentValues();
             } else {
-                showToast("Ошибка при сохранении настроек");
+                showToast(getString(R.string.error_saving_settings));
             }
         });
     }
@@ -467,41 +473,118 @@ public class AppConfigViewActivity extends ComponentActivity {
         repository.setScanning(isScanning);
     }
 
-    private void showCurrentValues() {
-        StringBuilder stringBuilder = new StringBuilder();
+//    private void showCurrentValues() {
+//        StringBuilder stringBuilder = new StringBuilder();
+//
+//        // Общие настройки
+//        stringBuilder.append("=== ОБЩИЕ НАСТРОЙКИ ===\n");
+//
+//        // IP сервера всегда из strings.xml
+//        String serverIp = getString(R.string.domen_server);
+//        stringBuilder.append("IPv4 сервера: ").append(serverIp).append("\n");
+//
+//        // API ключ всегда из strings.xml
+//        String apiKey = getString(R.string.default_api_key);
+//        stringBuilder.append("API Key: ").append(apiKey != null && !apiKey.isEmpty() ? "настроен" : "не настроен").append("\n");
+//        stringBuilder.append("Протокол: ").append(repository.getGeoProtocol()).append("\n");
+//        stringBuilder.append("Сканирование активно: ").append(repository.isScanning()).append("\n");
+//
+//        // Имя устройства из репозитория
+//        String deviceName = repository.getDeviceName();
+//        if (deviceName == null || deviceName.isEmpty()) {
+//            deviceName = "Telephone (по умолчанию)";
+//        }
+//        stringBuilder.append("Имя устройства: ").append(deviceName).append("\n");
+//
+//        // Настройки сканеров
+//        stringBuilder.append("\n=== НАСТРОЙКИ СКАНЕРОВ ===\n");
+//        for (String scannerName : repository.getAllScanners()) {
+//            ScannerSettings settings = repository.getScannerSettings(scannerName);
+//            if (settings != null) {
+//                stringBuilder.append(scannerName)
+//                        .append(": interval=").append(settings.getScanInterval()).append("s, ")
+//                        .append("signal strength=").append(settings.getSignalStrength()).append(", ")
+//                        .append("enabled=").append(settings.isEnabled()).append("\n");
+//            }
+//        }
+//
+//    }
 
-        // Общие настройки
-        stringBuilder.append("=== ОБЩИЕ НАСТРОЙКИ ===\n");
+    private void setupLanguageSpinner() {
+        String[] languageNames = {
+                getString(R.string.language_russian),
+                getString(R.string.language_english),
+                getString(R.string.language_arabic),
+                getString(R.string.language_chinese)
+        };
 
-        // IP сервера всегда из strings.xml
-        String serverIp = getString(R.string.domen_server);
-        stringBuilder.append("IPv4 сервера: ").append(serverIp).append("\n");
+        String[] languageCodes = {"ru", "en", "ar", "zh"};
 
-        // API ключ всегда из strings.xml
-        String apiKey = getString(R.string.default_api_key);
-        stringBuilder.append("API Key: ").append(apiKey != null && !apiKey.isEmpty() ? "настроен" : "не настроен").append("\n");
-        stringBuilder.append("Протокол: ").append(repository.getGeoProtocol()).append("\n");
-        stringBuilder.append("Сканирование активно: ").append(repository.isScanning()).append("\n");
+        ArrayAdapter<String> languageAdapter = new ArrayAdapter<String>(
+                this,
+                android.R.layout.simple_spinner_item,
+                languageNames
+        ) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                TextView text = view.findViewById(android.R.id.text1);
 
-        // Имя устройства из репозитория
-        String deviceName = repository.getDeviceName();
-        if (deviceName == null || deviceName.isEmpty()) {
-            deviceName = "Telephone (по умолчанию)";
-        }
-        stringBuilder.append("Имя устройства: ").append(deviceName).append("\n");
+                if (text != null) {
+                    text.setTextColor(Color.WHITE);
+                    text.setTextSize(16);
+                    text.setPadding(dpToPx(12), dpToPx(10), dpToPx(12), dpToPx(10));
+                }
 
-        // Настройки сканеров
-        stringBuilder.append("\n=== НАСТРОЙКИ СКАНЕРОВ ===\n");
-        for (String scannerName : repository.getAllScanners()) {
-            ScannerSettings settings = repository.getScannerSettings(scannerName);
-            if (settings != null) {
-                stringBuilder.append(scannerName)
-                        .append(": interval=").append(settings.getScanInterval()).append("s, ")
-                        .append("signal strength=").append(settings.getSignalStrength()).append(", ")
-                        .append("enabled=").append(settings.isEnabled()).append("\n");
+                return view;
             }
+
+            @Override
+            public View getDropDownView(int position, View convertView, ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                TextView text = view.findViewById(android.R.id.text1);
+
+                if (text != null) {
+                    text.setTextColor(Color.WHITE);
+                    text.setTextSize(16);
+                    text.setBackgroundColor(Color.parseColor("#172A46"));
+                    text.setPadding(dpToPx(16), dpToPx(12), dpToPx(16), dpToPx(12));
+                }
+
+                return view;
+            }
+        };
+
+        languageAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        languageSpinner.setAdapter(languageAdapter);
+
+        String currentLanguage = LocaleHelper.getCurrentLanguage(this);
+        int currentPosition = getIndexOf(languageCodes, currentLanguage);
+
+        if (currentPosition != -1) {
+            languageSpinner.setSelection(currentPosition, false);
         }
 
+        languageSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String selectedLanguage = languageCodes[position];
+                String currentLanguage = LocaleHelper.getCurrentLanguage(AppConfigViewActivity.this);
+
+                if (!selectedLanguage.equals(currentLanguage)) {
+                    LocaleHelper.setLocale(AppConfigViewActivity.this, selectedLanguage);
+
+                    Intent intent = getIntent();
+                    finish();
+                    overridePendingTransition(0, 0);
+                    startActivity(intent);
+                    overridePendingTransition(0, 0);
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
     }
 
     private void showToast(String message) {

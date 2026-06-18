@@ -16,7 +16,7 @@
         android:background="#0B1A2C"
         app:titleTextColor="@android:color/white"
         app:navigationIcon="?attr/homeAsUpIndicator"
-        app:title="Уведомления"/>
+        app:title="@string/notifications_title"/>
 
     <TextView
         android:id="@+id/empty_state_text"
@@ -24,7 +24,7 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:gravity="center"
-        android:text="Нет уведомлений"
+        android:text="@string/no_notifications"
         android:textColor="#808080"
         android:textSize="16sp"
         android:visibility="gone" />
@@ -46,7 +46,7 @@
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="16dp"
-        android:text="Очистить все"
+        android:text="@string/clear_all"
         android:textAllCaps="false"
         android:textColor="@android:color/white"
         android:backgroundTint="#FF3B30"
