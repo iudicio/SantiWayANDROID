@@ -11,13 +11,14 @@
         android:id="@+id/imageView"
         android:layout_width="64dp"
         android:layout_height="64dp"
-        android:src="@drawable/ic_mark" android:contentDescription="Application logo" />
+        android:src="@drawable/ic_mark"
+        android:contentDescription="@string/logo_description" />
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingTop="8dp"
-        android:text="Сетевой сканнер"
+        android:text="@string/network_scanner_title"
         android:textAppearance="@style/TextAppearance.AppCompat.Body1"
         android:textColor="@android:color/white"
         android:textSize="18sp"
@@ -27,7 +28,7 @@
         android:id="@+id/textView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Имя пользователя"
+        android:text="@string/user_name_placeholder"
         android:textColor="#CCCCCC"
         android:textSize="14sp" />
 

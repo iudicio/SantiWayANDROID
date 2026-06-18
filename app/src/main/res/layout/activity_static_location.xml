@@ -16,7 +16,7 @@
         android:layout_gravity="center"
         android:translationY="-21dp"
         android:src="@drawable/ic_map_pin"
-        android:contentDescription="Выбранная точка" />
+        android:contentDescription="@string/content_desc_selected_point" />
 
     <LinearLayout
         android:id="@+id/custom_zoom_container"
@@ -32,7 +32,7 @@
             android:layout_height="48dp"
             android:background="@drawable/bg_map_zoom_button"
             android:gravity="center"
-            android:text="+"
+            android:text="@string/zoom_in"
             android:textColor="@android:color/white"
             android:textSize="28sp"
             android:textStyle="bold" />
@@ -44,7 +44,7 @@
             android:layout_marginTop="10dp"
             android:background="@drawable/bg_map_zoom_button"
             android:gravity="center"
-            android:text="−"
+            android:text="@string/zoom_out"
             android:textColor="@android:color/white"
             android:textSize="30sp"
             android:textStyle="bold" />
@@ -57,7 +57,7 @@
         android:layout_height="52dp"
         android:layout_gravity="bottom"
         android:layout_margin="60dp"
-        android:text="Выбрать эту точку"
+        android:text="@string/select_this_point"
         android:textColor="@android:color/white"
         android:backgroundTint="#172A46" />
 

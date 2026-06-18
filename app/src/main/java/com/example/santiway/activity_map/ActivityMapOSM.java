@@ -75,7 +75,7 @@ public class ActivityMapOSM extends Fragment {
             double[] lons = args.getDoubleArray("history_longitudes");
             String[] timestamps = args.getStringArray("history_timestamps");
             deviceMac = args.getString("device_mac");
-            deviceName = args.getString("device_name", "Устройство");
+            deviceName = args.getString("device_name", getString(R.string.device_label));
 
             if (lats != null && lons != null && lats.length == lons.length) {
                 for (int i = 0; i < lats.length; i++) {
@@ -83,7 +83,7 @@ public class ActivityMapOSM extends Fragment {
                     if (timestamps != null && i < timestamps.length) {
                         deviceHistoryTimestamps.add(timestamps[i]);
                     } else {
-                        deviceHistoryTimestamps.add("Запись #" + (i + 1));
+                        deviceHistoryTimestamps.add(getString(R.string.map_record_number, i + 1));
                     }
                 }
             }
@@ -191,9 +191,10 @@ public class ActivityMapOSM extends Fragment {
             // Последняя точка (i == size-1) - главный маркер
             if (i == deviceHistoryPoints.size() - 1) {
                 // Последняя точка - главный маркер
-                marker.setTitle(deviceName + " (Последнее местоположение)");
+                marker.setTitle(getString(R.string.map_last_location_title, deviceName));
                 marker.setSnippet("MAC: " + (deviceMac != null ? deviceMac : "N/A") +
-                        "\nВремя: " + (deviceHistoryTimestamps.size() > i ? deviceHistoryTimestamps.get(i) : "Неизвестно"));
+                        "\n" + getString(R.string.time_label_short) + " " +
+                        (deviceHistoryTimestamps.size() > i ? deviceHistoryTimestamps.get(i) : getString(R.string.unknown_value)));
                 try {
                     // Используем цвет в зависимости от статуса
                     int color = getStatusColor(deviceStatus);
@@ -204,9 +205,9 @@ public class ActivityMapOSM extends Fragment {
                 }
             } else {
                 // Промежуточные точки - маленькие маркеры
-                marker.setTitle("Точка " + (i + 1));
+                marker.setTitle(getString(R.string.map_point_title, i + 1));
                 if (deviceHistoryTimestamps != null && i < deviceHistoryTimestamps.size()) {
-                    marker.setSnippet("Время: " + deviceHistoryTimestamps.get(i));
+                    marker.setSnippet(getString(R.string.time_label_short) + " " + deviceHistoryTimestamps.get(i));
                 }
                 try {
                     Bitmap smallMarker = createSmallMarker();

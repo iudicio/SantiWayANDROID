@@ -37,7 +37,7 @@
                 android:textColor="@android:color/white"
                 android:textSize="18sp"
                 android:textStyle="bold"
-                android:text="Заголовок уведомления" />
+                android:text="@string/notification_title_placeholder" />
 
             <TextView
                 android:id="@+id/notification_date"
@@ -46,7 +46,7 @@
                 android:layout_marginTop="4dp"
                 android:textColor="#CCCCCC"
                 android:textSize="14sp"
-                android:text="2025-12-13 09:19:18" />
+                android:text="@string/notification_date_placeholder" />
 
         </LinearLayout>
 
@@ -59,7 +59,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_block"
             app:tint="#FF6B6B"
-            android:contentDescription="Удалить уведомление" />
+            android:contentDescription="@string/content_desc_delete_notification"/>
 
     </LinearLayout>
 </androidx.cardview.widget.CardView>

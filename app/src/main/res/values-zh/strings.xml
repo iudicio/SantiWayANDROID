@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_config_title">应用设置</string>
+    <string name="general_settings_title">常规设置</string>
+    <string name="server_ipv4_hint">服务器 IPv4 地址</string>
+    <string name="device_name_hint">设备名称</string>
+    <string name="api_key_hint">API 密钥</string>
+    <string name="map_points_count_hint">地图上的点数</string>
+    <string name="geolocation_protocol_label">地理定位协议：</string>
+    <string name="target_detection_label">检测 target 设备</string>
+    <string name="use_static_coordinates">使用静态坐标</string>
+    <string name="latitude_hint">纬度</string>
+    <string name="longitude_hint">经度</string>
+    <string name="select_point_on_map">在地图上选择点</string>
+    <string name="save_general_settings">保存常规设置</string>
+    <string name="scanner_settings_title">扫描器设置</string>
+    <string name="select_scanner_label">选择扫描器：</string>
+    <string name="scan_interval_hint">扫描间隔（秒）</string>
+    <string name="signal_strength_hint">检测信号强度</string>
+    <string name="enabled_label">已启用</string>
+    <string name="save_scanner_settings">保存扫描器设置</string>
+
+    <string name="status_target">TARGET</string>
+    <string name="status_all">全部</string>
+    <string name="status_safe">SAFE</string>
+    <string name="search_by_name_or_mac_hint">按名称或 MAC 搜索</string>
+
+    <string name="default_folder_unified_data">主文件夹</string>
+    <string name="timer_zero">00:00:00</string>
+    <string name="content_desc_start_pause">开始/暂停</string>
+    <string name="content_desc_snapshot">快照</string>
+    <string name="content_desc_wifi_icon">Wi-Fi 图标</string>
+    <string name="content_desc_bluetooth_icon">Bluetooth 图标</string>
+    <string name="content_desc_cellular_icon">蜂窝网络图标</string>
+    <string name="last_sent_label">最后发送</string>
+    <string name="datetime_placeholder">--:--:-- --.--.----</string>
+
+    <string name="status_target_en">Target</string>
+    <string name="status_safe_en">Safe</string>
+    <string name="zoom_in">+</string>
+    <string name="zoom_out">−</string>
+    <string name="content_desc_center_map">居中地图</string>
+    <string name="content_desc_filter">筛选</string>
+    <string name="content_desc_refresh">刷新</string>
+    <string name="device_label">设备</string>
+    <string name="device_operator_placeholder">MTS RUS [31]</string>
+    <string name="mac_address_label">MAC 地址：</string>
+    <string name="mac_address_placeholder">C2:18:03:00:3D:7E</string>
+    <string name="type_label">类型：</string>
+    <string name="type_cell_placeholder">Cell</string>
+    <string name="cid_label">CID：</string>
+    <string name="cid_placeholder">18168328 (LTE)</string>
+    <string name="first_detection_label">首次检测：</string>
+    <string name="first_detection_placeholder">01.04.2026 13:47:25</string>
+    <string name="last_detection_label">最后检测：</string>
+    <string name="last_detection_placeholder">01.04.2026 13:48:54</string>
+    <string name="detections_label">检测次数：</string>
+    <string name="count_placeholder">20</string>
+
+    <string name="notification_details_title">通知详情</string>
+    <string name="notification_title_preview">检测到未授权的 MAC</string>
+    <string name="notification_datetime_preview">日期和时间：2025-12-13 09:19:18</string>
+    <string name="notification_body_preview">在区域内检测到标记为 ALARM 的未知 Bluetooth 地址。需要检查。</string>
+    <string name="attached_files_label">附件：</string>
+
+    <string name="notifications_title">通知</string>
+    <string name="no_notifications">没有通知</string>
+    <string name="clear_all">清除全部</string>
+
+    <string name="content_desc_selected_point">已选择的点</string>
+    <string name="select_this_point">选择此点</string>
+
+    <string name="select_folder_title">选择文件夹</string>
+    <string name="select_folder_for_scan_title">选择用于扫描的文件夹</string>
+
+    <string name="content_desc_rename_icon">重命名图标</string>
+    <string name="rename_action">重命名</string>
+    <string name="content_desc_clear_icon">清除图标</string>
+    <string name="clear_action">清除</string>
+    <string name="grey_action">灰色</string>
+    <string name="content_desc_alarm_icon">警报图标</string>
+    <string name="content_desc_safe_icon">Safe 图标</string>
+
+    <string name="create_new_folder_title">创建新文件夹</string>
+    <string name="enter_folder_name_hint">输入文件夹名称</string>
+
+    <string name="content_desc_notifications_icon">通知图标</string>
+    <string name="content_desc_settings_icon">设置图标</string>
+    <string name="settings_title">设置</string>
+    <string name="devices_title">设备</string>
+    <string name="create_action">创建</string>
+    <string name="delete_action">删除</string>
+
+    <string name="network_scanner_title">网络扫描器</string>
+    <string name="mac_sample_placeholder">00:11:22:33:44:55</string>
+    <string name="type_placeholder">类型</string>
+    <string name="time_placeholder">时间</string>
+    <string name="content_desc_share_json">分享 JSON</string>
+    <string name="info_action">信息</string>
+
+    <string name="content_desc_delete_icon">删除图标</string>
+    <string name="folder_name_placeholder">文件夹名称</string>
+    <string name="content_desc_select">选择</string>
+    <string name="folder_name_placeholder2">文件夹名称</string>
+
+    <string name="notification_title_placeholder">通知标题</string>
+    <string name="notification_date_placeholder">2025-12-13 09:19:18</string>
+    <string name="content_desc_delete_notification">删除通知</string>
+    <string name="startScan">开始扫描</string>
+    <string name="stopScan">停止扫描</string>
+    <string name="database">进入数据库</string>
+    <string name="navigation_drawer_open">打开导航面板</string>
+    <string name="navigation_drawer_close">关闭导航面板</string>
+    <string name="app_name">Network Scanner</string>
+    <string name="time_label_initial">工作时间：00:00:00</string>
+    <string name="bluetooth_text">Bluetooth</string>
+    <string name="wifi_text">Wi-Fi</string>
+    <string name="cellular_text">蜂窝网络</string>
+    <string name="scanning_status">正在扫描…</string>
+    <string name="stopped_status">已停止</string>
+    <string name="coordinates_text">有效坐标：51.5074, -0.1278</string>
+    <string name="button_start">开始</string>
+    <string name="button_stop">停止</string>
+
+    <string name="nav_create_folder">清空文件夹</string>
+    <string name="nav_delete">删除</string>
+    <string name="nav_make_safe">设为 safe</string>
+    <string name="nav_clear_status">清除状态</string>
+    <string name="nav_clear_triggers">清除触发器</string>
+
+    <string name="logo_description">应用标志</string>
+    <string name="toolbar_title">Network Scanner</string>
+    <string name="nav_open">打开导航面板</string>
+    <string name="nav_close">关闭导航面板</string>
+    <string name="status_standby">待机</string>
+    <string name="status_scanning">正在扫描</string>
+    <string name="status_connected">已连接</string>
+    <string name="wifi_status_label">Wi-Fi 状态：</string>
+    <string name="cellular_status_label">蜂窝网络状态：</string>
+    <string name="coordinates_label">坐标：</string>
+    <string name="user_name_placeholder">用户名</string>
+    <string name="device_list_title">设备列表</string>
+
+    <string name="title_wifi_status">Wi-Fi 状态</string>
+    <string name="title_cellular_status">蜂窝网络状态</string>
+    <string name="title_bluetooth_status">Bluetooth 状态</string>
+    <string name="title_coordinates">坐标</string>
+    <string name="status_off">离线</string>
+
+    <string name="folder_name_hint">输入文件夹名称</string>
+
+    <string name="nav_open_folder">打开文件夹</string>
+    <string name="nav_delete_folder">删除文件夹</string>
+
+    <string name="create_folder_dialog_title">创建新文件夹</string>
+    <string name="delete_folder_dialog_title">删除文件夹</string>
+    <string name="folder_name_empty_toast">文件夹名称不能为空。</string>
+    <string name="folder_created_toast">文件夹 \'%1$s\' 已创建。</string>
+    <string name="folder_exists_toast">已存在同名文件夹。</string>
+    <string name="no_folders_to_delete_toast">没有可删除的文件夹。</string>
+    <string name="folder_deleted_toast">文件夹 \'%1$s\' 已删除。</string>
+    <string name="dialog_create">创建</string>
+    <string name="dialog_cancel">取消</string>
+    <string name="dialog_delete">删除</string>
+
+    <string name="device_unknown">未知</string>
+    <string name="device_list_screen_name">设备列表</string>
+
+    <string name="permission_not_granted_message">并非所有权限都已授予。</string>
+    <string name="all_permissions_granted_message">所有权限都已授予。</string>
+
+    <string name="language_label">应用语言：</string>
+    <string name="language_russian">Русский</string>
+    <string name="language_english">English</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_chinese">中文</string>
+    <string name="spinner_arrow">▼</string>
+
+    <string name="toast_scanner_settings_saved">扫描器设置 "%1$s" 已保存！</string>
+    <string name="error_api_key_not_configured">应用中未配置 API 密钥</string>
+    <string name="toast_device_name_saved">设备名称已保存并发送到服务器！</string>
+    <string name="toast_settings_saved_device_name_not_changed">设置已保存。设备名称未更改。</string>
+
+    <string name="dialog_clear_title">清除</string>
+    <string name="dialog_clear_folder_message">删除 %1$s 中的所有记录？</string>
+    <string name="dialog_delete_upper">删除</string>
+    <string name="dialog_cancel_upper">取消</string>
+    <string name="toast_folder_data_deleted">%1$s 中的数据已删除</string>
+    <string name="dialog_rename_title">重命名</string>
+    <string name="dialog_save_upper">保存</string>
+    <string name="error_name_empty">名称不能为空</string>
+    <string name="error_folder_already_exists">已存在同名文件夹！</string>
+    <string name="toast_name_already_taken">名称已被占用</string>
+    <string name="toast_done">完成！</string>
+    <string name="error_table_name_missing">错误：未指定表名</string>
+    <string name="error_device_identifier_missing">无法获取设备标识符</string>
+    <string name="error_no_device_location_data">没有设备位置数据</string>
+    <string name="error_no_export_data">没有可导出的数据</string>
+    <string name="share_json_title">发送 JSON</string>
+    <string name="error_with_message">错误：%1$s</string>
+    <string name="main_folder_name">主文件夹</string>
+    <string name="error_no_selected_tab">未选择标签页</string>
+    <string name="toast_devices_status_updated">%1$d 个设备现在为 %2$s</string>
+
+    <string name="working_time_format">工作时间：%1$s</string>
+    <string name="toast_some_permissions_denied">部分权限未被授予</string>
+    <string name="toast_snapshot_blocks_scan">快照期间不能启动普通扫描</string>
+    <string name="toast_target_detection_enabled">TARGET 检测已启用</string>
+    <string name="toast_target_detection_disabled">TARGET 检测已禁用</string>
+    <string name="toast_update_installed">应用更新已成功安装</string>
+    <string name="error_folder_name_unavailable">文件夹名称不可用</string>
+    <string name="toast_folder_created">已创建文件夹：%1$s</string>
+    <string name="toast_scan_folder_switched">扫描文件夹已切换为：%1$s</string>
+    <string name="toast_snapshot_already_running">快照已在运行</string>
+    <string name="toast_snapshot_started">快照已启动 1 分钟</string>
+    <string name="toast_snapshot_finished">快照已完成</string>
+    <string name="coordinates_unavailable">坐标不可用</string>
+    <string name="toast_scan_started">扫描已启动：%1$s</string>
+    <string name="toast_scan_stopped">扫描已停止</string>
+    <string name="dialog_permissions_missing_title">权限不足</string>
+    <string name="dialog_permissions_missing_message">应用正常运行需要所有请求的权限。没有这些权限，将无法进行扫描和位置检测。</string>
+    <string name="dialog_request_again">重新请求</string>
+    <string name="dialog_limited_functionality_title">警告：功能受限</string>
+    <string name="limited_functionality_intro">请启用以下功能，以便应用正常运行：\n\n</string>
+    <string name="limited_functionality_network">• 移动网络或 Wi-Fi（用于发送数据）\n</string>
+    <string name="limited_functionality_location">• 地理定位（GPS 和基于网络的位置）\n</string>
+    <string name="limited_functionality_wifi">• Wi-Fi（用于扫描 Wi-Fi 网络）\n</string>
+    <string name="limited_functionality_bluetooth">• Bluetooth（用于扫描 Bluetooth 设备）\n</string>
+    <string name="limited_functionality_outro">\n没有这些功能，数据可能会收集不完整或不正确。</string>
+    <string name="dialog_open_settings">前往设置</string>
+    <string name="dialog_continue">继续</string>
+    <string name="error_cannot_open_settings">无法打开设置</string>
+    <string name="dialog_required_permissions_title">所需权限</string>
+    <string name="dialog_required_permissions_message">要扫描 Wi-Fi 和 Bluetooth 设备，应用需要：\n\n• 位置访问权限（用于检测设备）\n• Bluetooth 扫描权限（Android 12+）\n\n这些权限是应用主要功能所必需的。</string>
+    <string name="dialog_request">请求</string>
+    <string name="dialog_later">稍后</string>
+    <string name="dialog_notifications_title">通知</string>
+    <string name="dialog_notifications_permission_message">允许通知以接收扫描信息？</string>
+    <string name="dialog_allow">允许</string>
+    <string name="toast_devices_in_folder_marked">%2$s 中的 %1$d 个设备已标记为 %3$s。</string>
+    <string name="error_current_scan_folder_unknown">当前扫描文件夹未定义。</string>
+    <string name="toast_folder_selected">已选择文件夹：%1$s</string>
+    <string name="toast_no_folders_to_delete">除了 "%1$s" 之外没有可删除的文件夹</string>
+    <string name="toast_folder_deleted">文件夹已删除：%1$s</string>
+    <string name="error_folder_delete">删除文件夹时出错</string>
+    <string name="toast_apk_received">已收到 APK：%1$s</string>
+    <string name="toast_websocket_connected">WebSocket 已连接</string>
+    <string name="toast_websocket_disconnected">WebSocket 已断开连接</string>
+    <string name="toast_folder_short">文件夹：%1$s</string>
+    <string name="select_folder_for_delete_title">选择要删除的文件夹</string>
+    <string name="dialog_confirm_delete_title">确认删除</string>
+    <string name="dialog_confirm_delete_folder_message">确定要删除文件夹 «%1$s» 吗？所有数据都将丢失！</string>
+    <string name="error_location_permission_denied">位置权限已被拒绝</string>
+    <string name="error_location_error">位置错误：%1$s</string>
+
+    <string name="time_label_short">时间：</string>
+    <string name="map_point_title">点 %1$d</string>
+    <string name="map_record_number">记录 №%1$d</string>
+    <string name="map_last_location_title">%1$s（最后位置）</string>
+
+    <string name="error_loading_data">加载数据时出错</string>
+    <string name="datetime_format_label">日期和时间：%1$s</string>
+    <string name="install_apk">安装 APK</string>
+    <string name="unknown_file_type_message">文件：%1$s（%2$d 字节）。无法识别该类型以直接显示。如果显示此文本，则 MIME 类型不匹配 "image/*" 或 "application/vnd.android.package-archive"。</string>
+    <string name="error_installing_apk">安装 APK 时出错：%1$s</string>
+
+    <string name="toast_all_notifications_cleared">所有通知已清除</string>
+    <string name="error_opening_map">打开地图时出错</string>
+    <string name="toast_deleted">已删除</string>
+
+    <string name="device_map_title">设备地图</string>
+    <string name="toast_device_marked_target">设备已标记为 TARGET</string>
+    <string name="toast_device_marked_safe">设备已标记为 SAFE</string>
+    <string name="toast_device_marked_grey">设备已标记为 GREY</string>
+    <string name="error_status_update">更新状态时出错</string>
+    <string name="unknown_value">未知</string>
+
+    <string name="toast_coordinate_selected">坐标已选择</string>
+
+    <string name="default_api_key"></string>
+    <string name="domen_server">https://device-analysis.ru</string>
+</resources>

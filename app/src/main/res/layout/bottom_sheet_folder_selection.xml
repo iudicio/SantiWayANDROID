@@ -9,7 +9,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Выберите папку для сканирования"
+        android:text="@string/select_folder_for_scan_title"
         android:textColor="@android:color/white"
         android:textSize="20sp"
         android:textStyle="bold"

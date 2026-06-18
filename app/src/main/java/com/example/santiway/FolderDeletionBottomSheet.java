@@ -63,7 +63,7 @@ public class FolderDeletionBottomSheet extends BottomSheetDialogFragment {
         View view = inflater.inflate(R.layout.bottom_sheet_folder_list, container, false);
 
         TextView title = view.findViewById(R.id.bottom_sheet_title);
-        title.setText("Выберите папку для удаления");
+        title.setText(getString(R.string.select_folder_for_delete_title));
 
         ListView listView = view.findViewById(R.id.folder_list_view);
 
@@ -95,14 +95,14 @@ public class FolderDeletionBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void showConfirmDeleteDialog(String folderName) {
-        new AlertDialog.Builder(requireContext(), R.style.MyAlertDialogStyle) // Используем MyAlertDialogStyle для стилизации
-                .setTitle("Подтверждение удаления")
-                .setMessage("Вы уверены, что хотите удалить папку '" + folderName + "'? Все данные будут потеряны!")
-                .setPositiveButton("Удалить", (dialog, which) -> {
+        new AlertDialog.Builder(requireContext(), R.style.MyAlertDialogStyle)
+                .setTitle(getString(R.string.dialog_confirm_delete_title))
+                .setMessage(getString(R.string.dialog_confirm_delete_folder_message, folderName))
+                .setPositiveButton(getString(R.string.dialog_delete), (dialog, which) -> {
                     listener.onDeleteRequested(folderName);
                     dismiss();
                 })
-                .setNegativeButton("Отмена", null)
+                .setNegativeButton(getString(R.string.dialog_cancel), null)
                 .show();
     }
 }

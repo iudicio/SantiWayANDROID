@@ -1,5 +1,6 @@
 package com.example.santiway.activity_map;
 
+import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -24,6 +25,8 @@ import androidx.core.view.WindowInsetsCompat;
 import com.example.santiway.R;
 import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.example.santiway.DeviceListActivity;
+import com.example.santiway.LocaleHelper;
+import com.example.santiway.BaseLocalizedActivity;
 
 import org.osmdroid.util.GeoPoint;
 
@@ -33,7 +36,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-public class ActivityMapActivity extends AppCompatActivity {
+public class ActivityMapActivity extends BaseLocalizedActivity {
 
     private ActivityMapOSM mapFragment;
     private List<GeoPoint> deviceHistoryPoints = new ArrayList<>();
@@ -66,6 +69,11 @@ public class ActivityMapActivity extends AppCompatActivity {
     // Форматы даты
     private SimpleDateFormat dateFormat = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.getDefault());
     private SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(LocaleHelper.wrap(newBase));
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -265,7 +273,7 @@ public class ActivityMapActivity extends AppCompatActivity {
         if (getSupportActionBar() != null) {
             String title = (deviceName != null && !deviceName.isEmpty())
                     ? deviceName
-                    : (deviceMac != null ? deviceMac : "Карта устройства");
+                    : (deviceMac != null ? deviceMac : getString(R.string.device_map_title));
             getSupportActionBar().setTitle(title);
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
@@ -301,20 +309,20 @@ public class ActivityMapActivity extends AppCompatActivity {
         if ("TARGET".equals(status)) {
             setInfoCardColor("#CCFF3B30");
 
-            setupStatusButton(btnMakeTarget, "Grey", "#808080", "GREY");
-            setupStatusButton(btnMakeSafe, "Safe", "#34C759", "SAFE");
+            setupStatusButton(btnMakeTarget, getString(R.string.grey_action), "#808080", "GREY");
+            setupStatusButton(btnMakeSafe, getString(R.string.status_safe_en), "#34C759", "SAFE");
 
         } else if ("SAFE".equals(status)) {
             setInfoCardColor("#CC34C759");
 
-            setupStatusButton(btnMakeTarget, "Target", "#FF3B30", "TARGET");
-            setupStatusButton(btnMakeSafe, "Grey", "#808080", "GREY");
+            setupStatusButton(btnMakeTarget, getString(R.string.status_target_en), "#FF3B30", "TARGET");
+            setupStatusButton(btnMakeSafe, getString(R.string.grey_action), "#808080", "GREY");
 
         } else {
             setInfoCardColor("#CC172A46");
 
-            setupStatusButton(btnMakeTarget, "Target", "#FF3B30", "TARGET");
-            setupStatusButton(btnMakeSafe, "Safe", "#34C759", "SAFE");
+            setupStatusButton(btnMakeTarget, getString(R.string.status_target_en), "#FF3B30", "TARGET");
+            setupStatusButton(btnMakeSafe, getString(R.string.status_safe_en), "#34C759", "SAFE");
         }
     }
 
@@ -358,16 +366,16 @@ public class ActivityMapActivity extends AppCompatActivity {
 
                 String message;
                 if ("TARGET".equalsIgnoreCase(newStatus)) {
-                    message = "Устройство помечено как TARGET";
+                    message = getString(R.string.toast_device_marked_target);
                 } else if ("SAFE".equalsIgnoreCase(newStatus)) {
-                    message = "Устройство помечено как SAFE";
+                    message = getString(R.string.toast_device_marked_safe);
                 } else {
-                    message = "Устройство помечено как GREY";
+                    message = getString(R.string.toast_device_marked_grey);
                 }
 
                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(this, "Ошибка обновления статуса", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, getString(R.string.error_status_update), Toast.LENGTH_SHORT).show();
             }
         }
     }
@@ -378,7 +386,7 @@ public class ActivityMapActivity extends AppCompatActivity {
         View rowCid = findViewById(R.id.row_cid);
 
         tvDeviceName.setText(
-                (deviceName != null && !deviceName.trim().isEmpty()) ? deviceName : "Unknown"
+                (deviceName != null && !deviceName.trim().isEmpty()) ? deviceName : getString(R.string.unknown_value)
         );
 
         String subtitle = "";
@@ -392,8 +400,8 @@ public class ActivityMapActivity extends AppCompatActivity {
         }
         tvSubtitle.setText(subtitle);
 
-        tvMacAddress.setText(deviceMac != null ? deviceMac : "Неизвестно");
-        tvDeviceType.setText(deviceType != null ? deviceType : "Неизвестно");
+        tvMacAddress.setText(deviceMac != null ? deviceMac : getString(R.string.unknown_value));
+        tvDeviceType.setText(deviceType != null ? deviceType : getString(R.string.unknown_value));
 
         boolean isCell = deviceType != null &&
                 (deviceType.equalsIgnoreCase("Cell")
@@ -411,13 +419,13 @@ public class ActivityMapActivity extends AppCompatActivity {
         if (firstDetectionTime > 0) {
             tvFirstDetected.setText(dateFormat.format(new Date(firstDetectionTime)));
         } else {
-            tvFirstDetected.setText("Неизвестно");
+            tvFirstDetected.setText(getString(R.string.unknown_value));
         }
 
         if (lastDetectionTime > 0) {
             tvLastDetected.setText(dateFormat.format(new Date(lastDetectionTime)));
         } else {
-            tvLastDetected.setText("Неизвестно");
+            tvLastDetected.setText(getString(R.string.unknown_value));
         }
 
         tvDetectionCount.setText(String.valueOf(detectionCount));
@@ -425,7 +433,7 @@ public class ActivityMapActivity extends AppCompatActivity {
 
     private String extractCidOrFallback() {
         if (deviceMac == null || deviceMac.trim().isEmpty()) {
-            return "Неизвестно";
+            return getString(R.string.unknown_value);
         }
 
         // Если у тебя cell-id хранится как 250_1_36340_18168327
