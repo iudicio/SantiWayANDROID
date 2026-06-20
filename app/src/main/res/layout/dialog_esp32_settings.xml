@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:background="@drawable/bg_folder_actions_dialog" android:orientation="vertical" android:padding="20dp">
+    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="@string/esp32_settings_title" android:textColor="@android:color/white"
+        android:textSize="20sp" android:textStyle="bold" />
+    <TextView android:id="@+id/esp32_settings_mac" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textColor="#9FB3C8" />
+    <EditText android:id="@+id/esp32_name_input" style="@style/Esp32SettingsInput"
+        android:hint="@string/device_name_hint" android:inputType="text" />
+    <EditText android:id="@+id/esp32_latitude_input" style="@style/Esp32SettingsInput"
+        android:hint="@string/latitude_hint" android:inputType="numberDecimal|numberSigned" />
+    <EditText android:id="@+id/esp32_longitude_input" style="@style/Esp32SettingsInput"
+        android:hint="@string/longitude_hint" android:inputType="numberDecimal|numberSigned" />
+    <EditText android:id="@+id/esp32_altitude_input" style="@style/Esp32SettingsInput"
+        android:hint="@string/column_altitude" android:inputType="numberDecimal|numberSigned" />
+    <com.google.android.material.button.MaterialButton android:id="@+id/esp32_save_settings"
+        style="@style/Esp32SettingsButton" android:text="@string/dialog_save_upper" />
+    <com.google.android.material.button.MaterialButton android:id="@+id/esp32_connection_action"
+        style="@style/Esp32SettingsButton" android:text="@string/esp32_connect" />
+    <com.google.android.material.button.MaterialButton android:id="@+id/esp32_delete"
+        style="@style/Esp32SettingsButton" android:text="@string/delete_action" app:backgroundTint="#7A2636" />
+</LinearLayout>

@@ -54,6 +54,8 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.example.santiway.bluetooth_scanner.BluetoothForegroundService;
 import com.example.santiway.cell_scanner.CellForegroundService;
+import com.example.santiway.esp32.Esp32Activity;
+import com.example.santiway.esp32.Esp32ConnectionService;
 import com.example.santiway.upload_data.ApiConfig;
 import com.example.santiway.upload_data.DeviceUploadManager;
 import com.example.santiway.upload_data.DeviceUploadService;
@@ -156,6 +158,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
                         }
 
                         if (allGranted) {
+                            startEsp32ConnectionServiceIfPermitted();
                             // Разрешения получены
                             initializeLocationManager();
                             checkAllFunctionalityAndWarn();
@@ -218,6 +221,9 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
         scanArrowsIcon = findViewById(R.id.scan_arrows_icon);
         snapshotButton = findViewById(R.id.snapshot_button);
         targetDetectionButton = findViewById(R.id.target_detection_button);
+        findViewById(R.id.esp32_button).setOnClickListener(v ->
+                startActivity(new Intent(this, Esp32Activity.class)));
+        startEsp32ConnectionServiceIfPermitted();
         toolbarFolderTitleTextView = findViewById(R.id.toolbar_folder_title);
         wifiStatusTextView = findViewById(R.id.wifi_status);
         bluetoothStatusTextView = findViewById(R.id.bluetooth_status);
@@ -365,6 +371,14 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
 
     private int dpToPx(int dp) {
         return Math.round(dp * getResources().getDisplayMetrics().density);
+    }
+
+    private void startEsp32ConnectionServiceIfPermitted() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
+                == PackageManager.PERMISSION_GRANTED) {
+            ContextCompat.startForegroundService(this, new Intent(this, Esp32ConnectionService.class));
+        }
     }
 
     private void applyNavigationBarColor() {

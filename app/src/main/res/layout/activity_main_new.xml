@@ -63,77 +63,61 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
-            <LinearLayout
+            <GridLayout
                 android:id="@+id/scan_buttons_container"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="32dp"
                 android:layout_marginTop="16dp"
-                android:orientation="horizontal"
+                android:layout_marginEnd="32dp"
+                android:columnCount="2"
+                android:rowCount="2"
                 android:gravity="center"
                 app:layout_constraintTop_toBottomOf="@id/time_label"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent">
 
-                <FrameLayout
-                    android:id="@+id/scan_button_container"
-                    android:layout_width="96dp"
-                    android:layout_height="96dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:background="@android:color/transparent"
-                    app:layout_constraintTop_toTopOf="@id/play_pause_button"
-                    app:layout_constraintBottom_toBottomOf="@id/play_pause_button"
-                    app:layout_constraintStart_toStartOf="@id/play_pause_button"
-                    app:layout_constraintEnd_toEndOf="@id/play_pause_button">
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_columnWeight="1" android:gravity="center" android:orientation="vertical">
+                    <FrameLayout android:id="@+id/scan_button_container" android:layout_width="82dp"
+                        android:layout_height="82dp" android:background="@drawable/rounded_button_with_stroke">
+                        <ImageView android:id="@+id/scan_arrows_icon" android:layout_width="82dp"
+                            android:layout_height="82dp" android:layout_gravity="center" android:src="@drawable/ic_scan_arrows" />
+                        <ImageButton android:id="@+id/play_pause_button" android:layout_width="52dp"
+                            android:layout_height="52dp" android:layout_gravity="center"
+                            android:background="@android:color/transparent" android:contentDescription="@string/content_desc_start_pause"
+                            android:src="@drawable/ic_play_scan" />
+                    </FrameLayout>
+                    <TextView style="@style/MainControlLabel" android:text="@string/control_scan" />
+                </LinearLayout>
 
-                    <ImageView
-                        android:id="@+id/scan_arrows_icon"
-                        android:layout_width="96dp"
-                        android:layout_height="96dp"
-                        android:layout_gravity="center"
-                        android:src="@drawable/ic_scan_arrows" />
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_columnWeight="1" android:gravity="center" android:orientation="vertical">
+                    <ImageButton android:id="@+id/snapshot_button" style="@style/MainControlButton"
+                        android:contentDescription="@string/content_desc_snapshot" android:src="@drawable/ic_snapshot_camera" />
+                    <TextView style="@style/MainControlLabel" android:text="@string/control_snapshot" />
+                </LinearLayout>
 
-                    <ImageButton
-                        android:id="@+id/play_pause_button"
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:layout_gravity="center"
-                        android:background="@android:color/transparent"
-                        android:src="@drawable/ic_play_scan"
-                        android:scaleType="center"
-                        android:contentDescription="@string/content_desc_start_pause" />
-                </FrameLayout>
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_columnWeight="1" android:layout_marginTop="12dp" android:gravity="center" android:orientation="vertical">
+                    <ImageButton android:id="@+id/target_detection_button" style="@style/MainControlButton"
+                        android:contentDescription="@string/control_alerts" android:src="@drawable/ic_target_bell" />
+                    <TextView style="@style/MainControlLabel" android:text="@string/control_alerts" />
+                </LinearLayout>
 
-                <ImageButton
-                    android:id="@+id/snapshot_button"
-                    android:layout_width="96dp"
-                    android:layout_height="96dp"
-                    android:layout_marginStart="16dp"
-                    android:background="@drawable/rounded_button_with_stroke"
-                    android:elevation="6dp"
-                    android:src="@drawable/ic_snapshot_camera"
-                    android:scaleType="fitCenter"
-                    android:padding="24dp"
-                    android:contentDescription="@string/content_desc_snapshot"
-                    app:tint="#3DDC84" />
-
-                <ImageButton
-                    android:id="@+id/target_detection_button"
-                    android:layout_width="86dp"
-                    android:layout_height="86dp"
-                    android:layout_marginStart="12dp"
-                    android:background="@drawable/rounded_button_with_stroke"
-                    android:src="@drawable/ic_target_bell"
-                    android:padding="22dp"
-                    app:tint="#3DDC84" />
-
-            </LinearLayout>
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_columnWeight="1" android:layout_marginTop="12dp" android:gravity="center" android:orientation="vertical">
+                    <ImageButton android:id="@+id/esp32_button" style="@style/MainControlButton"
+                        android:contentDescription="@string/control_esp32" android:src="@drawable/ic_esp32_chip" />
+                    <TextView style="@style/MainControlLabel" android:text="@string/control_esp32" />
+                </LinearLayout>
+            </GridLayout>
 
             <androidx.cardview.widget.CardView
                 android:id="@+id/wifi_card"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="32dp"
+                android:layout_marginTop="20dp"
                 android:layout_marginStart="16dp"
                 android:layout_marginEnd="16dp"
                 app:cardBackgroundColor="#172A46" app:cardCornerRadius="12dp"
