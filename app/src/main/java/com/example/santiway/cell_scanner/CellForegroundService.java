@@ -16,6 +16,9 @@ import android.util.Log;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
+import com.example.santiway.FolderNameHelper;
+import com.example.santiway.LocaleHelper;
+import com.example.santiway.R;
 import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
@@ -35,7 +38,7 @@ public class CellForegroundService extends Service {
     private boolean isScanning = false;
     private final long scanInterval = 10000;
 
-    private String currentTableName = "Основная";
+    private String currentTableName = FolderNameHelper.MAIN_FOLDER_INTERNAL;
     private double currentLatitude = 0.0;
     private double currentLongitude = 0.0;
     private double currentAltitude = 0.0;
@@ -75,8 +78,8 @@ public class CellForegroundService extends Service {
 
     private void startForegroundService() {
         Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Cell Scanner Service")
-                .setContentText("Scanning for cellular towers...")
+                .setContentTitle(LocaleHelper.getString(this, R.string.cell_scanner_notification_title))
+                .setContentText(LocaleHelper.getString(this, R.string.cell_scanner_notification_scanning))
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)
@@ -149,7 +152,7 @@ public class CellForegroundService extends Service {
             if (resultId != -1) return true;
         } catch (Exception e) {
             Log.e(TAG, "Failed to save to database. Retrying with 'Основная'. Error: " + e.getMessage());
-            currentTableName = "Основная";
+            currentTableName = FolderNameHelper.MAIN_FOLDER_INTERNAL;
             try {
                 long retryResultId = databaseHelper.addCellTower(tower, currentTableName);
                 if (retryResultId != -1) {
@@ -173,10 +176,10 @@ public class CellForegroundService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    "Cell Scanner Service",
+                    LocaleHelper.getString(this, R.string.cell_scanner_channel_name),
                     NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("Уведомления о сканировании базовых станций");
+            channel.setDescription(LocaleHelper.getString(this, R.string.cell_scanner_channel_description));
             channel.setShowBadge(false);
 
             NotificationManager manager = getSystemService(NotificationManager.class);

@@ -27,6 +27,8 @@ import android.widget.Toast;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
+import com.example.santiway.LocaleHelper;
+import com.example.santiway.R;
 import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.example.santiway.host_database.AppSettingsRepository;
 import com.example.santiway.host_database.ScannerSettings;
@@ -285,7 +287,7 @@ public class BluetoothForegroundService extends Service {
         // Проверяем доступность Bluetooth адаптера
         if (btAdapter == null) {
             Log.e(TAG, "Bluetooth адаптер не инициализирован");
-            Toast.makeText(this, "Bluetooth не поддерживается", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, LocaleHelper.getString(this, R.string.toast_bluetooth_not_supported), Toast.LENGTH_SHORT).show();
             stopSelf();
             return;
         }
@@ -293,7 +295,7 @@ public class BluetoothForegroundService extends Service {
         // Проверяем включен ли Bluetooth
         if (!btAdapter.isEnabled()) {
             Log.w(TAG, "Bluetooth выключен, сканирование невозможно");
-            Toast.makeText(this, "Включите Bluetooth для сканирования", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, LocaleHelper.getString(this, R.string.toast_enable_bluetooth), Toast.LENGTH_SHORT).show();
             stopSelf();
             return;
         }
@@ -303,13 +305,13 @@ public class BluetoothForegroundService extends Service {
             bleScanner = btAdapter.getBluetoothLeScanner();
             if (bleScanner == null) {
                 Log.e(TAG, "Не удалось получить BLE сканер");
-                Toast.makeText(this, "Ошибка инициализации Bluetooth", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, LocaleHelper.getString(this, R.string.error_bluetooth_initialization), Toast.LENGTH_SHORT).show();
                 stopSelf();
                 return;
             }
         } catch (Exception e) {
             Log.e(TAG, "Ошибка при получении BLE сканера: " + e.getMessage());
-            Toast.makeText(this, "Ошибка Bluetooth", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, LocaleHelper.getString(this, R.string.error_bluetooth), Toast.LENGTH_SHORT).show();
             stopSelf();
             return;
         }
@@ -517,8 +519,8 @@ public class BluetoothForegroundService extends Service {
 
     private Notification createNotification() {
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Bluetooth Scanner")
-                .setContentText("Сканирование Bluetooth-устройств...")
+                .setContentTitle(LocaleHelper.getString(this, R.string.bluetooth_scanner_notification_title))
+                .setContentText(LocaleHelper.getString(this, R.string.bluetooth_scanner_notification_scanning))
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)
@@ -530,8 +532,9 @@ public class BluetoothForegroundService extends Service {
         NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager != null) {
             Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setContentTitle("Bluetooth Scanner")
-                    .setContentText("Найдено: " + totalDevices + " устройств, сохранено: " + savedDevices)
+                    .setContentTitle(LocaleHelper.getString(this, R.string.bluetooth_scanner_notification_title))
+                    .setContentText(LocaleHelper.getString(this, R.string.bluetooth_scanner_notification_progress,
+                            totalDevices, savedDevices))
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
                     .setPriority(NotificationCompat.PRIORITY_LOW)
                     .setOngoing(true)
@@ -545,10 +548,10 @@ public class BluetoothForegroundService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    "Bluetooth Scanner Service",
+                    LocaleHelper.getString(this, R.string.bluetooth_scanner_channel_name),
                     NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("Уведомления о сканировании Bluetooth устройств");
+            channel.setDescription(LocaleHelper.getString(this, R.string.bluetooth_scanner_channel_description));
             channel.setShowBadge(false);
 
             NotificationManager manager = getSystemService(NotificationManager.class);

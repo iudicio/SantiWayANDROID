@@ -11,6 +11,7 @@ import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.sqlite.SQLiteDatabase;
+import android.graphics.Color;
 import android.location.Location;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -47,6 +48,7 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.GravityCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
@@ -92,7 +94,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
     private MainDatabaseHelper databaseHelper;
     private LocationManager locationManager;
     private boolean isScanning = false;
-    private static final String DEFAULT_FOLDER_INTERNAL = "Основная";
+    private static final String DEFAULT_FOLDER_INTERNAL = FolderNameHelper.MAIN_FOLDER_INTERNAL;
     private String currentScanFolder = DEFAULT_FOLDER_INTERNAL;
     private DeviceUploadManager uploadManager;
 
@@ -178,6 +180,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
+        applyNavigationBarColor();
         setContentView(R.layout.activity_main_new);
 
         drawerLayout = findViewById(R.id.drawer_layout);
@@ -357,11 +360,20 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
     }
 
     private String getDisplayFolderName(String folderName) {
-        return folderName;
+        return FolderNameHelper.getDisplayName(this, folderName);
     }
 
     private int dpToPx(int dp) {
         return Math.round(dp * getResources().getDisplayMetrics().density);
+    }
+
+    private void applyNavigationBarColor() {
+        getWindow().setNavigationBarColor(Color.parseColor("#172A46"));
+        new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView())
+                .setAppearanceLightNavigationBars(false);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            getWindow().setNavigationBarContrastEnforced(false);
+        }
     }
 
     private void updateToolbarTitle(String folderName) {
@@ -427,7 +439,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
                                 .putString(KEY_CURRENT_FOLDER, currentScanFolder)
                                 .apply();
                         runOnUiThread(() -> Toast.makeText(MainActivity.this,
-                                getString(R.string.toast_scan_folder_switched, newTableName),
+                                getString(R.string.toast_scan_folder_switched, getDisplayFolderName(newTableName)),
                                 Toast.LENGTH_LONG).show());
                     }
                 }
@@ -617,7 +629,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
         timerHandler.removeCallbacks(timerRunnable);
         timerHandler.postDelayed(timerRunnable, 0);
 
-        Toast.makeText(this, getString(R.string.toast_scan_started, currentScanFolder), Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, getString(R.string.toast_scan_started, getDisplayFolderName(currentScanFolder)), Toast.LENGTH_SHORT).show();
     }
 
     private void stopScanning() {
@@ -937,7 +949,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
             if (currentScanFolder != null && !currentScanFolder.isEmpty()) {
                 int affectedRows = databaseHelper.updateAllDeviceStatusForTable(currentScanFolder, "SAFE");
                 Toast.makeText(this,
-                        getString(R.string.toast_devices_in_folder_marked, affectedRows, currentScanFolder, "SAFE"),
+                        getString(R.string.toast_devices_in_folder_marked, affectedRows, getDisplayFolderName(currentScanFolder), "SAFE"),
                         Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, getString(R.string.error_current_scan_folder_unknown), Toast.LENGTH_SHORT).show();
@@ -947,7 +959,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
             if (currentScanFolder != null && !currentScanFolder.isEmpty()) {
                 int affectedRows = databaseHelper.updateAllDeviceStatusForTable(currentScanFolder, "GREY");
                 Toast.makeText(this,
-                        getString(R.string.toast_devices_in_folder_marked, affectedRows, currentScanFolder, "GREY"),
+                        getString(R.string.toast_devices_in_folder_marked, affectedRows, getDisplayFolderName(currentScanFolder), "GREY"),
                         Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, getString(R.string.error_current_scan_folder_unknown), Toast.LENGTH_SHORT).show();
@@ -1009,7 +1021,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
                     startScanning();
                 }
 
-                Toast.makeText(MainActivity.this, getString(R.string.toast_folder_selected, currentScanFolder), Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, getString(R.string.toast_folder_selected, getDisplayFolderName(currentScanFolder)), Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -1088,7 +1100,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
                 String formattedDate = sdf.format(new Date(lastUploadTime));
                 lastUploadDateTextView.setText(formattedDate);
             } else {
-                lastUploadDateTextView.setText("--:--:-- --.--.----");
+                lastUploadDateTextView.setText(R.string.datetime_placeholder);
             }
         }
     }

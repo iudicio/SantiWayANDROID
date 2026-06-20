@@ -1,4 +1,5 @@
 package com.example.santiway;
+import android.animation.ObjectAnimator;
 import com.example.santiway.upload_folder_device.UserDeviceFolderSyncManager;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
@@ -36,19 +37,26 @@ import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import org.json.JSONArray;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.LinearInterpolator;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 public class DeviceListActivity extends BaseLocalizedActivity implements DeviceListAdapter.OnDeviceClickListener, StatusUpdateListener {
+
+    private static final String TAG = "DeviceListActivity";
 
     private Toolbar toolbar;
     private TabLayout tabLayout;
@@ -74,6 +82,10 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     private float downX;
     private float downY;
     private static final int SWIPE_THRESHOLD = 120;
+    private static final String KEY_FOLDER_ORDER = "device_folder_order";
+    private final List<String> orderedTables = new ArrayList<>();
+    private final Map<View, ObjectAnimator> folderWiggleAnimations = new HashMap<>();
+    private boolean folderMoveMode;
 
     // Хендлер для задержки
     private Handler handler = new Handler();
@@ -113,6 +125,25 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             }
         }
     };
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        if (folderMoveMode && event.getActionMasked() == MotionEvent.ACTION_DOWN
+                && !isTouchInsideTabLayout(event.getRawX(), event.getRawY())) {
+            stopFolderMoveMode();
+        }
+        return super.dispatchTouchEvent(event);
+    }
+
+    private boolean isTouchInsideTabLayout(float rawX, float rawY) {
+        int[] location = new int[2];
+        tabLayout.getLocationOnScreen(location);
+        return rawX >= location[0]
+                && rawX <= location[0] + tabLayout.getWidth()
+                && rawY >= location[1]
+                && rawY <= location[1] + tabLayout.getHeight();
+    }
+
     @Override
     public void onDeviceClick(Device device, String tableName, int position) {
         openDeviceMap(device, tableName, position);
@@ -217,7 +248,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
                 // 2. Создаем диалог подтверждения
                 AlertDialog dialog = new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
                         .setTitle(getString(R.string.dialog_clear_title))
-                        .setMessage(getString(R.string.dialog_clear_folder_message, currentFolder))
+                        .setMessage(getString(R.string.dialog_clear_folder_message, getDisplayTableName(currentFolder)))
                         .setPositiveButton(getString(R.string.dialog_delete_upper), (d, which) -> {
 
                             // --- ЛОГИКА ОЧИСТКИ ---
@@ -237,7 +268,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
                             currentOffset = 0;
                             hasMoreData = false;
 
-                            Toast.makeText(this, getString(R.string.toast_folder_data_deleted, currentFolder), Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, getString(R.string.toast_folder_data_deleted, getDisplayTableName(currentFolder)), Toast.LENGTH_SHORT).show();
                         })
                         .setNegativeButton(getString(R.string.dialog_cancel_upper), null)
                         .create();
@@ -255,81 +286,8 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             renameButton.setOnClickListener(v -> {
                 int selectedTabPos = tabLayout.getSelectedTabPosition();
                 if (selectedTabPos == -1) return;
-
-                String oldName = tabLayout.getTabAt(selectedTabPos).getText().toString();
-
-                // Поле ввода
-                final EditText input = new EditText(this);
-                input.setText(oldName);
-                input.setTextColor(Color.WHITE);
-
-                FrameLayout container = new FrameLayout(this);
-                FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                params.leftMargin = 50; params.rightMargin = 50;
-                input.setLayoutParams(params);
-                container.addView(input);
-
-                AlertDialog dialog = new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
-                        .setTitle(getString(R.string.dialog_rename_title))
-                        .setView(container)
-                        .setPositiveButton(getString(R.string.dialog_save_upper), null)
-                        .setNegativeButton(getString(R.string.dialog_cancel_upper), null)
-                        .create();
-
-                dialog.show();
-
-                // Переопределяем нажатие на "СОХРАНИТЬ", чтобы контролировать закрытие диалога
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
-                    String newName = input.getText().toString().trim();
-
-                    // 1. Проверка на пустое имя
-                    if (newName.isEmpty()) {
-                        input.setError(getString(R.string.error_name_empty));
-                        return;
-                    }
-
-                    // 2. ПРОВЕРКА НА СУЩЕСТВУЮЩЕЕ ИМЯ
-                    boolean alreadyExists = false;
-                    for (int i = 0; i < tabLayout.getTabCount(); i++) {
-                        if (tabLayout.getTabAt(i).getText().toString().equalsIgnoreCase(newName)) {
-                            alreadyExists = true;
-                            break;
-                        }
-                    }
-
-                    if (alreadyExists && !newName.equalsIgnoreCase(oldName)) {
-                        input.setError(getString(R.string.error_folder_already_exists));
-                        Toast.makeText(this, getString(R.string.toast_name_already_taken), Toast.LENGTH_SHORT).show();
-                    } else {
-                        // 3. Если всё ок — переименовываем
-                        MainDatabaseHelper dbHelper = new MainDatabaseHelper(this); // запрос на сервер
-                        dbHelper.renameTable(oldName, newName);
-
-
-                        new UserDeviceFolderSyncManager(this).syncFolderRenamed(oldName, newName);
-
-                        // обновляем вкладку и tag, иначе currentTable может остаться старым
-                        tabLayout.getTabAt(selectedTabPos).setText(newName);
-                        tabLayout.getTabAt(selectedTabPos).setTag(newName);
-
-                        currentTable = newName;
-
-                        getSharedPreferences("app_prefs", MODE_PRIVATE)
-                                .edit()
-                                .putString("current_folder", newName)
-                                .apply();
-
-                        Intent broadcastIntent = new Intent("com.example.santiway.FOLDER_SWITCHED");
-                        broadcastIntent.putExtra("newTableName", newName);
-                        sendBroadcast(broadcastIntent);
-
-                        dialog.dismiss();
-                        Toast.makeText(this, getString(R.string.toast_done), Toast.LENGTH_SHORT).show();
-                    }
-                });
-
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.parseColor("#3DDC84"));
+                String oldName = (String) tabLayout.getTabAt(selectedTabPos).getTag();
+                showRenameFolderDialog(oldName);
             });
         }
         LinearLayout safeButton = findViewById(R.id.action_safe);
@@ -436,6 +394,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     protected void onPause() {
         super.onPause();
 
+        if (folderMoveMode) stopFolderMoveMode();
         handler.removeCallbacks(autoRefreshRunnable);
         autoRefreshStarted = false;
     }
@@ -517,10 +476,12 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     }
 
     private String getDisplayTableName(String tableName) {
-        return tableName;
+        return FolderNameHelper.getDisplayName(this, tableName);
     }
 
     private void setupTabLayout() {
+        cancelFolderWiggleAnimations();
+        folderMoveMode = false;
         tabLayout.removeAllTabs();
         List<String> tables = databaseHelper.getAllTables();
 
@@ -530,7 +491,11 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             return;
         }
 
-        for (String tableName : tables) {
+        tables = applySavedFolderOrder(tables);
+        orderedTables.clear();
+        orderedTables.addAll(tables);
+
+        for (String tableName : orderedTables) {
             TabLayout.Tab tab = tabLayout.newTab()
                     .setText(getDisplayTableName(tableName));
             tab.setTag(tableName);
@@ -569,7 +534,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
 
         String intentFolder = getIntent().getStringExtra("selected_folder");
         String savedFolder = getSharedPreferences("app_prefs", MODE_PRIVATE)
-                .getString("current_folder", "Основная");
+                .getString("current_folder", FolderNameHelper.MAIN_FOLDER_INTERNAL);
 
         String folderToOpen = intentFolder != null && !intentFolder.trim().isEmpty()
                 ? intentFolder
@@ -591,6 +556,321 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
         if (initialTab != null) {
             initialTab.select();
         }
+
+        tabLayout.post(this::bindFolderLongPressActions);
+    }
+
+    private List<String> applySavedFolderOrder(List<String> databaseTables) {
+        List<String> result = new ArrayList<>();
+        String saved = getSharedPreferences("app_prefs", MODE_PRIVATE)
+                .getString(KEY_FOLDER_ORDER, "[]");
+        try {
+            JSONArray json = new JSONArray(saved);
+            for (int i = 0; i < json.length(); i++) {
+                String folder = json.optString(i);
+                if (databaseTables.contains(folder) && !result.contains(folder)) {
+                    result.add(folder);
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not restore folder order", e);
+        }
+        for (String folder : databaseTables) {
+            if (!result.contains(folder)) result.add(folder);
+        }
+        return result;
+    }
+
+    private void saveFolderOrder() {
+        JSONArray json = new JSONArray();
+        for (String folder : orderedTables) json.put(folder);
+        getSharedPreferences("app_prefs", MODE_PRIVATE)
+                .edit()
+                .putString(KEY_FOLDER_ORDER, json.toString())
+                .apply();
+    }
+
+    private void bindFolderLongPressActions() {
+        if (tabLayout.getChildCount() == 0 || !(tabLayout.getChildAt(0) instanceof ViewGroup)) return;
+        ViewGroup tabStrip = (ViewGroup) tabLayout.getChildAt(0);
+        int count = Math.min(tabStrip.getChildCount(), tabLayout.getTabCount());
+        for (int i = 0; i < count; i++) {
+            TabLayout.Tab tab = tabLayout.getTabAt(i);
+            View tabView = tabStrip.getChildAt(i);
+            if (tab == null || tab.getTag() == null) continue;
+            String folderName = (String) tab.getTag();
+            tabView.setOnTouchListener(null);
+            tabView.setOnLongClickListener(v -> {
+                showFolderActionsDialog(folderName);
+                return true;
+            });
+        }
+    }
+
+    private void showFolderActionsDialog(String folderName) {
+        View content = getLayoutInflater().inflate(R.layout.dialog_folder_actions, null);
+        TextView title = content.findViewById(R.id.folder_actions_dialog_title);
+        title.setText(getString(R.string.folder_actions_title, getDisplayTableName(folderName)));
+
+        AlertDialog dialog = new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
+                .setView(content)
+                .create();
+
+        content.findViewById(R.id.folder_action_move_button).setOnClickListener(v -> {
+            dialog.dismiss();
+            tabLayout.post(this::enableFolderMove);
+        });
+        content.findViewById(R.id.folder_action_rename_button).setOnClickListener(v -> {
+            dialog.dismiss();
+            showRenameFolderDialog(folderName);
+        });
+        content.findViewById(R.id.folder_action_delete_button).setOnClickListener(v -> {
+            dialog.dismiss();
+            showDeleteFolderDialog(folderName);
+        });
+
+        dialog.setOnShowListener(ignored -> {
+            if (dialog.getWindow() != null) {
+                dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+                int width = (int) (getResources().getDisplayMetrics().widthPixels * 0.9f);
+                dialog.getWindow().setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+            }
+        });
+        dialog.show();
+    }
+
+    private void enableFolderMove() {
+        if (tabLayout.getChildCount() == 0 || !(tabLayout.getChildAt(0) instanceof ViewGroup)) return;
+        folderMoveMode = true;
+        Toast.makeText(this, R.string.folder_move_instruction, Toast.LENGTH_LONG).show();
+
+        ViewGroup tabStrip = (ViewGroup) tabLayout.getChildAt(0);
+        int count = Math.min(tabStrip.getChildCount(), tabLayout.getTabCount());
+        for (int i = 0; i < count; i++) {
+            TabLayout.Tab tab = tabLayout.getTabAt(i);
+            if (tab == null || tab.getTag() == null) continue;
+            View tabView = tabStrip.getChildAt(i);
+            startFolderWiggle(tabView);
+            bindFolderDrag(tabStrip, tabView, (String) tab.getTag());
+        }
+    }
+
+    private void startFolderWiggle(View tabView) {
+        tabView.setPivotX(tabView.getWidth() / 2f);
+        tabView.setPivotY(tabView.getHeight() / 2f);
+        ObjectAnimator animator = ObjectAnimator.ofFloat(tabView, View.ROTATION,
+                0f, -20f, 20f, 0f);
+        animator.setDuration(1500L);
+        animator.setInterpolator(new LinearInterpolator());
+        animator.setRepeatCount(ObjectAnimator.INFINITE);
+        animator.setRepeatMode(ObjectAnimator.RESTART);
+        animator.start();
+        folderWiggleAnimations.put(tabView, animator);
+    }
+
+    private void bindFolderDrag(ViewGroup tabStrip, View tabView, String folderName) {
+        final float[] touchStartX = new float[1];
+        tabView.setOnTouchListener((view, event) -> {
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    touchStartX[0] = event.getRawX();
+                    ObjectAnimator wiggle = folderWiggleAnimations.remove(view);
+                    if (wiggle != null) wiggle.cancel();
+                    view.setRotation(0f);
+                    view.setScaleX(1.06f);
+                    view.setScaleY(1.06f);
+                    view.setAlpha(0.9f);
+                    ViewCompat.setElevation(view, dpToPx(12));
+                    tabStrip.requestDisallowInterceptTouchEvent(true);
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    view.setTranslationX(event.getRawX() - touchStartX[0]);
+                    autoScrollTabsWhileDragging(event.getRawX());
+                    return true;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    int targetPosition = findDropPosition(tabStrip, event.getRawX());
+                    float movedDistance = Math.abs(event.getRawX() - touchStartX[0]);
+                    view.animate().translationX(0f).scaleX(1f).scaleY(1f).alpha(1f)
+                            .setDuration(140).start();
+                    ViewCompat.setElevation(view, 0f);
+                    tabStrip.requestDisallowInterceptTouchEvent(false);
+                    view.performClick();
+
+                    int sourcePosition = orderedTables.indexOf(folderName);
+                    if (event.getActionMasked() == MotionEvent.ACTION_UP
+                            && movedDistance >= dpToPx(8)
+                            && sourcePosition >= 0 && targetPosition >= 0
+                            && sourcePosition != targetPosition) {
+                        String moved = orderedTables.remove(sourcePosition);
+                        orderedTables.add(targetPosition, moved);
+                        saveFolderOrder();
+                        getSharedPreferences("app_prefs", MODE_PRIVATE).edit()
+                                .putString("current_folder", folderName).apply();
+                        stopFolderMoveMode();
+                        setupTabLayout();
+                    } else {
+                        stopFolderMoveMode();
+                        if (event.getActionMasked() == MotionEvent.ACTION_UP
+                                && movedDistance < dpToPx(8) && sourcePosition >= 0) {
+                            TabLayout.Tab tappedTab = tabLayout.getTabAt(sourcePosition);
+                            if (tappedTab != null) tappedTab.select();
+                        }
+                    }
+                    return true;
+                default:
+                    return false;
+            }
+        });
+    }
+
+    private void stopFolderMoveMode() {
+        folderMoveMode = false;
+        cancelFolderWiggleAnimations();
+        if (tabLayout.getChildCount() > 0 && tabLayout.getChildAt(0) instanceof ViewGroup) {
+            ViewGroup tabStrip = (ViewGroup) tabLayout.getChildAt(0);
+            for (int i = 0; i < tabStrip.getChildCount(); i++) {
+                View child = tabStrip.getChildAt(i);
+                child.setRotation(0f);
+                child.setTranslationX(0f);
+                child.setScaleX(1f);
+                child.setScaleY(1f);
+                child.setAlpha(1f);
+                child.setOnTouchListener(null);
+            }
+        }
+        bindFolderLongPressActions();
+    }
+
+    private void cancelFolderWiggleAnimations() {
+        for (Map.Entry<View, ObjectAnimator> entry : folderWiggleAnimations.entrySet()) {
+            entry.getValue().cancel();
+            entry.getKey().setRotation(0f);
+        }
+        folderWiggleAnimations.clear();
+    }
+
+    private void autoScrollTabsWhileDragging(float rawX) {
+        int[] location = new int[2];
+        tabLayout.getLocationOnScreen(location);
+        float localX = rawX - location[0];
+        int edge = dpToPx(48);
+        int step = dpToPx(16);
+        if (localX < edge) {
+            tabLayout.scrollBy(-step, 0);
+        } else if (localX > tabLayout.getWidth() - edge) {
+            tabLayout.scrollBy(step, 0);
+        }
+    }
+
+    private int findDropPosition(ViewGroup tabStrip, float rawX) {
+        int target = tabStrip.getChildCount() - 1;
+        int[] location = new int[2];
+        for (int i = 0; i < tabStrip.getChildCount(); i++) {
+            View child = tabStrip.getChildAt(i);
+            child.getLocationOnScreen(location);
+            if (rawX < location[0] + child.getWidth() / 2f) return i;
+        }
+        return Math.max(target, 0);
+    }
+
+    private void showRenameFolderDialog(String oldName) {
+        if (oldName == null) return;
+        if (FolderNameHelper.isMainFolder(oldName)) {
+            Toast.makeText(this, R.string.error_main_folder_cannot_be_renamed, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        final EditText input = new EditText(this);
+        input.setText(oldName);
+        input.setSelectAllOnFocus(true);
+        input.setSingleLine(true);
+        input.setTextColor(Color.WHITE);
+
+        FrameLayout container = new FrameLayout(this);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.leftMargin = dpToPx(24);
+        params.rightMargin = dpToPx(24);
+        input.setLayoutParams(params);
+        container.addView(input);
+
+        AlertDialog dialog = new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
+                .setTitle(R.string.dialog_rename_title)
+                .setView(container)
+                .setPositiveButton(R.string.dialog_change, null)
+                .setNegativeButton(R.string.dialog_cancel, null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(v -> renameFolder(oldName, input, dialog)));
+        dialog.show();
+    }
+
+    private void renameFolder(String oldName, EditText input, AlertDialog dialog) {
+        String newName = input.getText().toString().trim();
+        if (newName.isEmpty()) {
+            input.setError(getString(R.string.error_name_empty));
+            return;
+        }
+        for (String existingName : orderedTables) {
+            if (!existingName.equalsIgnoreCase(oldName) && existingName.equalsIgnoreCase(newName)) {
+                input.setError(getString(R.string.error_folder_already_exists));
+                return;
+            }
+        }
+
+        databaseHelper.renameTable(oldName, newName);
+        new UserDeviceFolderSyncManager(this).syncFolderRenamed(oldName, newName);
+        int index = orderedTables.indexOf(oldName);
+        if (index >= 0) orderedTables.set(index, newName);
+        saveFolderOrder();
+        currentTable = newName;
+        getSharedPreferences("app_prefs", MODE_PRIVATE).edit()
+                .putString("current_folder", newName).apply();
+        Intent broadcast = new Intent("com.example.santiway.FOLDER_SWITCHED");
+        broadcast.putExtra("newTableName", newName);
+        sendBroadcast(broadcast);
+        dialog.dismiss();
+        setupTabLayout();
+        Toast.makeText(this, R.string.toast_done, Toast.LENGTH_SHORT).show();
+    }
+
+    private void showDeleteFolderDialog(String folderName) {
+        if (FolderNameHelper.isMainFolder(folderName)) {
+            Toast.makeText(this, R.string.error_main_folder_cannot_be_deleted, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
+                .setTitle(R.string.dialog_confirm_delete_title)
+                .setMessage(getString(R.string.dialog_confirm_delete_folder_message,
+                        getDisplayTableName(folderName)))
+                .setPositiveButton(R.string.dialog_yes, (dialog, which) -> deleteFolder(folderName))
+                .setNegativeButton(R.string.dialog_no, null)
+                .show();
+    }
+
+    private void deleteFolder(String folderName) {
+        if (!databaseHelper.deleteTable(folderName)) {
+            Toast.makeText(this, R.string.error_folder_delete, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new UserDeviceFolderSyncManager(this).syncFolderDeleted(folderName);
+        orderedTables.remove(folderName);
+        saveFolderOrder();
+
+        if (folderName.equals(currentTable)) {
+            currentTable = orderedTables.contains(FolderNameHelper.MAIN_FOLDER_INTERNAL)
+                    ? FolderNameHelper.MAIN_FOLDER_INTERNAL
+                    : (orderedTables.isEmpty() ? "" : orderedTables.get(0));
+            getSharedPreferences("app_prefs", MODE_PRIVATE).edit()
+                    .putString("current_folder", currentTable).apply();
+            Intent broadcast = new Intent("com.example.santiway.FOLDER_SWITCHED");
+            broadcast.putExtra("newTableName", currentTable);
+            sendBroadcast(broadcast);
+        }
+        setupTabLayout();
+        Toast.makeText(this, getString(R.string.toast_folder_deleted,
+                getDisplayTableName(folderName)), Toast.LENGTH_SHORT).show();
     }
 
     private void resetPagination() {

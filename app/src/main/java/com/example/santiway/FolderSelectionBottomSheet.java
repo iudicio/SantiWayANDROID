@@ -92,7 +92,7 @@ public class FolderSelectionBottomSheet extends BottomSheetDialogFragment {
         @Override
         public void onBindViewHolder(@NonNull FolderViewHolder holder, int position) {
             String folderName = folderList.get(position);
-            holder.folderNameTextView.setText(folderName);
+            holder.folderNameTextView.setText(FolderNameHelper.getDisplayName(holder.itemView.getContext(), folderName));
             holder.itemView.setOnClickListener(v -> clickListener.onFolderClick(folderName));
         }
 

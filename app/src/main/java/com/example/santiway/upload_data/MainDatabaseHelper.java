@@ -24,6 +24,7 @@ import com.example.santiway.NotificationData;
 import com.example.santiway.NotificationDatabaseHelper;
 import com.example.santiway.NotificationsActivity;
 import com.example.santiway.R;
+import com.example.santiway.LocaleHelper;
 import com.example.santiway.cell_scanner.CellTower;
 import com.example.santiway.wifi_scanner.WifiDevice;
 import java.util.ArrayList;
@@ -499,14 +500,13 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             String type = values.getAsString("type");
             String name = values.getAsString("name");
             if (name == null || name.isEmpty()) {
-                name = "Unknown";
+                name = LocaleHelper.getString(mContext, R.string.unknown_value);
             }
 
             // 1. Сохраняем уведомление в БД
             NotificationDatabaseHelper notifDb = new NotificationDatabaseHelper(mContext);
-            String title = "Target: " + type;
-            String message = String.format(Locale.getDefault(),
-                    "Устройство %s (%s) в движении!\nКоординаты: %.6f, %.6f",
+            String title = LocaleHelper.getString(mContext, R.string.target_notification_title, type);
+            String message = LocaleHelper.getString(mContext, R.string.target_device_moving_message,
                     name, uniqueId, lat, lon);
 
             NotificationData alert = new NotificationData(
@@ -528,10 +528,10 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 if (channel == null) {
                     NotificationChannel newChannel = new NotificationChannel(
                             TARGET_NOTIFICATION_CHANNEL_ID,
-                            "Обнаружение целей",
+                            LocaleHelper.getString(mContext, R.string.target_channel_name),
                             NotificationManager.IMPORTANCE_HIGH
                     );
-                    newChannel.setDescription("Уведомления о движущихся целевых устройствах");
+                    newChannel.setDescription(LocaleHelper.getString(mContext, R.string.target_channel_description));
                     newChannel.enableVibration(true);
                     newChannel.setVibrationPattern(new long[]{0, 500, 200, 500});
                     newChannel.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), null);
@@ -560,7 +560,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                     alertCount++;
                 }
             }
-            String contentText = "Обнаружено: " + alertCount + " целей";
+            String contentText = LocaleHelper.getString(mContext, R.string.targets_detected_count, alertCount);
 
             // 5. Получаем флаг "первое ли уведомление" из SharedPreferences
             SharedPreferences prefs = mContext.getSharedPreferences("notif_prefs", Context.MODE_PRIVATE);
@@ -569,7 +569,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             // 6. Строим базовое уведомление
             NotificationCompat.Builder builder = new NotificationCompat.Builder(mContext, TARGET_NOTIFICATION_CHANNEL_ID)
                     .setSmallIcon(R.drawable.ic_notifications)
-                    .setContentTitle("Внимание: Обнаружены цели!")
+                    .setContentTitle(LocaleHelper.getString(mContext, R.string.targets_detected_title))
                     .setContentText(contentText)
                     .setContentIntent(pendingIntent)
                     .setAutoCancel(true);
@@ -1517,10 +1517,10 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         // 1. Создаем канал для Android 8.0+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
-                    channelId, "Target Alerts",
+                    channelId, LocaleHelper.getString(mContext, R.string.target_alerts_channel_name),
                     NotificationManager.IMPORTANCE_HIGH // Высокая важность дает звук и всплывающий баннер
             );
-            channel.setDescription("Уведомления об обнаружении целей");
+            channel.setDescription(LocaleHelper.getString(mContext, R.string.target_alerts_channel_description));
             channel.enableVibration(true);
             if (notificationManager != null) {
                 notificationManager.createNotificationChannel(channel);
