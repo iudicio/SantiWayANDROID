@@ -194,7 +194,9 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                 }
             }
 
-            deviceTypeTextView.setText(device.getType() != null ? device.getType() : "N/A");
+        deviceTypeTextView.setText(device.getType() != null
+                ? device.getType()
+                : itemView.getContext().getString(R.string.unknown_value));
 
             if (device.getTimestamp() > 0) {
                 long diff = System.currentTimeMillis() - device.getTimestamp();

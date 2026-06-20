@@ -192,9 +192,11 @@ public class ActivityMapOSM extends Fragment {
             if (i == deviceHistoryPoints.size() - 1) {
                 // Последняя точка - главный маркер
                 marker.setTitle(getString(R.string.map_last_location_title, deviceName));
-                marker.setSnippet("MAC: " + (deviceMac != null ? deviceMac : "N/A") +
-                        "\n" + getString(R.string.time_label_short) + " " +
-                        (deviceHistoryTimestamps.size() > i ? deviceHistoryTimestamps.get(i) : getString(R.string.unknown_value)));
+                marker.setSnippet(getString(R.string.map_device_snippet,
+                        deviceMac != null ? deviceMac : getString(R.string.unknown_value),
+                        deviceHistoryTimestamps.size() > i
+                                ? deviceHistoryTimestamps.get(i)
+                                : getString(R.string.unknown_value)));
                 try {
                     // Используем цвет в зависимости от статуса
                     int color = getStatusColor(deviceStatus);

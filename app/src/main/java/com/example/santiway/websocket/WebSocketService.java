@@ -12,6 +12,8 @@ import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 
+import com.example.santiway.LocaleHelper;
+import com.example.santiway.R;
 import com.example.santiway.upload_data.ApiConfig;
 
 public class WebSocketService extends Service {
@@ -96,10 +98,10 @@ public class WebSocketService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    "WebSocket Service",
+                    LocaleHelper.getString(this, R.string.websocket_channel_name),
                     NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("Channel for WebSocket connection service");
+            channel.setDescription(LocaleHelper.getString(this, R.string.websocket_channel_description));
 
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) {
@@ -110,8 +112,8 @@ public class WebSocketService extends Service {
 
     private Notification createNotification() {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("WebSocket Service")
-                .setContentText("Подключение к серверу уведомлений...")
+                .setContentTitle(LocaleHelper.getString(this, R.string.websocket_notification_title))
+                .setContentText(LocaleHelper.getString(this, R.string.websocket_notification_connecting))
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true);

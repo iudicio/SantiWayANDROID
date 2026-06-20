@@ -18,6 +18,7 @@ import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
 import com.example.santiway.R;
+import com.example.santiway.LocaleHelper;
 
 import java.util.List;
 
@@ -99,10 +100,10 @@ public class DeviceUploadService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    "Загрузка данных",
+                    LocaleHelper.getString(this, R.string.upload_channel_name),
                     NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("Сервис для загрузки данных устройства");
+            channel.setDescription(LocaleHelper.getString(this, R.string.upload_channel_description));
 
             NotificationManager manager = getSystemService(NotificationManager.class);
             if (manager != null) {
@@ -113,8 +114,8 @@ public class DeviceUploadService extends Service {
 
     private Notification createNotification() {
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("SantiWay")
-                .setContentText("Загрузка данных устройства")
+                .setContentTitle(getString(R.string.app_name))
+                .setContentText(LocaleHelper.getString(this, R.string.upload_notification_text))
                 .setSmallIcon(R.drawable.ic_pause)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)

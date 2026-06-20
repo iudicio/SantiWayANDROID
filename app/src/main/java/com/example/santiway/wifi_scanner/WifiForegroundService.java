@@ -23,6 +23,8 @@ import android.widget.Toast;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
+import com.example.santiway.LocaleHelper;
+import com.example.santiway.R;
 import com.example.santiway.gsm_protocol.LocationManager;
 import com.example.santiway.upload_data.MainDatabaseHelper;
 
@@ -128,7 +130,7 @@ public class WifiForegroundService extends Service {
         // Check if WiFi is enabled
         if (wifiManager == null || !wifiManager.isWifiEnabled()) {
             Log.w(TAG, "WiFi is not enabled");
-            Toast.makeText(this, "Включите WiFi для сканирования", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, LocaleHelper.getString(this, R.string.toast_enable_wifi), Toast.LENGTH_SHORT).show();
             stopSelf();
             return;
         }
@@ -356,8 +358,8 @@ public class WifiForegroundService extends Service {
 
     private Notification createNotification() {
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Wi-Fi Scanner")
-                .setContentText("Сканирование сетей...")
+                .setContentTitle(LocaleHelper.getString(this, R.string.wifi_scanner_notification_title))
+                .setContentText(LocaleHelper.getString(this, R.string.wifi_scanner_notification_scanning))
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)
@@ -369,8 +371,9 @@ public class WifiForegroundService extends Service {
         NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager != null) {
             Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setContentTitle("Wi-Fi Scanner")
-                    .setContentText("Сохранено: " + savedNetworks + " сетей, порог: " + (int)minSignalStrength + " dBm")
+                    .setContentTitle(LocaleHelper.getString(this, R.string.wifi_scanner_notification_title))
+                    .setContentText(LocaleHelper.getString(this, R.string.wifi_scanner_notification_progress,
+                            savedNetworks, (int) minSignalStrength))
                     .setSmallIcon(android.R.drawable.ic_dialog_info)
                     .setPriority(NotificationCompat.PRIORITY_LOW)
                     .setOngoing(true)
@@ -385,10 +388,10 @@ public class WifiForegroundService extends Service {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID,
-                    "Wi-Fi Scanner Service",
+                    LocaleHelper.getString(this, R.string.wifi_scanner_channel_name),
                     NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("Уведомления о сканировании Wi-Fi сетей");
+            channel.setDescription(LocaleHelper.getString(this, R.string.wifi_scanner_channel_description));
             channel.setShowBadge(false);
 
             NotificationManager manager = getSystemService(NotificationManager.class);

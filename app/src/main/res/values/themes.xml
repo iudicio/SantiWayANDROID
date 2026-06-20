@@ -1,5 +1,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <style name="Base.Theme.SantiWay" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:navigationBarColor">#172A46</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
     </style>
 
     <style name="Theme.SantiWay" parent="Base.Theme.SantiWay" />
@@ -59,6 +62,8 @@
     <style name="CustomAlertDialogTheme" parent="Theme.AppCompat.DayNight.Dialog.Alert">
         <item name="android:windowBackground">@drawable/rounded_dialog_bg</item>
         <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:colorBackground">#0B1A2C</item>
         <item name="android:colorAccent">#3DDC84</item>
     </style>
 </resources>

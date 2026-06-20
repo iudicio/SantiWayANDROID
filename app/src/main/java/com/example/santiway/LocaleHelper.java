@@ -38,4 +38,11 @@ public class LocaleHelper {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .getString(KEY_LANGUAGE, "ru");
     }
+
+    public static String getString(Context context, int stringRes, Object... formatArgs) {
+        Context localizedContext = wrap(context);
+        return formatArgs.length == 0
+                ? localizedContext.getString(stringRes)
+                : localizedContext.getString(stringRes, formatArgs);
+    }
 }
