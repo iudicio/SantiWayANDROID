@@ -27,6 +27,8 @@
 
     <!-- Фоновые сервисы -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- Уведомления (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -93,6 +95,11 @@
             android:exported="false" />
 
         <activity
+            android:name=".esp32.Esp32Activity"
+            android:exported="false"
+            android:theme="@style/Theme.SantiWay" />
+
+        <activity
             android:name=".DatabaseViewActivity"
             android:exported="false" />
 
@@ -136,6 +143,21 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="location"/>
+
+        <service
+            android:name=".esp32.Esp32ConnectionService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <receiver
+            android:name=".esp32.Esp32BootReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Сервисы загрузки -->
         <service
