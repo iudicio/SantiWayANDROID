@@ -10,6 +10,7 @@ import android.util.Log;
 
 import androidx.core.app.ActivityCompat;
 
+import com.example.santiway.esp32.Esp32ConnectionService;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
@@ -71,6 +72,12 @@ public class LocationManager {
 
     public void startLocationUpdates() {
         SharedPreferences prefs = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE);
+        Location meshLocation = getFreshMeshLocation();
+        if (meshLocation != null) {
+            updateLocation(meshLocation);
+            Log.d(TAG, "ESP32 mesh location enabled");
+            return;
+        }
 
         if (prefs.getBoolean("static_location_enabled", false)) {
             Location staticLocation = new Location("static");
@@ -132,6 +139,11 @@ public class LocationManager {
     // НОВЫЙ МЕТОД: принудительное получение координат (синхронное)
     public Location getFreshLocation() {
         SharedPreferences prefs = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE);
+        Location meshLocation = getFreshMeshLocation();
+        if (meshLocation != null) {
+            updateLocation(meshLocation);
+            return meshLocation;
+        }
 
         if (prefs.getBoolean("static_location_enabled", false)) {
             Location staticLocation = new Location("static");
@@ -232,6 +244,23 @@ public class LocationManager {
         if (currentLocation == null) return false;
         long timeDiff = System.currentTimeMillis() - currentLocation.getTime();
         return timeDiff < 300000; // 5 минут
+    }
+
+    private Location getFreshMeshLocation() {
+        SharedPreferences prefs = context.getSharedPreferences(Esp32ConnectionService.PREFS_MESH_LOCATION,
+                Context.MODE_PRIVATE);
+        long updatedAt = prefs.getLong("updated_at", 0);
+        if (updatedAt == 0 || System.currentTimeMillis() - updatedAt > 120000) return null;
+        double latitude = prefs.getFloat("latitude", 0f);
+        double longitude = prefs.getFloat("longitude", 0f);
+        if (latitude == 0 && longitude == 0) return null;
+        Location location = new Location("esp32_mesh");
+        location.setLatitude(latitude);
+        location.setLongitude(longitude);
+        location.setAltitude(prefs.getFloat("altitude", 0f));
+        location.setAccuracy(12f);
+        location.setTime(updatedAt);
+        return location;
     }
 
     public interface OnLocationUpdateListener {

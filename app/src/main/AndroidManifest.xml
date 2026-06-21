@@ -19,6 +19,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
 
     <!-- Локация -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -97,6 +98,11 @@
 
         <activity
             android:name=".esp32.Esp32Activity"
+            android:exported="false"
+            android:theme="@style/Theme.SantiWay" />
+
+        <activity
+            android:name=".esp32.Esp32MapActivity"
             android:exported="false"
             android:theme="@style/Theme.SantiWay" />
 

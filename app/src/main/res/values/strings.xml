@@ -385,6 +385,14 @@
     <string name="esp32_firmware_flashing">Идёт прошивка. Не отключайте USB.</string>
     <string name="esp32_firmware_success">Прошивка завершена успешно</string>
     <string name="esp32_firmware_failed">Ошибка прошивки: %1$s</string>
+    <string name="esp32_map_action">Карта ESP32</string>
+    <string name="esp32_map_title">Карта ESP32</string>
+    <string name="esp32_map_summary">ESP32 на карте: %1$d · последнее обновление: %2$s назад</string>
+    <string name="esp32_map_updated_ago">Обновлено %1$s назад</string>
+    <string name="esp32_map_mode_static">статическая</string>
+    <string name="esp32_map_mode_auto">авто</string>
+    <string name="esp32_map_mode_unknown">без координат</string>
+    <string name="esp32_map_phone_title">Телефон по ESP32 mesh</string>
     <string name="firmware_progress_zero" translatable="false">0%</string>
     <string name="firmware_progress_percent" translatable="false">%1$d%%</string>
     <string name="error_invalid_coordinates">Введите корректные координаты</string>

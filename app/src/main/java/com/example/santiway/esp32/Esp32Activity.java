@@ -90,6 +90,8 @@ public class Esp32Activity extends BaseLocalizedActivity {
         findViewById(R.id.esp32_scan_button).setOnClickListener(v -> discoverEsp32());
         findViewById(R.id.esp32_program_firmware).setOnClickListener(v ->
                 startActivity(new Intent(this, Esp32FirmwareActivity.class)));
+        findViewById(R.id.esp32_map_button).setOnClickListener(v ->
+                startActivity(new Intent(this, Esp32MapActivity.class)));
         ensurePermissionsAndStart(false);
         renderDevices();
     }
@@ -102,6 +104,8 @@ public class Esp32Activity extends BaseLocalizedActivity {
         return ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN)
                 == PackageManager.PERMISSION_GRANTED
                 && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
+                == PackageManager.PERMISSION_GRANTED
+                && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADVERTISE)
                 == PackageManager.PERMISSION_GRANTED;
     }
 
@@ -109,7 +113,7 @@ public class Esp32Activity extends BaseLocalizedActivity {
         if (!hasPermissions()) {
             String[] permissions = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
                     ? new String[]{Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT,
-                    Manifest.permission.ACCESS_FINE_LOCATION}
+                    Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.ACCESS_FINE_LOCATION}
                     : new String[]{Manifest.permission.ACCESS_FINE_LOCATION};
             ActivityCompat.requestPermissions(this, permissions, REQUEST_BLUETOOTH);
             return;

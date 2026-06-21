@@ -14,6 +14,10 @@ import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.BluetoothLeAdvertiser;
+import android.bluetooth.le.AdvertiseCallback;
+import android.bluetooth.le.AdvertiseData;
+import android.bluetooth.le.AdvertiseSettings;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
 import android.content.Context;
@@ -33,10 +37,9 @@ import com.example.santiway.FolderNameHelper;
 import com.example.santiway.R;
 import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.example.santiway.wifi_scanner.WifiDevice;
-import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationServices;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -47,6 +50,8 @@ public class Esp32ConnectionService extends Service {
     public static final UUID SERVICE_UUID = UUID.fromString("7a1e0001-8e7f-4d8d-a7f4-2c6e6d520001");
     private static final UUID DATA_UUID = UUID.fromString("7a1e0002-8e7f-4d8d-a7f4-2c6e6d520001");
     private static final UUID CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
+    private static final int PHONE_BEACON_MANUFACTURER_ID = 0x02E5;
+    public static final String PREFS_MESH_LOCATION = "esp32_mesh_location";
     public static final String ACTION_DISCOVER = "com.example.santiway.esp32.DISCOVER";
     public static final String ACTION_CONNECT = "com.example.santiway.esp32.CONNECT";
     public static final String ACTION_DISCONNECT = "com.example.santiway.esp32.DISCONNECT";
@@ -62,9 +67,10 @@ public class Esp32ConnectionService extends Service {
     private final Set<String> connecting = ConcurrentHashMap.newKeySet();
     private BluetoothAdapter adapter;
     private BluetoothLeScanner scanner;
+    private BluetoothLeAdvertiser advertiser;
+    private String phoneBeaconId;
     private Esp32DatabaseHelper database;
     private MainDatabaseHelper mainDatabase;
-    private FusedLocationProviderClient locationClient;
     private long discoverNewUntil;
 
     @Override public void onCreate() {
@@ -72,15 +78,16 @@ public class Esp32ConnectionService extends Service {
         database = new Esp32DatabaseHelper(this);
         database.markAllDisconnected();
         mainDatabase = new MainDatabaseHelper(this);
-        locationClient = LocationServices.getFusedLocationProviderClient(this);
         BluetoothManager manager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         adapter = manager != null ? manager.getAdapter() : null;
+        phoneBeaconId = getOrCreatePhoneBeaconId();
         createChannel();
         startForeground(3201, new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_device)
                 .setContentTitle(getString(R.string.esp32_service_title))
                 .setContentText(getString(R.string.esp32_service_text))
                 .setOngoing(true).setPriority(NotificationCompat.PRIORITY_LOW).build());
+        startPhoneBeacon();
         handler.post(scanCycle);
     }
 
@@ -103,12 +110,44 @@ public class Esp32ConnectionService extends Service {
     private boolean hasPermissions() {
         return Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
                 (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
-                        && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED);
+                        && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+                        && ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED);
     }
+
+    private String getOrCreatePhoneBeaconId() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_MESH_LOCATION, MODE_PRIVATE);
+        String existing = prefs.getString("phone_beacon_id", null);
+        if (existing != null && !existing.isEmpty()) return existing;
+        String id = UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.US);
+        prefs.edit().putString("phone_beacon_id", id).apply();
+        return id;
+    }
+
+    @android.annotation.SuppressLint("MissingPermission")
+    private void startPhoneBeacon() {
+        if (adapter == null || !adapter.isEnabled() || !hasPermissions()) return;
+        advertiser = adapter.getBluetoothLeAdvertiser();
+        if (advertiser == null) return;
+        byte[] marker = ("SWP" + phoneBeaconId).getBytes(StandardCharsets.UTF_8);
+        AdvertiseSettings settings = new AdvertiseSettings.Builder()
+                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
+                .setConnectable(false)
+                .build();
+        AdvertiseData data = new AdvertiseData.Builder()
+                .addManufacturerData(PHONE_BEACON_MANUFACTURER_ID, marker)
+                .build();
+        advertiser.startAdvertising(settings, data, advertiseCallback);
+    }
+
+    private final AdvertiseCallback advertiseCallback = new AdvertiseCallback() {
+        @Override public void onStartFailure(int errorCode) { advertiser = null; }
+    };
 
     private final Runnable scanCycle = new Runnable() {
         @Override public void run() {
             if (adapter != null && adapter.isEnabled() && hasPermissions()) {
+                if (advertiser == null) startPhoneBeacon();
                 scanner = adapter.getBluetoothLeScanner();
                 if (scanner != null) {
                     scanner.startScan(scanCallback);
@@ -155,6 +194,14 @@ public class Esp32ConnectionService extends Service {
         connecting.add(mac);
         BluetoothGatt gatt = device.connectGatt(this, false, new DeviceGattCallback(mac), BluetoothDevice.TRANSPORT_LE);
         gatts.put(mac, gatt);
+        handler.postDelayed(() -> {
+            if (!connecting.contains(mac)) return;
+            BluetoothGatt pending = gatts.remove(mac);
+            connecting.remove(mac);
+            if (pending != null && hasPermissions()) { pending.disconnect(); pending.close(); }
+            database.setConnected(mac, false);
+            broadcastChanged();
+        }, 12000);
     }
 
     private void disconnect(String mac, boolean disableAutoConnect) {
@@ -176,7 +223,6 @@ public class Esp32ConnectionService extends Service {
                 connecting.remove(mac);
                 database.upsertDevice(mac, "ESP32 " + mac.substring(Math.max(0, mac.length() - 5)), 0, 0, 0);
                 database.setConnected(mac, true);
-                updateDefaultLocation(mac);
                 if (!gatt.requestMtu(247)) gatt.discoverServices();
                 broadcastChanged();
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
@@ -209,25 +255,100 @@ public class Esp32ConnectionService extends Service {
                 @NonNull BluetoothGattCharacteristic c, @NonNull byte[] value) { processRecord(mac, value); }
     }
 
-    private void updateDefaultLocation(String mac) {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return;
-        locationClient.getLastLocation().addOnSuccessListener(location -> {
-            if (location != null) database.updateDefaultCoordinatesIfUnset(mac, location.getLatitude(),
-                    location.getLongitude(), location.hasAltitude() ? location.getAltitude() : 0);
-            broadcastChanged();
-        });
-    }
-
     private void processRecord(String sourceMac, byte[] bytes) {
         if (bytes == null) return;
         String[] fields = new String(bytes, StandardCharsets.UTF_8).trim().split("\\|", 5);
-        if (fields.length < 4 || fields[1].equalsIgnoreCase(sourceMac)) return;
+        if (fields.length < 4) return;
+        if ("R".equals(fields[0])) {
+            processRelayedRecord(sourceMac, fields);
+            return;
+        }
+        if ("M".equals(fields[0])) {
+            processMeshLink(sourceMac, fields, 0);
+            return;
+        }
+        if ("P".equals(fields[0])) {
+            processPhoneSample(sourceMac, fields, 0);
+            return;
+        }
+        if (fields[1].equalsIgnoreCase(sourceMac)) return;
         try {
             int rssi = Integer.parseInt(fields[2]);
             String transport = "W".equals(fields[0]) ? "Wi-Fi" : "B".equals(fields[0]) ? "Bluetooth" : "";
             if (transport.isEmpty()) return;
             database.saveObservation(sourceMac, transport, fields[1], rssi, fields.length > 4 ? fields[4] : fields[3]);
             saveAsRegularScan(sourceMac, fields, rssi);
+            broadcastChanged();
+        } catch (NumberFormatException ignored) { }
+    }
+
+    private void processRelayedRecord(String proxyMac, String[] fields) {
+        if (fields.length < 5) return;
+        String origin = fields[1].toUpperCase();
+        int hops;
+        try { hops = Integer.parseInt(fields[2]); } catch (NumberFormatException e) { return; }
+        database.upsertDevice(origin, "ESP32 " + origin.substring(Math.max(0, origin.length() - 5)), 0, 0, 0);
+        database.saveMeshLink(origin, proxyMac, -70, hops);
+        processRecordFromSource(origin, fields[3], fields[4], hops);
+    }
+
+    private void processRecordFromSource(String sourceMac, String type, String payload, int hops) {
+        String[] nested = (type + "|" + payload).split("\\|", 5);
+        if (nested.length < 4) return;
+        if ("M".equals(nested[0])) {
+            processMeshLink(sourceMac, nested, hops);
+            return;
+        }
+        if ("P".equals(nested[0])) {
+            processPhoneSample(sourceMac, nested, hops);
+            return;
+        }
+        try {
+            int rssi = Integer.parseInt(nested[2]);
+            String transport = "W".equals(nested[0]) ? "Wi-Fi" : "B".equals(nested[0]) ? "Bluetooth" : "";
+            if (transport.isEmpty()) return;
+            database.saveObservation(sourceMac, transport, nested[1], rssi,
+                    nested.length > 4 ? nested[4] : nested[3]);
+            saveAsRegularScan(sourceMac, nested, rssi);
+            database.autoPositionUnknownDevices();
+            broadcastChanged();
+        } catch (NumberFormatException ignored) { }
+    }
+
+    private void processPhoneSample(String sourceMac, String[] fields, int hopsToPhone) {
+        if (fields.length < 3) return;
+        try {
+            String phoneId = fields[1];
+            int rssi = Integer.parseInt(fields[2]);
+            Esp32DatabaseHelper.PhonePosition position =
+                    database.savePhoneSampleAndEstimate(phoneId, sourceMac, rssi, hopsToPhone);
+            if (position != null && phoneId.equalsIgnoreCase(phoneBeaconId)) {
+                getSharedPreferences(PREFS_MESH_LOCATION, MODE_PRIVATE).edit()
+                        .putFloat("latitude", (float) position.latitude)
+                        .putFloat("longitude", (float) position.longitude)
+                        .putFloat("altitude", (float) position.altitude)
+                        .putLong("updated_at", position.updatedAt)
+                        .putInt("anchor_count", position.anchorCount)
+                        .apply();
+            }
+            broadcastChanged();
+        } catch (NumberFormatException ignored) { }
+    }
+
+    private void processMeshLink(String sourceMac, String[] fields, int hopsToPhone) {
+        if (fields.length < 4) return;
+        try {
+            String source = fields[1].equalsIgnoreCase("SELF") ? sourceMac : fields[1];
+            String neighbor = fields[2];
+            int rssi = Integer.parseInt(fields[3]);
+            if (source == null || neighbor == null || source.equalsIgnoreCase(neighbor)) return;
+            database.upsertDevice(source.toUpperCase(),
+                    "ESP32 " + source.substring(Math.max(0, source.length() - 5)), 0, 0, 0);
+            database.upsertDevice(neighbor.toUpperCase(),
+                    "ESP32 " + neighbor.substring(Math.max(0, neighbor.length() - 5)), 0, 0, 0);
+            database.saveMeshLink(source, neighbor, rssi, hopsToPhone);
+            database.saveMeshLink(neighbor, source, rssi, hopsToPhone);
+            database.autoPositionUnknownDevices();
             broadcastChanged();
         } catch (NumberFormatException ignored) { }
     }
@@ -276,6 +397,7 @@ public class Esp32ConnectionService extends Service {
     @Override public void onDestroy() {
         handler.removeCallbacksAndMessages(null);
         if (scanner != null && hasPermissions()) scanner.stopScan(scanCallback);
+        if (advertiser != null && hasPermissions()) advertiser.stopAdvertising(advertiseCallback);
         for (BluetoothGatt gatt : gatts.values()) { if (hasPermissions()) gatt.disconnect(); gatt.close(); }
         database.markAllDisconnected();
         database.close(); mainDatabase.close();

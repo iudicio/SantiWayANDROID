@@ -376,6 +376,14 @@
     <string name="esp32_firmware_flashing">Flashing. Do not disconnect USB.</string>
     <string name="esp32_firmware_success">Firmware installed successfully</string>
     <string name="esp32_firmware_failed">Flashing failed: %1$s</string>
+    <string name="esp32_map_action">ESP32 map</string>
+    <string name="esp32_map_title">ESP32 map</string>
+    <string name="esp32_map_summary">ESP32 on map: %1$d · last update: %2$s ago</string>
+    <string name="esp32_map_updated_ago">Updated %1$s ago</string>
+    <string name="esp32_map_mode_static">static</string>
+    <string name="esp32_map_mode_auto">auto</string>
+    <string name="esp32_map_mode_unknown">no coordinates</string>
+    <string name="esp32_map_phone_title">Phone via ESP32 mesh</string>
     <string name="firmware_progress_zero" translatable="false">0%</string>
     <string name="firmware_progress_percent" translatable="false">%1$d%%</string>
     <string name="error_invalid_coordinates">Enter valid coordinates</string>
