@@ -15,7 +15,7 @@
         android:layout_height="?attr/actionBarSize"
         android:background="#0B1A2C"
         app:titleTextColor="@android:color/white"
-        app:navigationIcon="?attr/homeAsUpIndicator"
+        app:navigationIcon="@drawable/ic_arrow_back"
         app:title="@string/notifications_title"/>
 
     <TextView

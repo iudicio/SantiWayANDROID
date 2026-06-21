@@ -508,6 +508,8 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             public void onTabSelected(TabLayout.Tab tab) {
                 if (tab == null || tab.getTag() == null) return;
 
+                scrollTabIntoView(tab.getPosition());
+
                 resetPagination();
                 currentTable = (String) tab.getTag();
 
@@ -555,9 +557,27 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
         TabLayout.Tab initialTab = tabLayout.getTabAt(selectedIndex);
         if (initialTab != null) {
             initialTab.select();
+            scrollTabIntoView(selectedIndex);
         }
 
         tabLayout.post(this::bindFolderLongPressActions);
+    }
+
+    private void scrollTabIntoView(int position) {
+        tabLayout.post(() -> {
+            if (position < 0 || tabLayout.getChildCount() == 0
+                    || !(tabLayout.getChildAt(0) instanceof ViewGroup)) return;
+            ViewGroup tabStrip = (ViewGroup) tabLayout.getChildAt(0);
+            if (position >= tabStrip.getChildCount()) return;
+            View tabView = tabStrip.getChildAt(position);
+            int visibleLeft = tabLayout.getScrollX();
+            int visibleRight = visibleLeft + tabLayout.getWidth();
+            if (tabView.getRight() > visibleRight) {
+                tabLayout.smoothScrollTo(tabView.getRight() - tabLayout.getWidth(), 0);
+            } else if (tabView.getLeft() < visibleLeft) {
+                tabLayout.smoothScrollTo(tabView.getLeft(), 0);
+            }
+        });
     }
 
     private List<String> applySavedFolderOrder(List<String> databaseTables) {

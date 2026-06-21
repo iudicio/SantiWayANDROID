@@ -357,5 +357,47 @@
     <string name="esp32_connect">连接</string>
     <string name="esp32_disconnect">断开</string>
     <string name="esp32_delete_confirmation">断开此 ESP32 并删除它及所有已保存的数据？</string>
+    <string name="esp32_empty_devices">尚无已保存的 ESP32 设备</string>
+    <string name="esp32_coordinates_format">纬度：%1$s · 经度：%2$s · 高度：%3$s</string>
+    <string name="esp32_program_action">烧录 ESP32</string>
+    <string name="esp32_available_title">可用的 ESP32</string>
+    <string name="esp32_program_title">通过 USB 烧录 ESP32</string>
+    <string name="esp32_usb_instructions">使用 USB OTG 将 ESP32 连接到手机，并选择合并后的 firmware.bin。烧录过程中请勿断开。</string>
+    <string name="esp32_usb_waiting">正在等待 ESP32 USB 连接…</string>
+    <string name="esp32_usb_detected">已检测到：%1$s。正在请求权限…</string>
+    <string name="esp32_usb_ready">ESP32 已就绪：%1$s</string>
+    <string name="esp32_usb_permission_denied">USB 权限被拒绝</string>
+    <string name="esp32_usb_open_error">无法打开 USB 端口</string>
+    <string name="esp32_firmware_missing">应用中没有 firmware.bin，请手动选择合并文件。</string>
+    <string name="esp32_firmware_ready">固件：%1$s</string>
+    <string name="esp32_choose_firmware">选择合并的 firmware.bin</string>
+    <string name="esp32_start_firmware">烧录 ESP32</string>
+    <string name="esp32_firmware_read_error">无法读取固件文件</string>
+    <string name="esp32_firmware_flashing">正在烧录，请勿断开 USB。</string>
+    <string name="esp32_firmware_success">固件烧录成功</string>
+    <string name="esp32_firmware_failed">烧录失败：%1$s</string>
+    <string name="firmware_progress_zero" translatable="false">0%</string>
+    <string name="firmware_progress_percent" translatable="false">%1$d%%</string>
     <string name="error_invalid_coordinates">请输入有效坐标</string>
+    <string name="settings_control_center_title">SantiWay 控制中心</string>
+    <string name="settings_control_center_subtitle">在这里配置连接、地图、语言和扫描行为。</string>
+    <string name="settings_connection_subtitle">服务器参数来自应用配置。设备名称会发送到服务器。</string>
+    <string name="settings_navigation_title">语言与导航</string>
+    <string name="settings_location_title">坐标来源</string>
+    <string name="open_manual_action">打开说明</string>
+    <string name="manual_title">说明</string>
+    <string name="manual_heading">如何使用 SantiWay</string>
+    <string name="manual_intro">主要流程的简短说明：扫描、查看设备、地图、设置以及连接 ESP32。</string>
+    <string name="manual_quick_start_title">1. 快速开始</string>
+    <string name="manual_quick_start_body">授予应用所需权限，在设置中检查服务器和 API，选择语言和定位协议，然后返回主屏幕开始扫描。</string>
+    <string name="manual_scan_title">2. 扫描</string>
+    <string name="manual_scan_body">点击 Start 收集 Wi‑Fi、Bluetooth 和蜂窝网络观测。检查完区域后点击 Stop。快照模式会保存一次短暂的即时测量，不会同时运行常规扫描。</string>
+    <string name="manual_devices_title">3. 设备数据库</string>
+    <string name="manual_devices_body">打开数据库查看发现的设备。可按名称或 MAC 搜索，将设备标记为 TARGET、SAFE 或 GREY，重命名文件夹，并在不再需要会话时清除记录。</string>
+    <string name="manual_map_title">4. 地图</string>
+    <string name="manual_map_body">地图显示已保存的发现记录和所选设备的历史。如果在设置中启用静态坐标，应用会使用所选点而不是实时 GPS。</string>
+    <string name="manual_esp32_title">5. ESP32</string>
+    <string name="manual_esp32_body">打开 ESP32 页面以查找并连接模块。已连接的 ESP32 会向应用发送记录，并显示在已连接设备列表中。</string>
+    <string name="manual_settings_title">6. 设置</string>
+    <string name="manual_settings_body">在设置中选择语言、协议、静态坐标、地图点数限制和设备名称。返回扫描前请保存更改。</string>
 </resources>

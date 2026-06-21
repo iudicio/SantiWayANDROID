@@ -51,7 +51,10 @@ public class Esp32ConnectionService extends Service {
     public static final String ACTION_CONNECT = "com.example.santiway.esp32.CONNECT";
     public static final String ACTION_DISCONNECT = "com.example.santiway.esp32.DISCONNECT";
     public static final String ACTION_CHANGED = "com.example.santiway.esp32.CHANGED";
+    public static final String ACTION_DEVICE_FOUND = "com.example.santiway.esp32.DEVICE_FOUND";
     public static final String EXTRA_MAC = "mac";
+    public static final String EXTRA_NAME = "name";
+    public static final String EXTRA_RSSI = "rssi";
     private static final String CHANNEL_ID = "esp32_connections";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -126,11 +129,25 @@ public class Esp32ConnectionService extends Service {
             boolean serviceMatch = result.getScanRecord() != null && result.getScanRecord().getServiceUuids() != null
                     && result.getScanRecord().getServiceUuids().stream().anyMatch(p -> SERVICE_UUID.equals(p.getUuid()));
             boolean discoverNew = System.currentTimeMillis() < discoverNewUntil;
-            if ((saved.contains(mac) || (discoverNew && serviceMatch)) && !gatts.containsKey(mac) && !connecting.contains(mac)) {
+            if (discoverNew && serviceMatch && !gatts.containsKey(mac) && !connecting.contains(mac)) {
+                broadcastDeviceFound(result);
+            }
+            if (saved.contains(mac) && !discoverNew && !gatts.containsKey(mac) && !connecting.contains(mac)) {
                 connect(result.getDevice());
             }
         }
     };
+
+    @android.annotation.SuppressLint("MissingPermission")
+    private void broadcastDeviceFound(ScanResult result) {
+        if (!hasPermissions()) return;
+        String name = result.getDevice().getName();
+        Intent intent = new Intent(ACTION_DEVICE_FOUND).setPackage(getPackageName());
+        intent.putExtra(EXTRA_MAC, result.getDevice().getAddress().toUpperCase());
+        intent.putExtra(EXTRA_NAME, name == null || name.trim().isEmpty() ? "ESP32" : name);
+        intent.putExtra(EXTRA_RSSI, result.getRssi());
+        sendBroadcast(intent);
+    }
 
     private void connect(BluetoothDevice device) {
         if (device == null || !hasPermissions()) return;

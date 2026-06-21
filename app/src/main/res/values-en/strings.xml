@@ -357,5 +357,47 @@
     <string name="esp32_connect">Connect</string>
     <string name="esp32_disconnect">Disconnect</string>
     <string name="esp32_delete_confirmation">Disconnect this ESP32 and delete it with all saved data?</string>
+    <string name="esp32_empty_devices">No saved ESP32 devices yet</string>
+    <string name="esp32_coordinates_format">Lat: %1$s · Lon: %2$s · Alt: %3$s</string>
+    <string name="esp32_program_action">Program ESP32</string>
+    <string name="esp32_available_title">Available ESP32 devices</string>
+    <string name="esp32_program_title">Flash ESP32 over USB</string>
+    <string name="esp32_usb_instructions">Connect the ESP32 using USB OTG. Use one merged firmware.bin. Do not unplug it while flashing.</string>
+    <string name="esp32_usb_waiting">Waiting for an ESP32 USB connection…</string>
+    <string name="esp32_usb_detected">Detected: %1$s. Requesting access…</string>
+    <string name="esp32_usb_ready">ESP32 ready: %1$s</string>
+    <string name="esp32_usb_permission_denied">USB access was denied</string>
+    <string name="esp32_usb_open_error">Could not open the USB port</string>
+    <string name="esp32_firmware_missing">No firmware.bin is bundled. Select a merged file manually.</string>
+    <string name="esp32_firmware_ready">Firmware: %1$s</string>
+    <string name="esp32_choose_firmware">Select merged firmware.bin</string>
+    <string name="esp32_start_firmware">Flash ESP32</string>
+    <string name="esp32_firmware_read_error">Could not read the firmware file</string>
+    <string name="esp32_firmware_flashing">Flashing. Do not disconnect USB.</string>
+    <string name="esp32_firmware_success">Firmware installed successfully</string>
+    <string name="esp32_firmware_failed">Flashing failed: %1$s</string>
+    <string name="firmware_progress_zero" translatable="false">0%</string>
+    <string name="firmware_progress_percent" translatable="false">%1$d%%</string>
     <string name="error_invalid_coordinates">Enter valid coordinates</string>
+    <string name="settings_control_center_title">SantiWay Control Center</string>
+    <string name="settings_control_center_subtitle">Configure connection, map, language, and scanning behavior here.</string>
+    <string name="settings_connection_subtitle">Server values come from the app configuration. The device name is sent to the server.</string>
+    <string name="settings_navigation_title">Language and Navigation</string>
+    <string name="settings_location_title">Coordinate Source</string>
+    <string name="open_manual_action">Open manual</string>
+    <string name="manual_title">Manual</string>
+    <string name="manual_heading">How to use SantiWay</string>
+    <string name="manual_intro">A short guide to the main flow: scanning, viewing devices, map, settings, and ESP32 connection.</string>
+    <string name="manual_quick_start_title">1. Quick Start</string>
+    <string name="manual_quick_start_body">Grant the requested permissions, check the server and API in settings, choose language and geolocation protocol, then return to the main screen and start scanning.</string>
+    <string name="manual_scan_title">2. Scanning</string>
+    <string name="manual_scan_body">Tap Start to collect Wi-Fi, Bluetooth, and cellular observations. Tap Stop when the area has been checked. Snapshot mode saves a short point-in-time measurement without regular scanning running at the same time.</string>
+    <string name="manual_devices_title">3. Device Database</string>
+    <string name="manual_devices_body">Open the database to review discovered devices. Search by name or MAC, mark devices as TARGET, SAFE, or GREY, rename folders, and clear records when a session is no longer needed.</string>
+    <string name="manual_map_title">4. Map</string>
+    <string name="manual_map_body">The map shows saved detections and the history of the selected device. If static coordinates are enabled in settings, the app uses the selected point instead of live GPS.</string>
+    <string name="manual_esp32_title">5. ESP32</string>
+    <string name="manual_esp32_body">Open the ESP32 section to find and connect a module. Connected ESP32 devices send records to the app and appear in the connected-device list.</string>
+    <string name="manual_settings_title">6. Settings</string>
+    <string name="manual_settings_body">In settings you choose language, protocol, static coordinates, map point limit, and device name. Save changes before returning to scanning.</string>
 </resources>

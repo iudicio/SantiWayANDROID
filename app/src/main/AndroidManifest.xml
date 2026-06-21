@@ -44,6 +44,7 @@
     <!-- Декларация использования Bluetooth для старых версий Android -->
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
 
     <!-- Декларация для локации -->
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
@@ -99,11 +100,16 @@
             android:exported="false"
             android:theme="@style/Theme.SantiWay" />
 
+        <activity android:name=".esp32.firmware.Esp32FirmwareActivity" android:exported="false"
+            android:theme="@style/Theme.SantiWay" />
+
         <activity
             android:name=".DatabaseViewActivity"
             android:exported="false" />
 
         <activity android:name=".AppConfigViewActivity"
+            android:exported="false" />
+        <activity android:name=".AppManualActivity"
             android:exported="false" />
 
         <activity

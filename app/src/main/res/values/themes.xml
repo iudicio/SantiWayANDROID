@@ -3,6 +3,7 @@
         <item name="android:navigationBarColor">#172A46</item>
         <item name="android:windowLightNavigationBar">false</item>
         <item name="android:enforceNavigationBarContrast">false</item>
+        <item name="homeAsUpIndicator">@drawable/ic_arrow_back</item>
     </style>
 
     <style name="Theme.SantiWay" parent="Base.Theme.SantiWay" />

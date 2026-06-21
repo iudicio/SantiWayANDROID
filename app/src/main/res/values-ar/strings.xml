@@ -357,5 +357,47 @@
     <string name="esp32_connect">اتصال</string>
     <string name="esp32_disconnect">قطع الاتصال</string>
     <string name="esp32_delete_confirmation">هل تريد قطع اتصال ESP32 وحذفها مع جميع البيانات المحفوظة؟</string>
+    <string name="esp32_empty_devices">لا توجد أجهزة ESP32 محفوظة حتى الآن</string>
+    <string name="esp32_coordinates_format">خط العرض: %1$s · خط الطول: %2$s · الارتفاع: %3$s</string>
+    <string name="esp32_program_action">برمجة ESP32</string>
+    <string name="esp32_available_title">أجهزة ESP32 المتاحة</string>
+    <string name="esp32_program_title">تفليش ESP32 عبر USB</string>
+    <string name="esp32_usb_instructions">وصّل ESP32 بالهاتف عبر USB OTG واستخدم ملف firmware.bin مدمجًا. لا تفصل الكابل أثناء التفليش.</string>
+    <string name="esp32_usb_waiting">بانتظار اتصال ESP32 عبر USB…</string>
+    <string name="esp32_usb_detected">تم اكتشاف: %1$s. جارٍ طلب الإذن…</string>
+    <string name="esp32_usb_ready">ESP32 جاهزة: %1$s</string>
+    <string name="esp32_usb_permission_denied">تم رفض إذن USB</string>
+    <string name="esp32_usb_open_error">تعذر فتح منفذ USB</string>
+    <string name="esp32_firmware_missing">لا يوجد firmware.bin مرفق. اختر ملفًا مدمجًا يدويًا.</string>
+    <string name="esp32_firmware_ready">البرنامج الثابت: %1$s</string>
+    <string name="esp32_choose_firmware">اختيار firmware.bin مدمج</string>
+    <string name="esp32_start_firmware">تفليش ESP32</string>
+    <string name="esp32_firmware_read_error">تعذر قراءة ملف البرنامج الثابت</string>
+    <string name="esp32_firmware_flashing">جارٍ التفليش. لا تفصل USB.</string>
+    <string name="esp32_firmware_success">اكتمل تثبيت البرنامج الثابت</string>
+    <string name="esp32_firmware_failed">فشل التفليش: %1$s</string>
+    <string name="firmware_progress_zero" translatable="false">0%</string>
+    <string name="firmware_progress_percent" translatable="false">%1$d%%</string>
     <string name="error_invalid_coordinates">أدخل إحداثيات صحيحة</string>
+    <string name="settings_control_center_title">مركز تحكم SantiWay</string>
+    <string name="settings_control_center_subtitle">يمكنك هنا ضبط الاتصال والخريطة واللغة وسلوك المسح.</string>
+    <string name="settings_connection_subtitle">تؤخذ قيم الخادم من إعدادات التطبيق. يتم إرسال اسم الجهاز إلى الخادم.</string>
+    <string name="settings_navigation_title">اللغة والتنقل</string>
+    <string name="settings_location_title">مصدر الإحداثيات</string>
+    <string name="open_manual_action">فتح التعليمات</string>
+    <string name="manual_title">التعليمات</string>
+    <string name="manual_heading">كيفية استخدام SantiWay</string>
+    <string name="manual_intro">دليل مختصر للسيناريو الأساسي: المسح، عرض الأجهزة، الخريطة، الإعدادات، والاتصال بـ ESP32.</string>
+    <string name="manual_quick_start_title">1. البدء السريع</string>
+    <string name="manual_quick_start_body">امنح التطبيق الأذونات المطلوبة، وتحقق من الخادم وواجهة API في الإعدادات، واختر اللغة وبروتوكول تحديد الموقع، ثم ارجع إلى الشاشة الرئيسية وابدأ المسح.</string>
+    <string name="manual_scan_title">2. المسح</string>
+    <string name="manual_scan_body">اضغط Start لجمع ملاحظات Wi‑Fi وBluetooth والشبكات الخلوية. اضغط Stop عندما تنتهي من فحص المنطقة. يحفظ وضع اللقطة قياسًا قصيرًا في نقطة زمنية محددة دون تشغيل المسح العادي في الوقت نفسه.</string>
+    <string name="manual_devices_title">3. قاعدة الأجهزة</string>
+    <string name="manual_devices_body">افتح قاعدة البيانات لمراجعة الأجهزة المكتشفة. ابحث بالاسم أو MAC، وعلّم الأجهزة كـ TARGET أو SAFE أو GREY، وأعد تسمية المجلدات، وامسح السجلات عندما لا تعود الجلسة مطلوبة.</string>
+    <string name="manual_map_title">4. الخريطة</string>
+    <string name="manual_map_body">تعرض الخريطة الاكتشافات المحفوظة وسجل الجهاز المحدد. إذا كانت الإحداثيات الثابتة مفعلة في الإعدادات، يستخدم التطبيق النقطة المحددة بدلًا من GPS المباشر.</string>
+    <string name="manual_esp32_title">5. ESP32</string>
+    <string name="manual_esp32_body">افتح قسم ESP32 للعثور على الوحدة والاتصال بها. ترسل أجهزة ESP32 المتصلة السجلات إلى التطبيق وتظهر في قائمة الأجهزة المتصلة.</string>
+    <string name="manual_settings_title">6. الإعدادات</string>
+    <string name="manual_settings_body">في الإعدادات تختار اللغة والبروتوكول والإحداثيات الثابتة وحد نقاط الخريطة واسم الجهاز. احفظ التغييرات قبل الرجوع إلى المسح.</string>
 </resources>

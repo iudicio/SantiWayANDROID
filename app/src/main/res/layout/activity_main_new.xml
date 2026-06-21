@@ -80,9 +80,11 @@
                 <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
                     android:layout_columnWeight="1" android:gravity="center" android:orientation="vertical">
                     <FrameLayout android:id="@+id/scan_button_container" android:layout_width="82dp"
-                        android:layout_height="82dp" android:background="@drawable/rounded_button_with_stroke">
+                        android:layout_height="82dp">
                         <ImageView android:id="@+id/scan_arrows_icon" android:layout_width="82dp"
-                            android:layout_height="82dp" android:layout_gravity="center" android:src="@drawable/ic_scan_arrows" />
+                            android:layout_height="82dp" android:layout_gravity="center"
+                            android:contentDescription="@string/content_desc_start_pause"
+                            android:src="@drawable/ic_scan_arrows" />
                         <ImageButton android:id="@+id/play_pause_button" android:layout_width="52dp"
                             android:layout_height="52dp" android:layout_gravity="center"
                             android:background="@android:color/transparent" android:contentDescription="@string/content_desc_start_pause"
@@ -237,58 +239,6 @@
                         android:text="@string/stopped_status"
                         android:textColor="#3DDC84"
                         android:textSize="16sp" />
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-            <androidx.cardview.widget.CardView
-                android:id="@+id/last_upload_card"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                app:cardBackgroundColor="#1E3A5A"
-                app:cardCornerRadius="12dp"
-                app:contentPadding="16dp"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
-                app:cardElevation="2dp"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/cellular_card">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:layout_marginBottom="8dp">
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginStart="12dp"
-                            android:text="@string/last_sent_label"
-                            android:textColor="@color/white"
-                            android:textSize="16sp"
-                            android:textStyle="bold"/>
-                    </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/last_upload_date"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="32dp"
-                        android:text="@string/datetime_placeholder"
-                        android:textColor="#3DDC84"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        android:textAllCaps="false"/>
-
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 

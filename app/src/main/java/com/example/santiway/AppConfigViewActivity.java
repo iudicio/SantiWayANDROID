@@ -91,6 +91,8 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
             Intent intent = new Intent(this, StaticLocationMapActivity.class);
             startActivity(intent);
         });
+        findViewById(R.id.open_manual_btn).setOnClickListener(v ->
+                startActivity(new Intent(this, AppManualActivity.class)));
 
         boolean targetDetectionEnabled = getSharedPreferences("AppSettings", MODE_PRIVATE)
                 .getBoolean("target_detection_enabled", true);
@@ -110,7 +112,7 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
 
         styleAllTextInputs(root);
 
-        toolbar.setNavigationIcon(androidx.appcompat.R.drawable.abc_ic_ab_back_material);
+        toolbar.setNavigationIcon(R.drawable.ic_arrow_back);
 
         if (toolbar.getNavigationIcon() != null) {
             toolbar.getNavigationIcon().setTint(Color.WHITE);

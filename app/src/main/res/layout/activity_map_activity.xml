@@ -31,7 +31,7 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:navigationIcon="?attr/homeAsUpIndicator"
+        app:navigationIcon="@drawable/ic_arrow_back"
         app:titleTextColor="@android:color/white" />
 
     <!-- Переключатель Target / Safe -->

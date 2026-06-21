@@ -366,5 +366,47 @@
     <string name="esp32_connect">Подключить</string>
     <string name="esp32_disconnect">Отключить</string>
     <string name="esp32_delete_confirmation">Отключить ESP32 и удалить её вместе с сохранёнными данными?</string>
+    <string name="esp32_empty_devices">Сохранённых ESP32 пока нет</string>
+    <string name="esp32_coordinates_format">Широта: %1$s · Долгота: %2$s · Высота: %3$s</string>
+    <string name="esp32_program_action">Программирование ESP32</string>
+    <string name="esp32_available_title">Доступные ESP32</string>
+    <string name="esp32_program_title">Прошивка ESP32 по USB</string>
+    <string name="esp32_usb_instructions">Подключите ESP32 к телефону через USB OTG. Используйте единый merged firmware.bin. Не отключайте кабель во время прошивки.</string>
+    <string name="esp32_usb_waiting">Ожидание USB-подключения ESP32…</string>
+    <string name="esp32_usb_detected">Обнаружено: %1$s. Запрос доступа…</string>
+    <string name="esp32_usb_ready">ESP32 готова: %1$s</string>
+    <string name="esp32_usb_permission_denied">Доступ к USB не предоставлен</string>
+    <string name="esp32_usb_open_error">Не удалось открыть USB-порт</string>
+    <string name="esp32_firmware_missing">В приложении нет firmware.bin. Выберите merged-файл вручную.</string>
+    <string name="esp32_firmware_ready">Прошивка: %1$s</string>
+    <string name="esp32_choose_firmware">Выбрать merged firmware.bin</string>
+    <string name="esp32_start_firmware">Прошить ESP32</string>
+    <string name="esp32_firmware_read_error">Не удалось прочитать файл прошивки</string>
+    <string name="esp32_firmware_flashing">Идёт прошивка. Не отключайте USB.</string>
+    <string name="esp32_firmware_success">Прошивка завершена успешно</string>
+    <string name="esp32_firmware_failed">Ошибка прошивки: %1$s</string>
+    <string name="firmware_progress_zero" translatable="false">0%</string>
+    <string name="firmware_progress_percent" translatable="false">%1$d%%</string>
     <string name="error_invalid_coordinates">Введите корректные координаты</string>
+    <string name="settings_control_center_title">Центр управления SantiWay</string>
+    <string name="settings_control_center_subtitle">Здесь настраиваются подключение, карта, язык и поведение съёмки.</string>
+    <string name="settings_connection_subtitle">Значения сервера берутся из конфигурации приложения. Имя устройства отправляется на сервер.</string>
+    <string name="settings_navigation_title">Язык и навигация</string>
+    <string name="settings_location_title">Источник координат</string>
+    <string name="open_manual_action">Открыть инструкцию</string>
+    <string name="manual_title">Инструкция</string>
+    <string name="manual_heading">Как пользоваться SantiWay</string>
+    <string name="manual_intro">Краткая инструкция по основному сценарию: сканирование, просмотр устройств, карта, настройки и подключение ESP32.</string>
+    <string name="manual_quick_start_title">1. Быстрый старт</string>
+    <string name="manual_quick_start_body">Выдайте приложению запрошенные разрешения, проверьте сервер и API в настройках, выберите язык и протокол геолокации, затем вернитесь на главный экран и запустите сканирование.</string>
+    <string name="manual_scan_title">2. Сканирование</string>
+    <string name="manual_scan_body">Нажмите Старт, чтобы собирать Wi-Fi, Bluetooth и сотовые наблюдения. Нажмите Стоп, когда зона обследована. Режим снапшота сохраняет короткий точечный замер без одновременного обычного сканирования.</string>
+    <string name="manual_devices_title">3. База устройств</string>
+    <string name="manual_devices_body">Откройте базу, чтобы просмотреть найденные устройства. Ищите по имени или MAC, помечайте устройства как TARGET, SAFE или GREY, переименовывайте папки и очищайте записи, когда сессия больше не нужна.</string>
+    <string name="manual_map_title">4. Карта</string>
+    <string name="manual_map_body">Карта показывает сохранённые обнаружения и историю выбранного устройства. Если в настройках включены статические координаты, приложение использует выбранную точку вместо live GPS.</string>
+    <string name="manual_esp32_title">5. ESP32</string>
+    <string name="manual_esp32_body">Откройте раздел ESP32, чтобы найти и подключить модуль. Подключённые ESP32 передают записи в приложение и отображаются в списке подключённых устройств.</string>
+    <string name="manual_settings_title">7. Настройки</string>
+    <string name="manual_settings_body">В настройках выбираются язык, протокол, статические координаты, лимит точек на карте и имя устройства. Сохраняйте изменения перед возвратом к сканированию.</string>
 </resources>
