@@ -51,6 +51,7 @@ public class Esp32ConnectionService extends Service {
     private static final UUID DATA_UUID = UUID.fromString("7a1e0002-8e7f-4d8d-a7f4-2c6e6d520001");
     private static final UUID CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
     private static final int PHONE_BEACON_MANUFACTURER_ID = 0x02E5;
+    private static final long POSITION_REFRESH_MS = 15000L;
     public static final String PREFS_MESH_LOCATION = "esp32_mesh_location";
     public static final String ACTION_DISCOVER = "com.example.santiway.esp32.DISCOVER";
     public static final String ACTION_CONNECT = "com.example.santiway.esp32.CONNECT";
@@ -89,6 +90,7 @@ public class Esp32ConnectionService extends Service {
                 .setOngoing(true).setPriority(NotificationCompat.PRIORITY_LOW).build());
         startPhoneBeacon();
         handler.post(scanCycle);
+        handler.post(positionRefreshCycle);
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
@@ -158,6 +160,13 @@ public class Esp32ConnectionService extends Service {
                 }
             }
             handler.postDelayed(this, 12000);
+        }
+    };
+
+    private final Runnable positionRefreshCycle = new Runnable() {
+        @Override public void run() {
+            if (database != null) database.autoPositionUnknownDevices();
+            handler.postDelayed(this, POSITION_REFRESH_MS);
         }
     };
 
@@ -277,7 +286,9 @@ public class Esp32ConnectionService extends Service {
             String transport = "W".equals(fields[0]) ? "Wi-Fi" : "B".equals(fields[0]) ? "Bluetooth" : "";
             if (transport.isEmpty()) return;
             database.saveObservation(sourceMac, transport, fields[1], rssi, fields.length > 4 ? fields[4] : fields[3]);
-            saveAsRegularScan(sourceMac, fields, rssi);
+            if (!database.triangulateObservedDeviceNow(transport, fields[1])) {
+                saveAsRegularScan(sourceMac, fields, rssi);
+            }
             broadcastChanged();
         } catch (NumberFormatException ignored) { }
     }
@@ -309,7 +320,9 @@ public class Esp32ConnectionService extends Service {
             if (transport.isEmpty()) return;
             database.saveObservation(sourceMac, transport, nested[1], rssi,
                     nested.length > 4 ? nested[4] : nested[3]);
-            saveAsRegularScan(sourceMac, nested, rssi);
+            if (!database.triangulateObservedDeviceNow(transport, nested[1])) {
+                saveAsRegularScan(sourceMac, nested, rssi);
+            }
             database.autoPositionUnknownDevices();
             broadcastChanged();
         } catch (NumberFormatException ignored) { }

@@ -1,7 +1,17 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Base.Theme.SantiWay" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+        <item name="colorPrimary">#172A46</item>
+        <item name="colorPrimaryDark">#071427</item>
+        <item name="colorAccent">#3DDC84</item>
+        <item name="android:statusBarColor">#071427</item>
+        <item name="android:navigationBarColor">#172A46</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:enforceStatusBarContrast">false</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
+        <item name="alertDialogTheme">@style/CustomAlertDialogTheme</item>
+        <item name="android:alertDialogTheme">@style/CustomAlertDialogTheme</item>
+        <item name="homeAsUpIndicator">@drawable/ic_arrow_back</item>
     </style>
 </resources>

@@ -29,6 +29,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.santiway.BaseLocalizedActivity;
+import com.example.santiway.DialogStyleUtils;
 import com.example.santiway.R;
 import com.example.santiway.esp32.firmware.Esp32FirmwareActivity;
 import com.google.android.material.button.MaterialButton;
@@ -141,6 +142,7 @@ public class Esp32Activity extends BaseLocalizedActivity {
                 })
                 .setNegativeButton(R.string.dialog_cancel, null)
                 .create();
+        discoveryDialog.setOnShowListener(ignored -> DialogStyleUtils.tintButtons(discoveryDialog));
         discoveryDialog.show();
     }
 
@@ -246,8 +248,8 @@ public class Esp32Activity extends BaseLocalizedActivity {
                     : Esp32ConnectionService.ACTION_CONNECT, mac);
             dialog.dismiss();
         });
-        view.findViewById(R.id.esp32_delete).setOnClickListener(v ->
-                new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
+        view.findViewById(R.id.esp32_delete).setOnClickListener(v -> {
+                AlertDialog deleteDialog = new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
                         .setTitle(R.string.dialog_confirm_delete_title)
                         .setMessage(R.string.esp32_delete_confirmation)
                         .setPositiveButton(R.string.dialog_yes, (d, w) -> {
@@ -259,7 +261,10 @@ public class Esp32Activity extends BaseLocalizedActivity {
                             dialog.dismiss();
                         })
                         .setNegativeButton(R.string.dialog_no, null)
-                        .show());
+                        .create();
+                deleteDialog.setOnShowListener(ignored -> DialogStyleUtils.tintButtons(deleteDialog));
+                deleteDialog.show();
+        });
         dialog.show();
     }
 
@@ -280,7 +285,7 @@ public class Esp32Activity extends BaseLocalizedActivity {
             holder.mac.setText(item.mac);
             holder.status.setText(item.connected ? R.string.connection_true : R.string.connection_false);
             int color = Color.parseColor(item.connected ? "#3DDC84" : "#9FB3C8");
-            holder.status.setTextColor(color);
+            holder.status.setTextColor(Color.WHITE);
             holder.statusBar.setBackgroundColor(color);
             holder.time.setText((item.connected ? getString(R.string.column_connected_at) + ": " + item.connectedAt
                     : getString(R.string.column_disconnected_at) + ": " + item.disconnectedAt));

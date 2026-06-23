@@ -53,7 +53,7 @@
                     android:layout_marginTop="6dp"
                     android:lineSpacingExtra="2dp"
                     android:text="@string/settings_control_center_subtitle"
-                    android:textColor="#9FB3C8"
+                    android:textColor="@android:color/white"
                     android:textSize="13sp" />
 
                 <com.google.android.material.button.MaterialButton
@@ -63,12 +63,98 @@
                     android:layout_marginTop="14dp"
                     android:text="@string/open_manual_action"
                     android:textAllCaps="false"
-                    android:textColor="#071427"
+                    android:textColor="@android:color/black"
                     android:textStyle="bold"
                     app:backgroundTint="#3DDC84"
                     app:cornerRadius="8dp"
                     app:icon="@drawable/ic_apps"
                     app:iconTint="#071427" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/bg_settings_panel"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/alarm_settings_title"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:lineSpacingExtra="2dp"
+                    android:text="@string/alarm_settings_subtitle"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp" />
+
+                <Switch
+                    android:id="@+id/alarm_mode_off_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/alarm_mode_off_label"
+                    android:textColor="@android:color/white"
+                    android:thumbTint="@android:color/white"
+                    android:trackTint="#3DDC84" />
+
+                <Switch
+                    android:id="@+id/alarm_mode_targets_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/alarm_mode_targets_label"
+                    android:textColor="@android:color/white"
+                    android:thumbTint="@android:color/white"
+                    android:trackTint="#4EA5FF" />
+
+                <Switch
+                    android:id="@+id/alarm_mode_cells_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/alarm_mode_cells_label"
+                    android:textColor="@android:color/white"
+                    android:thumbTint="@android:color/white"
+                    android:trackTint="#F5C542" />
+
+                <Switch
+                    android:id="@+id/alarm_mode_marked_targets_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/alarm_mode_marked_targets_label"
+                    android:textColor="@android:color/white"
+                    android:thumbTint="@android:color/white"
+                    android:trackTint="#FF3B30" />
+
+                <Switch
+                    android:id="@+id/alarm_mode_all_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/alarm_mode_all_label"
+                    android:textColor="@android:color/white"
+                    android:thumbTint="@android:color/white"
+                    android:trackTint="#3DDC84" />
+
+                <Switch
+                    android:id="@+id/alarm_quiet_mode_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/alarm_quiet_mode_label"
+                    android:textColor="@android:color/white"
+                    android:thumbTint="@android:color/white"
+                    android:trackTint="#FF3B30" />
             </LinearLayout>
 
             <LinearLayout
@@ -92,7 +178,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:text="@string/settings_connection_subtitle"
-                    android:textColor="#9FB3C8"
+                    android:textColor="@android:color/white"
                     android:textSize="12sp" />
 
                 <com.google.android.material.textfield.TextInputLayout
@@ -111,7 +197,7 @@
                         android:focusable="false"
                         android:longClickable="false"
                         android:textColor="@android:color/white"
-                        android:textColorHint="#9FB3C8" />
+                        android:textColorHint="@android:color/white" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.textfield.TextInputLayout
@@ -130,7 +216,7 @@
                         android:focusable="false"
                         android:longClickable="false"
                         android:textColor="@android:color/white"
-                        android:textColorHint="#9FB3C8" />
+                        android:textColorHint="@android:color/white" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.textfield.TextInputLayout
@@ -146,7 +232,7 @@
                         android:layout_height="wrap_content"
                         android:inputType="text"
                         android:textColor="@android:color/white"
-                        android:textColorHint="#9FB3C8" />
+                        android:textColorHint="@android:color/white" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.textfield.TextInputLayout
@@ -162,8 +248,89 @@
                         android:layout_height="wrap_content"
                         android:inputType="number"
                         android:textColor="@android:color/white"
-                        android:textColorHint="#9FB3C8" />
+                        android:textColorHint="@android:color/white" />
                 </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/SantiWayTextInputLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:hint="@string/data_retention_days_hint">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/data_retention_days_input"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:textColor="@android:color/white"
+                        android:textColorHint="@android:color/white" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/SantiWayTextInputLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:hint="@string/map_marker_size_hint">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/map_marker_size_input"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:textColor="@android:color/white"
+                        android:textColorHint="@android:color/white" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/SantiWayTextInputLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:hint="@string/yandex_tiles_api_key_hint">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/yandex_tiles_api_key_input"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="text"
+                        android:textColor="@android:color/white"
+                        android:textColorHint="@android:color/white" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="@string/map_layer_default_label"
+                    android:textColor="@android:color/white"
+                    android:textSize="13sp" />
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/bg_settings_field">
+
+                    <Spinner
+                        android:id="@+id/map_layer_spinner"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@android:color/transparent"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="44dp"
+                        android:popupBackground="#172A46" />
+
+                    <TextView
+                        android:layout_width="44dp"
+                        android:layout_height="match_parent"
+                        android:layout_gravity="end"
+                        android:gravity="center"
+                        android:text="@string/spinner_arrow"
+                        android:textColor="@android:color/white"
+                        android:textSize="18sp" />
+                </FrameLayout>
             </LinearLayout>
 
             <LinearLayout
@@ -187,7 +354,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:text="@string/language_label"
-                    android:textColor="#C5D2E0"
+                    android:textColor="@android:color/white"
                     android:textSize="13sp" />
 
                 <FrameLayout
@@ -220,7 +387,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
                     android:text="@string/geolocation_protocol_label"
-                    android:textColor="#C5D2E0"
+                    android:textColor="@android:color/white"
                     android:textSize="13sp" />
 
                 <FrameLayout
@@ -266,17 +433,6 @@
                     android:textStyle="bold" />
 
                 <Switch
-                    android:id="@+id/target_detection_switch"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="@string/target_detection_label"
-                    android:textColor="@android:color/white"
-                    android:thumbTint="@android:color/white"
-                    android:trackTint="#3DDC84"
-                    android:visibility="gone" />
-
-                <Switch
                     android:id="@+id/static_location_switch"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -299,7 +455,7 @@
                         android:layout_height="wrap_content"
                         android:inputType="numberDecimal|numberSigned"
                         android:textColor="@android:color/white"
-                        android:textColorHint="#9FB3C8" />
+                        android:textColorHint="@android:color/white" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.textfield.TextInputLayout
@@ -315,7 +471,7 @@
                         android:layout_height="wrap_content"
                         android:inputType="numberDecimal|numberSigned"
                         android:textColor="@android:color/white"
-                        android:textColorHint="#9FB3C8" />
+                        android:textColorHint="@android:color/white" />
                 </com.google.android.material.textfield.TextInputLayout>
 
                 <com.google.android.material.button.MaterialButton
@@ -339,7 +495,7 @@
                 android:layout_marginTop="16dp"
                 android:text="@string/save_general_settings"
                 android:textAllCaps="false"
-                android:textColor="#071427"
+                android:textColor="@android:color/black"
                 android:textStyle="bold"
                 app:backgroundTint="#3DDC84"
                 app:cornerRadius="8dp" />

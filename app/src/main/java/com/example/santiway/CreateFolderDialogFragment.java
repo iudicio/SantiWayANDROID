@@ -51,6 +51,7 @@ public class CreateFolderDialogFragment extends DialogFragment {
         final AlertDialog dialog = builder.create();
 
         dialog.setOnShowListener(dialogInterface -> {
+            DialogStyleUtils.tintButtons(dialog);
             dialog.getButton(Dialog.BUTTON_POSITIVE).setOnClickListener(v -> {
                 String folderName = input.getText().toString().trim();
 

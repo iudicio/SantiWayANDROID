@@ -63,6 +63,7 @@ public class BluetoothForegroundService extends Service {
 
     private Handler handler;
     private Runnable scanRunnable;
+    private Runnable stopScanRunnable;
     private boolean isScanning = false;
 
     private long scanInterval = 15000; // интервал между циклами сканирования
@@ -190,7 +191,10 @@ public class BluetoothForegroundService extends Service {
         }
 
         // Улучшенная проверка на дубликаты в текущем цикле
-        String currentTimeKey = address + "_" + (System.currentTimeMillis() / 1000);
+        if (address == null || address.trim().isEmpty()) {
+            return;
+        }
+        String currentTimeKey = address.toUpperCase(java.util.Locale.US);
         if (processedInCurrentCycle.contains(currentTimeKey)) {
             Log.d(TAG, "⏱️ Duplicate in current cycle: " + address + " - skipping");
             return;
@@ -341,6 +345,13 @@ public class BluetoothForegroundService extends Service {
         if (handler != null && scanRunnable != null) {
             handler.removeCallbacks(scanRunnable);
         }
+        if (handler != null && stopScanRunnable != null) {
+            handler.removeCallbacks(stopScanRunnable);
+        }
+        processedInCurrentCycle = new HashSet<>();
+        if (seenAddresses != null) {
+            seenAddresses.clear();
+        }
 
         try {
             stopAllScanning();
@@ -388,10 +399,11 @@ public class BluetoothForegroundService extends Service {
                 updateScannerSettings();
                 startAllScanning();
 
-                handler.postDelayed(() -> {
+                stopScanRunnable = () -> {
                     stopAllScanning();
                     if (isScanning) handler.postDelayed(scanRunnable, scanInterval);
-                }, scanDuration);
+                };
+                handler.postDelayed(stopScanRunnable, scanDuration);
             }
         };
 
@@ -401,7 +413,11 @@ public class BluetoothForegroundService extends Service {
     }
 
     private void startAllScanning() {
-        processedInCurrentCycle.clear();
+        if (processedInCurrentCycle.size() > 512) {
+            processedInCurrentCycle = new HashSet<>(256);
+        } else {
+            processedInCurrentCycle.clear();
+        }
         // Проверяем статус Bluetooth перед сканированием
         if (btAdapter == null || !btAdapter.isEnabled()) {
             Log.w(TAG, "Bluetooth отключен во время сканирования, останавливаем сервис");
@@ -409,13 +425,12 @@ public class BluetoothForegroundService extends Service {
             return;
         }
         // ПРИНУДИТЕЛЬНО ОБНОВЛЯЕМ КООРДИНАТЫ ПЕРЕД КАЖДЫМ СКАНИРОВАНИЕМ
-        Location freshLocation = locationManager.getFreshLocation();
-        if (freshLocation != null) {
-            currentLatitude = freshLocation.getLatitude();
-            currentLongitude = freshLocation.getLongitude();
-            currentAltitude = freshLocation.hasAltitude() ? freshLocation.getAltitude() : 0.0;
-            currentAccuracy = freshLocation.getAccuracy();
-            Log.d(TAG, "📍 Fresh coordinates obtained: " + currentLatitude + ", " + currentLongitude);
+        Location bestLocation = locationManager.getBestEffortLocation();
+        if (bestLocation != null) {
+            currentLatitude = bestLocation.getLatitude();
+            currentLongitude = bestLocation.getLongitude();
+            currentAltitude = bestLocation.hasAltitude() ? bestLocation.getAltitude() : 0.0;
+            currentAccuracy = bestLocation.getAccuracy();
         } else {
             Log.w(TAG, "⚠️ Could not get fresh coordinates, using last known or zeros");
             currentLatitude = locationManager.getLatitude();
@@ -590,6 +605,13 @@ public class BluetoothForegroundService extends Service {
         // Убираем callback'и
         if (handler != null && scanRunnable != null) {
             handler.removeCallbacks(scanRunnable);
+        }
+        if (handler != null && stopScanRunnable != null) {
+            handler.removeCallbacks(stopScanRunnable);
+        }
+        processedInCurrentCycle = new HashSet<>();
+        if (seenAddresses != null) {
+            seenAddresses.clear();
         }
 
         // Закрываем базу данных

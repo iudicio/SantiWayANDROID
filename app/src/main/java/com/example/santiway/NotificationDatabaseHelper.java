@@ -159,6 +159,36 @@ public class NotificationDatabaseHelper extends SQLiteOpenHelper {
         return true;
     }
 
+    public int countNotificationsByType(NotificationData.NotificationType type) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor c = null;
+        try {
+            c = db.rawQuery(
+                    "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE " + COL_TYPE + " = ?",
+                    new String[]{type.name()}
+            );
+            if (c != null && c.moveToFirst()) {
+                return c.getInt(0);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error counting notifications: " + e.getMessage());
+        } finally {
+            if (c != null) c.close();
+        }
+        return 0;
+    }
+
+    public int deleteOldNotifications(long maxAgeMillis) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        long cutoffTime = System.currentTimeMillis() - maxAgeMillis;
+        try {
+            return db.delete(TABLE_NAME, COL_TIMESTAMP + " < ?", new String[]{String.valueOf(cutoffTime)});
+        } catch (Exception e) {
+            Log.e(TAG, "Error deleting old notifications: " + e.getMessage());
+            return 0;
+        }
+    }
+
     public void deleteNotification(String id) {
         SQLiteDatabase db = this.getWritableDatabase();
         int deleted = db.delete(TABLE_NAME, COL_ID + "=?", new String[]{id});

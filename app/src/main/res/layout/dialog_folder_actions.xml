@@ -68,6 +68,46 @@
             app:strokeWidth="1dp" />
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/folder_action_gray_search_button"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="8dp"
+            android:gravity="start|center_vertical"
+            android:paddingStart="16dp"
+            android:text="@string/folder_action_gray_search"
+            android:textAllCaps="false"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            app:backgroundTint="#172A46"
+            app:cornerRadius="8dp"
+            app:icon="@drawable/ic_grey"
+            app:iconGravity="textStart"
+            app:iconPadding="14dp"
+            app:iconTint="#B8C7DA"
+            app:strokeColor="#2D4566"
+            app:strokeWidth="1dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/folder_action_trigger_button"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="8dp"
+            android:gravity="start|center_vertical"
+            android:paddingStart="16dp"
+            android:text="@string/folder_action_trigger"
+            android:textAllCaps="false"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            app:backgroundTint="#172A46"
+            app:cornerRadius="8dp"
+            app:icon="@drawable/ic_snapshot_trigger"
+            app:iconGravity="textStart"
+            app:iconPadding="14dp"
+            app:iconTint="#F5C542"
+            app:strokeColor="#2D4566"
+            app:strokeWidth="1dp" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/folder_action_delete_button"
             android:layout_width="match_parent"
             android:layout_height="52dp"

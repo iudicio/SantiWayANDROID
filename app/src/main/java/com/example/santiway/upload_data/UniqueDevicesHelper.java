@@ -9,11 +9,15 @@ import android.util.Log;
 import com.example.santiway.DeviceListActivity;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public class UniqueDevicesHelper {
     private static final String TAG = "UniqueDevicesHelper";
+    private static final Set<String> TABLES_READY = Collections.synchronizedSet(new HashSet<>());
     private final String uniqueTableName;
     private final Context context;
     private boolean tableChecked = false;
@@ -28,7 +32,11 @@ public class UniqueDevicesHelper {
      * Создает таблицу уникальных устройств, используя существующее соединение с БД
      */
     private void createTableIfNeeded(SQLiteDatabase db) {
-        if (tableChecked) return;
+        if (tableChecked || TABLES_READY.contains(uniqueTableName)) {
+            tableChecked = true;
+            TABLES_READY.add(uniqueTableName);
+            return;
+        }
 
         try {
             String safeTableName = "\"" + uniqueTableName + "\"";
@@ -306,6 +314,106 @@ public class UniqueDevicesHelper {
     /**
      * Получает список всех уникальных устройств для отображения
      */
+    public List<DeviceListActivity.Device> getDevicesPage(int offset, int limit) {
+        return queryDevicesPage(null, offset, limit);
+    }
+
+    public List<DeviceListActivity.Device> getDevicesPageWithSearch(String query, int offset, int limit) {
+        return queryDevicesPage(query, offset, limit);
+    }
+
+    private List<DeviceListActivity.Device> queryDevicesPage(String query, int offset, int limit) {
+        List<DeviceListActivity.Device> deviceList = new ArrayList<>();
+        MainDatabaseHelper dbHelper = new MainDatabaseHelper(context);
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
+
+        int safeOffset = Math.max(0, offset);
+        int safeLimit = limit <= 0 ? 50 : limit;
+
+        try {
+            db = dbHelper.getReadableDatabase();
+            createTableIfNeeded(db);
+
+            String normalizedQuery = query == null ? "" : query.trim().toUpperCase(Locale.US);
+            boolean hasQuery = !normalizedQuery.isEmpty();
+            String sql = "SELECT type, name, bssid, cell_id, unique_identifier, " +
+                    "latitude, longitude, last_seen, status, total_scans, network_type " +
+                    "FROM \"" + uniqueTableName + "\" ";
+
+            List<String> args = new ArrayList<>();
+            if (hasQuery) {
+                String likeQuery = "%" + normalizedQuery + "%";
+                sql += "WHERE UPPER(COALESCE(name, '')) LIKE ? " +
+                        "   OR UPPER(COALESCE(bssid, '')) LIKE ? " +
+                        "   OR UPPER(COALESCE(unique_identifier, '')) LIKE ? " +
+                        "   OR CAST(COALESCE(cell_id, '') AS TEXT) LIKE ? " +
+                        "   OR UPPER(COALESCE(network_type, '')) LIKE ? ";
+                args.add(likeQuery);
+                args.add(likeQuery);
+                args.add(likeQuery);
+                args.add(likeQuery);
+                args.add(likeQuery);
+            }
+
+            sql += "ORDER BY last_seen DESC LIMIT ? OFFSET ?";
+            args.add(String.valueOf(safeLimit));
+            args.add(String.valueOf(safeOffset));
+
+            cursor = db.rawQuery(sql, args.toArray(new String[0]));
+
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    deviceList.add(deviceFromCursor(cursor));
+                } while (cursor.moveToNext());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading unique devices page: " + e.getMessage(), e);
+        } finally {
+            if (cursor != null) cursor.close();
+            if (db != null && db.isOpen()) db.close();
+        }
+
+        return deviceList;
+    }
+
+    private DeviceListActivity.Device deviceFromCursor(Cursor cursor) {
+        String type = cursor.getString(cursor.getColumnIndexOrThrow("type"));
+        String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
+        String mac = cursor.getString(cursor.getColumnIndexOrThrow("bssid"));
+        long cellId = cursor.getLong(cursor.getColumnIndexOrThrow("cell_id"));
+        String uniqueIdentifier = cursor.getString(cursor.getColumnIndexOrThrow("unique_identifier"));
+        long lastSeen = cursor.getLong(cursor.getColumnIndexOrThrow("last_seen"));
+        String status = cursor.getString(cursor.getColumnIndexOrThrow("status"));
+        int totalScans = cursor.getInt(cursor.getColumnIndexOrThrow("total_scans"));
+
+        String displayName;
+        String finalId;
+
+        if ("Cell".equalsIgnoreCase(type)) {
+            displayName = (name != null && !name.trim().isEmpty()) ? name : "Cell Tower";
+            finalId = (uniqueIdentifier != null && !uniqueIdentifier.trim().isEmpty())
+                    ? uniqueIdentifier
+                    : String.valueOf(cellId);
+        } else {
+            displayName = (name != null && !name.trim().isEmpty()) ? name : "Unknown";
+            finalId = (mac != null && !mac.trim().isEmpty()) ? mac : "";
+        }
+
+        String finalDisplayName = displayName + " [" + totalScans + "]";
+        String finalStatus = (status != null && !status.trim().isEmpty()) ? status : "GREY";
+
+        return new DeviceListActivity.Device(
+                finalDisplayName,
+                type,
+                "",
+                "",
+                finalId,
+                finalStatus,
+                lastSeen
+        );
+    }
+
     public List<DeviceListActivity.Device> getAllDevices() {
         List<DeviceListActivity.Device> deviceList = new ArrayList<>();
         MainDatabaseHelper dbHelper = new MainDatabaseHelper(context);

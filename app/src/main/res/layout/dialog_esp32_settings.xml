@@ -7,7 +7,7 @@
         android:text="@string/esp32_settings_title" android:textColor="@android:color/white"
         android:textSize="20sp" android:textStyle="bold" />
     <TextView android:id="@+id/esp32_settings_mac" android:layout_width="wrap_content"
-        android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textColor="#9FB3C8" />
+        android:layout_height="wrap_content" android:layout_marginTop="6dp" android:textColor="@android:color/white" />
     <EditText android:id="@+id/esp32_name_input" style="@style/Esp32SettingsInput"
         android:hint="@string/device_name_hint" android:inputType="text" />
     <EditText android:id="@+id/esp32_latitude_input" style="@style/Esp32SettingsInput"

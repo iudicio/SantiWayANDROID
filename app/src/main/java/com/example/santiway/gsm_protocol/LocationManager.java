@@ -29,6 +29,7 @@ public class LocationManager {
     private FusedLocationProviderClient fusedLocationClient;
     private LocationCallback locationCallback;
     private Location currentLocation;
+    private boolean updatesStarted;
 
     // Интервалы обновления
     private static final long UPDATE_INTERVAL = 15000; // 15 секунд
@@ -70,7 +71,7 @@ public class LocationManager {
         }
     }
 
-    public void startLocationUpdates() {
+    public synchronized void startLocationUpdates() {
         SharedPreferences prefs = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE);
         Location meshLocation = getFreshMeshLocation();
         if (meshLocation != null) {
@@ -91,6 +92,10 @@ public class LocationManager {
             return;
         }
 
+        if (updatesStarted) {
+            return;
+        }
+
         if (!hasLocationPermission()) {
             Log.w(TAG, "Location permissions not granted");
             if (onLocationUpdateListener != null) {
@@ -106,6 +111,7 @@ public class LocationManager {
                     locationCallback,
                     Looper.getMainLooper()
             );
+            updatesStarted = true;
             Log.d(TAG, "Location updates started (interval: " + UPDATE_INTERVAL + "ms)");
 
             // Сразу запрашиваем последнюю известную локацию
@@ -118,9 +124,11 @@ public class LocationManager {
         }
     }
 
-    public void stopLocationUpdates() {
+    public synchronized void stopLocationUpdates() {
         try {
+            if (!updatesStarted) return;
             fusedLocationClient.removeLocationUpdates(locationCallback);
+            updatesStarted = false;
             Log.d(TAG, "Location updates stopped");
         } catch (SecurityException e) {
             Log.e(TAG, "SecurityException when stopping updates: " + e.getMessage());
@@ -263,6 +271,27 @@ public class LocationManager {
         return location;
     }
 
+    public Location getBestEffortLocation() {
+        SharedPreferences prefs = context.getSharedPreferences("AppSettings", Context.MODE_PRIVATE);
+        Location meshLocation = getFreshMeshLocation();
+        if (meshLocation != null) {
+            updateLocation(meshLocation);
+            return meshLocation;
+        }
+
+        if (prefs.getBoolean("static_location_enabled", false)) {
+            Location staticLocation = new Location("static");
+            staticLocation.setLatitude(prefs.getFloat("static_latitude", 0f));
+            staticLocation.setLongitude(prefs.getFloat("static_longitude", 0f));
+            staticLocation.setAccuracy(1f);
+            staticLocation.setTime(System.currentTimeMillis());
+            updateLocation(staticLocation);
+            return staticLocation;
+        }
+
+        return currentLocation;
+    }
+
     public interface OnLocationUpdateListener {
         void onLocationUpdate(Location location);
         void onPermissionDenied();
@@ -273,6 +302,10 @@ public class LocationManager {
 
     public void setOnLocationUpdateListener(OnLocationUpdateListener listener) {
         this.onLocationUpdateListener = listener;
+    }
+
+    public void clearOnLocationUpdateListener() {
+        this.onLocationUpdateListener = null;
     }
 
     // Получение последней известной локации с обработкой ошибок

@@ -99,7 +99,7 @@
         android:layout_marginEnd="16dp"
         android:text="@string/esp32_find_and_connect"
         android:textAllCaps="false"
-        android:textColor="#071427"
+        android:textColor="@android:color/black"
         android:textStyle="bold"
         app:backgroundTint="#3DDC84"
         app:cornerRadius="8dp"
@@ -165,7 +165,7 @@
             android:layout_marginTop="12dp"
             android:gravity="center"
             android:text="@string/esp32_empty_devices"
-            android:textColor="#9FB3C8"
+            android:textColor="@android:color/white"
             android:textSize="15sp" />
     </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

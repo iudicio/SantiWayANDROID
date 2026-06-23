@@ -255,7 +255,7 @@ public class CellScanner {
                 CellSignalStrength signalStrength = nrInfo.getCellSignalStrength();
                 
                 CellIdentityNr cellIdentity = (CellIdentityNr) nrInfo.getCellIdentity();
-                tower.setCellId((int) cellIdentity.getNci());
+                tower.setCellId(cellIdentity.getNci());
                 tower.setTac(cellIdentity.getTac());
                 String mccStr = cellIdentity.getMccString();
                 String mncStr = cellIdentity.getMncString();

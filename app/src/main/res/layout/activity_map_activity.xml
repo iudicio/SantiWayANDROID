@@ -59,7 +59,7 @@
             android:paddingEnd="12dp"
             android:text="@string/status_target_en"
             android:textAllCaps="false"
-            android:textColor="@android:color/white"
+            android:textColor="@android:color/black"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -75,7 +75,7 @@
             android:paddingEnd="12dp"
             android:text="@string/status_safe_en"
             android:textAllCaps="false"
-            android:textColor="@android:color/white"
+            android:textColor="@android:color/black"
             android:textSize="12sp"
             android:textStyle="bold" />
     </LinearLayout>
@@ -85,6 +85,7 @@
         android:layout_width="48dp"
         android:layout_height="wrap_content"
         android:orientation="vertical"
+        android:visibility="gone"
         android:layout_marginEnd="16dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent"

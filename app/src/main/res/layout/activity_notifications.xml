@@ -25,7 +25,7 @@
         android:layout_weight="1"
         android:gravity="center"
         android:text="@string/no_notifications"
-        android:textColor="#808080"
+        android:textColor="@android:color/white"
         android:textSize="16sp"
         android:visibility="gone" />
 
@@ -48,7 +48,7 @@
         android:layout_marginBottom="16dp"
         android:text="@string/clear_all"
         android:textAllCaps="false"
-        android:textColor="@android:color/white"
+        android:textColor="@android:color/black"
         android:backgroundTint="#FF3B30"
         app:cornerRadius="12dp" />
 

@@ -189,7 +189,7 @@ public class CellTower {
 
     // Уникальный идентификатор с учетом всех параметров
     public String getUniqueId() {
-        if (mcc > 0 && mnc > 0) {
+        if (mcc > 0 && mnc >= 0) {
             if ("LTE".equals(networkType) || "5G".equals(networkType)) {
                 return String.format(Locale.US, "%d_%d_%d_%d", mcc, mnc, tac, cellId);
             } else {

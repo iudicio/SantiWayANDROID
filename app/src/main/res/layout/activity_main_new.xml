@@ -41,7 +41,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="end"
                 android:layout_marginEnd="16dp"
-                android:textColor="#3DDC84" android:textSize="18sp"
+                android:textColor="@android:color/white" android:textSize="18sp"
                 android:textStyle="bold"
                 android:text="@string/timer_zero"
                 android:visibility="gone" />
@@ -71,7 +71,7 @@
                 android:layout_marginTop="16dp"
                 android:layout_marginEnd="32dp"
                 android:columnCount="2"
-                android:rowCount="2"
+                android:rowCount="3"
                 android:gravity="center"
                 app:layout_constraintTop_toBottomOf="@id/time_label"
                 app:layout_constraintStart_toStartOf="parent"
@@ -113,6 +113,7 @@
                         android:contentDescription="@string/control_esp32" android:src="@drawable/ic_esp32_chip" />
                     <TextView style="@style/MainControlLabel" android:text="@string/control_esp32" />
                 </LinearLayout>
+
             </GridLayout>
 
             <androidx.cardview.widget.CardView
@@ -152,7 +153,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/stopped_status"
-                        android:textColor="#3DDC84" android:textSize="16sp" />
+                        android:textColor="@android:color/white" android:textSize="16sp" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
@@ -194,7 +195,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/stopped_status"
-                        android:textColor="#3DDC84"
+                        android:textColor="@android:color/white"
                         android:textSize="16sp" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
@@ -237,7 +238,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/stopped_status"
-                        android:textColor="#3DDC84"
+                        android:textColor="@android:color/white"
                         android:textSize="16sp" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>

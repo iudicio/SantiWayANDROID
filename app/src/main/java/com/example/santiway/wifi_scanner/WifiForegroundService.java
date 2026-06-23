@@ -10,6 +10,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.database.sqlite.SQLiteDatabase;
 import android.location.Location;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
@@ -171,6 +172,7 @@ public class WifiForegroundService extends Service {
         if (handler != null && scanRunnable != null) {
             handler.removeCallbacks(scanRunnable);
         }
+        processedInCurrentScan = new HashSet<>();
 
         // Stop foreground service
         stopSelf();
@@ -201,12 +203,9 @@ public class WifiForegroundService extends Service {
     private void startWifiScan() {
         if (wifiManager != null && wifiManager.isWifiEnabled()) {
             // Принудительно обновляем координаты перед сканированием
-            Location freshLocation = locationManager.getFreshLocation();
-            if (freshLocation != null) {
-                Log.d(TAG, "Fresh location obtained: " + freshLocation.getLatitude() +
-                        ", " + freshLocation.getLongitude());
-            } else {
-                Log.w(TAG, "Could not get fresh location, will use last known or zeros");
+            Location bestLocation = locationManager.getBestEffortLocation();
+            if (bestLocation == null) {
+                Log.w(TAG, "Could not get cached location, will use last known or zeros");
             }
 
             boolean scanStarted = wifiManager.startScan();
@@ -256,7 +255,11 @@ public class WifiForegroundService extends Service {
     private void processScanResults(List<ScanResult> scanResults) {
         int savedCount = 0;
         int filteredCount = 0;
-        processedInCurrentScan.clear();
+        if (processedInCurrentScan.size() > 512) {
+            processedInCurrentScan = new HashSet<>(Math.max(16, Math.min(scanResults.size() * 2, 512)));
+        } else {
+            processedInCurrentScan.clear();
+        }
 
         // Получаем текущие координаты из LocationManager
         double latitude = locationManager.getLatitude();
@@ -264,7 +267,11 @@ public class WifiForegroundService extends Service {
         double altitude = locationManager.getAltitude();
         float accuracy = locationManager.getAccuracy();
 
-        for (ScanResult result : scanResults) {
+        SQLiteDatabase db = databaseHelper.getWritableDatabase();
+        boolean ownsTransaction = !db.inTransaction();
+        try {
+            if (ownsTransaction) db.beginTransaction();
+            for (ScanResult result : scanResults) {
             // Фильтруем по силе сигнала
             if (result.level < minSignalStrength) {
                 filteredCount++;
@@ -273,7 +280,7 @@ public class WifiForegroundService extends Service {
 
             if (result.SSID != null && !result.SSID.isEmpty() && result.BSSID != null) {
                 // Проверяем дубликаты в текущем сканировании
-                String key = result.BSSID + "_" + (System.currentTimeMillis() / 1000);
+                String key = result.BSSID.toUpperCase(java.util.Locale.US);
                 if (processedInCurrentScan.contains(key)) {
                     Log.d(TAG, "⏱️ Duplicate WiFi in current scan: " + result.BSSID);
                     continue;
@@ -284,6 +291,10 @@ public class WifiForegroundService extends Service {
                     savedCount++;
                 }
             }
+            }
+            if (ownsTransaction) db.setTransactionSuccessful();
+        } finally {
+            if (ownsTransaction && db.inTransaction()) db.endTransaction();
         }
 
         Log.d(TAG, "Saved " + savedCount + " networks to table: " + currentTableName +
@@ -423,6 +434,7 @@ public class WifiForegroundService extends Service {
         if (handler != null && scanRunnable != null) {
             handler.removeCallbacks(scanRunnable);
         }
+        processedInCurrentScan = new HashSet<>();
 
         // Close database
         if (databaseHelper != null) {

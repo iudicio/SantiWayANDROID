@@ -23,7 +23,7 @@
         <item name="android:layout_height">48dp</item>
         <item name="android:layout_marginTop">8dp</item>
         <item name="android:textColor">@android:color/white</item>
-        <item name="android:textColorHint">#9FB3C8</item>
+        <item name="android:textColorHint">@android:color/white</item>
         <item name="android:singleLine">true</item>
     </style>
 

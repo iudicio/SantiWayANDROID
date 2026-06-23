@@ -97,12 +97,22 @@
             android:exported="false" />
 
         <activity
+            android:name=".GrayDeviceSearchActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SantiWay" />
+
+        <activity
             android:name=".esp32.Esp32Activity"
             android:exported="false"
             android:theme="@style/Theme.SantiWay" />
 
         <activity
             android:name=".esp32.Esp32MapActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SantiWay" />
+
+        <activity
+            android:name=".esp32.TriangulatedDevicesActivity"
             android:exported="false"
             android:theme="@style/Theme.SantiWay" />
 

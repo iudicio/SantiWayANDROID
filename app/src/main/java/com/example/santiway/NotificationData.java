@@ -19,7 +19,7 @@ public class NotificationData implements Serializable {
     private String deviceId;
 
     public enum NotificationType {
-        ALARM, SYSTEM, INFO;
+        ALARM, SYSTEM, INFO, CELL_UNKNOWN;
 
         public int getColor() {
             switch (this) {
@@ -29,6 +29,8 @@ public class NotificationData implements Serializable {
                     return Color.parseColor("#3DDC84"); // Зеленый (как в вашем стиле)
                 case INFO:
                     return Color.parseColor("#808080"); // Серый
+                case CELL_UNKNOWN:
+                    return Color.parseColor("#FF9800");
                 default:
                     return Color.parseColor("#FFFFFF");
             }

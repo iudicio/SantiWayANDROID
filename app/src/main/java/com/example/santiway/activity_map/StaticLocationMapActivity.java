@@ -3,10 +3,13 @@ package com.example.santiway;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.example.santiway.BaseLocalizedActivity;
+import com.example.santiway.activity_map.MapLayerManager;
 
 
 import org.osmdroid.config.Configuration;
@@ -39,6 +42,11 @@ public class StaticLocationMapActivity extends BaseLocalizedActivity {
         zoomOutButton = findViewById(R.id.btn_zoom_out);
 
         mapView.setMultiTouchControls(true);
+        MapLayerManager.applySavedLayer(this, mapView);
+        FrameLayout root = findViewById(R.id.root_static_location_map);
+        root.addView(MapLayerManager.createOsmControls(this, mapView, 16));
+        View oldZoom = findViewById(R.id.custom_zoom_container);
+        if (oldZoom != null) oldZoom.setVisibility(View.GONE);
 
         // Убираем стандартные кнопки приближения/отдаления osmdroid
         mapView.getZoomController().setVisibility(
