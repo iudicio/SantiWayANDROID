@@ -189,14 +189,17 @@ public class CellTower {
 
     // Уникальный идентификатор с учетом всех параметров
     public String getUniqueId() {
+        String type = networkType == null || networkType.trim().isEmpty()
+                ? "CELL"
+                : networkType.trim().toUpperCase(Locale.US);
         if (mcc > 0 && mnc >= 0) {
             if ("LTE".equals(networkType) || "5G".equals(networkType)) {
-                return String.format(Locale.US, "%d_%d_%d_%d", mcc, mnc, tac, cellId);
+                return String.format(Locale.US, "%s_%d_%d_%d_%d", type, mcc, mnc, tac, cellId);
             } else {
-                return String.format(Locale.US, "%d_%d_%d_%d", mcc, mnc, lac, cellId);
+                return String.format(Locale.US, "%s_%d_%d_%d_%d", type, mcc, mnc, lac, cellId);
             }
         }
-        return String.valueOf(cellId);
+        return type + "_" + cellId;
     }
 
 

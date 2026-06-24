@@ -58,6 +58,16 @@
             app:selectionRequired="true">
 
             <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_filter_type_all"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/device_type_all_filter"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white" />
+
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_filter_type_wifi"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
@@ -73,7 +83,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="@string/bluetooth_text"
+                android:text="@string/device_type_bluetooth_filter"
                 android:textAllCaps="false"
                 android:textColor="@android:color/white" />
 
@@ -83,7 +93,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="@string/map_cell_towers_layer_action"
+                android:text="@string/device_type_cell_towers_filter"
                 android:textAllCaps="false"
                 android:textColor="@android:color/white" />
         </com.google.android.material.button.MaterialButtonToggleGroup>

@@ -53,6 +53,7 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
     private Switch serverUploadSwitch;
     private EditText deviceNameInput;
     private EditText mapPointLimitInput;
+    private EditText snapshotDurationSecondsInput;
     private EditText dataRetentionDaysInput;
     private EditText mapMarkerSizeInput;
     private EditText yandexTilesApiKeyInput;
@@ -189,16 +190,20 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
         });
 
         mapPointLimitInput = findViewById(R.id.map_point_limit_input);
+        snapshotDurationSecondsInput = findViewById(R.id.snapshot_duration_seconds_input);
         dataRetentionDaysInput = findViewById(R.id.data_retention_days_input);
         mapMarkerSizeInput = findViewById(R.id.map_marker_size_input);
         yandexTilesApiKeyInput = findViewById(R.id.yandex_tiles_api_key_input);
 
         int pointLimit = getSharedPreferences("AppSettings", MODE_PRIVATE)
                 .getInt("map_point_limit", 100);
+        int snapshotDurationSeconds = getSharedPreferences("AppSettings", MODE_PRIVATE)
+                .getInt("snapshot_duration_seconds", 60);
         int retentionDays = getSharedPreferences("AppSettings", MODE_PRIVATE)
                 .getInt("data_retention_days", 7);
 
         mapPointLimitInput.setText(String.valueOf(pointLimit));
+        snapshotDurationSecondsInput.setText(String.valueOf(snapshotDurationSeconds <= 0 ? 60 : snapshotDurationSeconds));
         dataRetentionDaysInput.setText(String.valueOf(retentionDays <= 0 ? 7 : retentionDays));
         mapMarkerSizeInput.setText(String.valueOf(MapLayerManager.markerSizeDp(this)));
         yandexTilesApiKeyInput.setText(MapLayerManager.yandexApiKey(this));
@@ -480,6 +485,7 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
         }
 
         int mapPointLimit = 100;
+        int snapshotDurationSeconds = 60;
         int dataRetentionDays = 7;
         int mapMarkerSize = MapLayerManager.markerSizeDp(this);
 
@@ -488,6 +494,13 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
             if (mapPointLimit <= 0) mapPointLimit = 100;
         } catch (Exception e) {
             mapPointLimit = 100;
+        }
+
+        try {
+            snapshotDurationSeconds = Integer.parseInt(safeText(snapshotDurationSecondsInput));
+            if (snapshotDurationSeconds <= 0) snapshotDurationSeconds = 60;
+        } catch (Exception e) {
+            snapshotDurationSeconds = 60;
         }
 
         try {
@@ -517,6 +530,7 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
         getSharedPreferences("AppSettings", MODE_PRIVATE)
                 .edit()
                 .putInt("map_point_limit", mapPointLimit)
+                .putInt("snapshot_duration_seconds", snapshotDurationSeconds)
                 .putInt("data_retention_days", dataRetentionDays)
                 .apply();
 
@@ -540,6 +554,7 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
         getSharedPreferences("AppSettings", MODE_PRIVATE)
                 .edit()
                 .putInt("map_point_limit", mapPointLimit)
+                .putInt("snapshot_duration_seconds", snapshotDurationSeconds)
                 .putInt("data_retention_days", dataRetentionDays)
                 .putBoolean("static_location_enabled", staticLocationSwitch.isChecked())
                 .putFloat("static_latitude", staticLat)
@@ -727,6 +742,7 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
         if (!sameText(currentDeviceName, savedDeviceName)) return true;
 
         if (positiveIntChanged(mapPointLimitInput, prefs.getInt("map_point_limit", 100), 100)) return true;
+        if (positiveIntChanged(snapshotDurationSecondsInput, prefs.getInt("snapshot_duration_seconds", 60), 60)) return true;
         if (positiveIntChanged(dataRetentionDaysInput, prefs.getInt("data_retention_days", 7), 7)) return true;
         Integer markerSize = parseInteger(safeText(mapMarkerSizeInput));
         if (markerSize == null || markerSize != MapLayerManager.markerSizeDp(this)) return true;

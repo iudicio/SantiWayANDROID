@@ -103,6 +103,10 @@ public class CellScanner {
         Set<String> currentTowerIds = new HashSet<>();
         
         try {
+            if (!hasLocationPermission()) {
+                Log.w(TAG, "Location permission not granted for getAllCellInfo");
+                return towers;
+            }
             List<CellInfo> cellInfos = telephonyManager.getAllCellInfo();
             
             if (cellInfos != null) {
@@ -120,8 +124,12 @@ public class CellScanner {
                         }
                         
                         towers.add(tower);
+                    } else if (tower != null) {
+                        Log.d(TAG, "Rejected cell tower: " + tower.getDescription());
                     }
                 }
+            } else {
+                Log.d(TAG, "TelephonyManager.getAllCellInfo returned null");
             }
             
             knownTowerIds = currentTowerIds;
@@ -168,21 +176,26 @@ public class CellScanner {
             return false;
         }
 
-        // Для LTE проверяем TAC
+        // Некоторые устройства/операторы скрывают LAC/TAC у соседних сот.
+        // Такие соты всё равно полезны для обнаружения, поэтому не отбрасываем их целиком.
         if ("LTE".equals(tower.getNetworkType()) || "5G".equals(tower.getNetworkType())) {
             if (tower.getTac() <= 0 || tower.getTac() == 2147483647) {
-                Log.d(TAG, "Invalid TAC: " + tower.getTac());
-                return false;
+                Log.d(TAG, "Missing/invalid TAC, keeping tower anyway: " + tower.getTac());
             }
         } else {
-            // Для GSM/UMTS проверяем LAC
             if (tower.getLac() <= 0 || tower.getLac() == 2147483647) {
-                Log.d(TAG, "Invalid LAC: " + tower.getLac());
-                return false;
+                Log.d(TAG, "Missing/invalid LAC, keeping tower anyway: " + tower.getLac());
             }
         }
         
         return true;
+    }
+
+    private boolean hasLocationPermission() {
+        return ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
     }
 
     private CellTower parseCellInfo(CellInfo cellInfo) {
@@ -195,8 +208,13 @@ public class CellScanner {
                 
                 tower.setCellId(gsmInfo.getCellIdentity().getCid());
                 tower.setLac(gsmInfo.getCellIdentity().getLac());
-                tower.setMcc(gsmInfo.getCellIdentity().getMcc());
-                tower.setMnc(gsmInfo.getCellIdentity().getMnc());
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    tower.setMcc(parseOperatorPart(gsmInfo.getCellIdentity().getMccString()));
+                    tower.setMnc(parseOperatorPart(gsmInfo.getCellIdentity().getMncString()));
+                } else {
+                    tower.setMcc(gsmInfo.getCellIdentity().getMcc());
+                    tower.setMnc(gsmInfo.getCellIdentity().getMnc());
+                }
                 tower.setArfcn(gsmInfo.getCellIdentity().getArfcn());
                 tower.setSignalStrength(gsmSignal.getDbm());
                 tower.setSignalQuality(gsmSignal.getLevel());
@@ -214,8 +232,13 @@ public class CellScanner {
                 
                 tower.setCellId(wcdmaInfo.getCellIdentity().getCid());
                 tower.setLac(wcdmaInfo.getCellIdentity().getLac());
-                tower.setMcc(wcdmaInfo.getCellIdentity().getMcc());
-                tower.setMnc(wcdmaInfo.getCellIdentity().getMnc());
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    tower.setMcc(parseOperatorPart(wcdmaInfo.getCellIdentity().getMccString()));
+                    tower.setMnc(parseOperatorPart(wcdmaInfo.getCellIdentity().getMncString()));
+                } else {
+                    tower.setMcc(wcdmaInfo.getCellIdentity().getMcc());
+                    tower.setMnc(wcdmaInfo.getCellIdentity().getMnc());
+                }
                 tower.setPsc(wcdmaInfo.getCellIdentity().getPsc());
                 tower.setArfcn(wcdmaInfo.getCellIdentity().getUarfcn());
                 tower.setSignalStrength(wcdmaSignal.getDbm());
@@ -235,8 +258,13 @@ public class CellScanner {
                 
                 tower.setCellId(lteInfo.getCellIdentity().getCi());
                 tower.setTac(lteInfo.getCellIdentity().getTac());
-                tower.setMcc(lteInfo.getCellIdentity().getMcc());
-                tower.setMnc(lteInfo.getCellIdentity().getMnc());
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    tower.setMcc(parseOperatorPart(lteInfo.getCellIdentity().getMccString()));
+                    tower.setMnc(parseOperatorPart(lteInfo.getCellIdentity().getMncString()));
+                } else {
+                    tower.setMcc(lteInfo.getCellIdentity().getMcc());
+                    tower.setMnc(lteInfo.getCellIdentity().getMnc());
+                }
                 tower.setPci(lteInfo.getCellIdentity().getPci());
                 tower.setEarfcn(lteInfo.getCellIdentity().getEarfcn());
                 tower.setSignalStrength(lteSignal.getDbm());
@@ -259,16 +287,8 @@ public class CellScanner {
                 tower.setTac(cellIdentity.getTac());
                 String mccStr = cellIdentity.getMccString();
                 String mncStr = cellIdentity.getMncString();
-                try {
-                    tower.setMcc(mccStr != null ? Integer.parseInt(mccStr) : -1);
-                } catch (NumberFormatException nfe) {
-                    tower.setMcc(-1);
-                }
-                try {
-                    tower.setMnc(mncStr != null ? Integer.parseInt(mncStr) : -1);
-                } catch (NumberFormatException nfe) {
-                    tower.setMnc(-1);
-                }
+                tower.setMcc(parseOperatorPart(mccStr));
+                tower.setMnc(parseOperatorPart(mncStr));
                 tower.setPci(cellIdentity.getPci());
                 tower.setEarfcn(cellIdentity.getNrarfcn());
                 tower.setSignalStrength(signalStrength.getDbm());
@@ -297,6 +317,15 @@ public class CellScanner {
         }
         
         return tower;
+    }
+
+    private int parseOperatorPart(String value) {
+        if (value == null || value.trim().isEmpty()) return -1;
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
     
     private int getSignalStrength() {

@@ -279,6 +279,22 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
+                    android:hint="@string/snapshot_duration_seconds_hint">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/snapshot_duration_seconds_input"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:textColor="@android:color/white"
+                        android:textColorHint="@android:color/white" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/SantiWayTextInputLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
                     android:hint="@string/data_retention_days_hint">
 
                     <com.google.android.material.textfield.TextInputEditText

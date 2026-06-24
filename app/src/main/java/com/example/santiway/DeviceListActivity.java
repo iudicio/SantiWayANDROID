@@ -7,6 +7,8 @@ import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.textfield.TextInputEditText;
 
 import android.app.AlertDialog;
+import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
@@ -51,6 +53,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.Calendar;
 import java.text.SimpleDateFormat;
 import org.json.JSONArray;
 import android.os.Parcel;
@@ -78,6 +81,8 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     private static final String KEY_LAST_SNAPSHOT_TRIGGER_HAS_ORIGIN = "last_snapshot_trigger_has_origin";
     private static final String KEY_LAST_SNAPSHOT_TRIGGER_ARMED = "last_snapshot_trigger_armed";
     private static final String KEY_LAST_SNAPSHOT_TRIGGER_APPLIED = "last_snapshot_trigger_applied";
+    private static final String KEY_DEVICE_LIST_TYPE_FILTER = "device_list_type_filter";
+    private static final String KEY_DEVICE_LIST_STATUS_FILTER = "device_list_status_filter";
     private static final float FOLDER_TRIGGER_DISTANCE_METERS = 500f;
 
     private Toolbar toolbar;
@@ -93,12 +98,12 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     private int currentOffset = 0;
     private final int PAGE_SIZE = 50; // Количество элементов на странице
     private String currentTable = "";
-    private MaterialButton btnTypeWifi, btnTypeBluetooth, btnTypeCell;
+    private MaterialButton btnTypeAll, btnTypeWifi, btnTypeBluetooth, btnTypeCell;
     private MaterialButton btnFilterTarget, btnFilterSafe, btnFilterAll;
     private MaterialButtonToggleGroup deviceTypeFilterGroup, statusFilterGroup;
 
     private final List<Device> allLoadedDevices = new ArrayList<>();
-    private String currentTypeFilter = "WIFI";
+    private String currentTypeFilter = "ALL";
     private String currentStatusFilter = "ALL";
     private TextInputEditText etSearchDevice;
     private String currentSearchQuery = "";
@@ -196,6 +201,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
 
         deviceTypeFilterGroup = findViewById(R.id.device_type_filter_group);
         statusFilterGroup = findViewById(R.id.status_filter_group);
+        btnTypeAll = findViewById(R.id.btn_filter_type_all);
         btnTypeWifi = findViewById(R.id.btn_filter_type_wifi);
         btnTypeBluetooth = findViewById(R.id.btn_filter_type_bluetooth);
         btnTypeCell = findViewById(R.id.btn_filter_type_cell);
@@ -203,6 +209,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
         btnFilterSafe = findViewById(R.id.btn_filter_safe);
         btnFilterAll = findViewById(R.id.btn_filter_all);
         etSearchDevice = findViewById(R.id.et_search_device);
+        loadSavedFilters();
 
         TextInputLayout searchInputLayout = findViewById(R.id.search_input_layout);
 
@@ -996,11 +1003,61 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
         EditText input = new EditText(this);
         input.setHint(hintRes);
         input.setSingleLine(true);
-        input.setInputType(InputType.TYPE_CLASS_DATETIME | InputType.TYPE_DATETIME_VARIATION_NORMAL);
+        input.setInputType(InputType.TYPE_NULL);
+        input.setFocusable(false);
+        input.setCursorVisible(false);
         input.setTextColor(Color.WHITE);
         input.setHintTextColor(Color.WHITE);
         input.setTextSize(13);
+        input.setOnClickListener(v -> showDateTimePicker(input));
         return input;
+    }
+
+    private void showDateTimePicker(EditText target) {
+        Calendar initial = Calendar.getInstance();
+        String currentText = target.getText() == null ? "" : target.getText().toString().trim();
+        if (!currentText.isEmpty()) {
+            try {
+                SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+                format.setLenient(false);
+                Date parsed = format.parse(currentText);
+                if (parsed != null) {
+                    initial.setTime(parsed);
+                }
+            } catch (Exception ignored) {}
+        }
+
+        DatePickerDialog dateDialog = new DatePickerDialog(
+                this,
+                (view, year, month, dayOfMonth) -> {
+                    Calendar selected = Calendar.getInstance();
+                    selected.set(Calendar.YEAR, year);
+                    selected.set(Calendar.MONTH, month);
+                    selected.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+                    selected.set(Calendar.HOUR_OF_DAY, initial.get(Calendar.HOUR_OF_DAY));
+                    selected.set(Calendar.MINUTE, initial.get(Calendar.MINUTE));
+                    selected.set(Calendar.SECOND, 0);
+                    selected.set(Calendar.MILLISECOND, 0);
+
+                    TimePickerDialog timeDialog = new TimePickerDialog(
+                            this,
+                            (timeView, hourOfDay, minute) -> {
+                                selected.set(Calendar.HOUR_OF_DAY, hourOfDay);
+                                selected.set(Calendar.MINUTE, minute);
+                                SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+                                target.setText(format.format(selected.getTime()));
+                            },
+                            selected.get(Calendar.HOUR_OF_DAY),
+                            selected.get(Calendar.MINUTE),
+                            true
+                    );
+                    timeDialog.show();
+                },
+                initial.get(Calendar.YEAR),
+                initial.get(Calendar.MONTH),
+                initial.get(Calendar.DAY_OF_MONTH)
+        );
+        dateDialog.show();
     }
 
     private void setPeriodInputsEnabled(LinearLayout row, boolean enabled) {
@@ -1618,23 +1675,26 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
 
     private void setupFilterButtons() {
         if (deviceTypeFilterGroup != null) {
-            deviceTypeFilterGroup.check(R.id.btn_filter_type_wifi);
+            deviceTypeFilterGroup.check(typeFilterButtonId(currentTypeFilter));
             deviceTypeFilterGroup.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
                 if (!isChecked) return;
-                if (checkedId == R.id.btn_filter_type_wifi) {
+                if (checkedId == R.id.btn_filter_type_all) {
+                    currentTypeFilter = "ALL";
+                } else if (checkedId == R.id.btn_filter_type_wifi) {
                     currentTypeFilter = "WIFI";
                 } else if (checkedId == R.id.btn_filter_type_bluetooth) {
                     currentTypeFilter = "BLUETOOTH";
                 } else if (checkedId == R.id.btn_filter_type_cell) {
                     currentTypeFilter = "CELL";
                 }
+                saveFilters();
                 applyCurrentFilter();
                 updateFilterButtonsUI();
             });
         }
 
         if (statusFilterGroup != null) {
-            statusFilterGroup.check(R.id.btn_filter_all);
+            statusFilterGroup.check(statusFilterButtonId(currentStatusFilter));
             statusFilterGroup.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
                 if (!isChecked) return;
                 if (checkedId == R.id.btn_filter_target) {
@@ -1644,12 +1704,54 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
                 } else if (checkedId == R.id.btn_filter_all) {
                     currentStatusFilter = "ALL";
                 }
+                saveFilters();
                 applyCurrentFilter();
                 updateFilterButtonsUI();
             });
         }
 
         updateFilterButtonsUI();
+    }
+
+    private void loadSavedFilters() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_APP, MODE_PRIVATE);
+        currentTypeFilter = sanitizeTypeFilter(
+                prefs.getString(KEY_DEVICE_LIST_TYPE_FILTER, currentTypeFilter)
+        );
+        currentStatusFilter = sanitizeStatusFilter(
+                prefs.getString(KEY_DEVICE_LIST_STATUS_FILTER, currentStatusFilter)
+        );
+    }
+
+    private void saveFilters() {
+        getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                .edit()
+                .putString(KEY_DEVICE_LIST_TYPE_FILTER, currentTypeFilter)
+                .putString(KEY_DEVICE_LIST_STATUS_FILTER, currentStatusFilter)
+                .apply();
+    }
+
+    private String sanitizeTypeFilter(String value) {
+        if ("WIFI".equals(value) || "BLUETOOTH".equals(value) || "CELL".equals(value)) return value;
+        return "ALL";
+    }
+
+    private String sanitizeStatusFilter(String value) {
+        if ("TARGET".equals(value) || "SAFE".equals(value)) return value;
+        return "ALL";
+    }
+
+    private int typeFilterButtonId(String typeFilter) {
+        if ("WIFI".equals(typeFilter)) return R.id.btn_filter_type_wifi;
+        if ("BLUETOOTH".equals(typeFilter)) return R.id.btn_filter_type_bluetooth;
+        if ("CELL".equals(typeFilter)) return R.id.btn_filter_type_cell;
+        return R.id.btn_filter_type_all;
+    }
+
+    private int statusFilterButtonId(String statusFilter) {
+        if ("TARGET".equals(statusFilter)) return R.id.btn_filter_target;
+        if ("SAFE".equals(statusFilter)) return R.id.btn_filter_safe;
+        return R.id.btn_filter_all;
     }
 
     private void setupSearch() {
@@ -1706,6 +1808,9 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
 
     private boolean matchesCurrentTypeFilter(Device device) {
         if (device == null || device.getType() == null) return false;
+        if ("ALL".equals(currentTypeFilter)) {
+            return true;
+        }
         String type = device.getType().trim();
         if ("WIFI".equals(currentTypeFilter)) {
             return "Wi-Fi".equalsIgnoreCase(type) || "WiFi".equalsIgnoreCase(type);
@@ -1774,6 +1879,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     }
 
     private void updateFilterButtonsUI() {
+        styleToggleButton(btnTypeAll, "ALL".equals(currentTypeFilter), "#3A4A63");
         styleToggleButton(btnTypeWifi, "WIFI".equals(currentTypeFilter), "#2D8CFF");
         styleToggleButton(btnTypeBluetooth, "BLUETOOTH".equals(currentTypeFilter), "#6C63FF");
         styleToggleButton(btnTypeCell, "CELL".equals(currentTypeFilter), "#FF9800");

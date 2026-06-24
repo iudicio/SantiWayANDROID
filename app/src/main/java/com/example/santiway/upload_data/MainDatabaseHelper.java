@@ -53,6 +53,8 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     private static final long DUPLICATE_WINDOW_MS = 30000L;
     private static final long RETENTION_CLEANUP_INTERVAL_MS = 60L * 60L * 1000L;
     private static final long DEVICES_CHANGED_BROADCAST_INTERVAL_MS = 2000L;
+    private static final double GPS_SPOOF_DISTANCE_METERS = 10000.0;
+    private static final double GPS_SPOOF_SPEED_KMH = 400.0;
     private static volatile long lastRetentionCleanupAt = 0L;
     private static final Map<String, Long> LAST_DEVICES_CHANGED_BROADCAST = new HashMap<>();
     private static final Map<String, Boolean> INDEX_READY = new HashMap<>();
@@ -63,7 +65,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
     private static final String TAG = "MainDatabaseHelper";
     private static final String DATABASE_NAME = "UnifiedScanner.db";
-    private static final int DATABASE_VERSION = 8; // УВЕЛИЧЕНО
+    private static final int DATABASE_VERSION = 9;
     private final Context mContext;
 
     public MainDatabaseHelper(Context context) {
@@ -121,6 +123,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         db.execSQL(createUnifiedTable);
         db.execSQL(createTargetTable);
         db.execSQL(createSafeTable);
+        createGpsSpoofedDevicesTable(db);
         createCoreIndexes(db);
     }
 
@@ -128,10 +131,21 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         try {
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_target_devices_key ON target_devices(device_key)");
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_safe_devices_key ON safe_devices(device_key)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_gps_spoofed_devices_key ON gps_spoofed_devices(device_key)");
         } catch (Exception e) {
             Log.e(TAG, "Error creating status indexes: " + e.getMessage());
         }
         createIndexesForExistingScannerTables(db);
+    }
+
+    private void createGpsSpoofedDevicesTable(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS gps_spoofed_devices (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "device_key TEXT NOT NULL UNIQUE," +
+                "distance_meters REAL," +
+                "speed_kmh REAL," +
+                "timestamp INTEGER" +
+                ");");
     }
 
     private void createIndexesForExistingScannerTables(SQLiteDatabase db) {
@@ -147,6 +161,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 if (table == null
                         || "target_devices".equals(table)
                         || "safe_devices".equals(table)
+                        || "gps_spoofed_devices".equals(table)
                         || "unique_devices".equals(table)) {
                     continue;
                 }
@@ -239,6 +254,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
                 if ("target_devices".equals(table)
                         || "safe_devices".equals(table)
+                        || "gps_spoofed_devices".equals(table)
                         || "unique_devices".equals(table)) {
                     continue;
                 }
@@ -324,8 +340,47 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         return false;
     }
 
+    private boolean isGpsSpoofIgnored(SQLiteDatabase db, String uniqueId) {
+        String key = normalizeDeviceKey(uniqueId);
+        if (key == null || key.isEmpty()) return false;
+
+        Cursor cursor = null;
+        try {
+            createGpsSpoofedDevicesTable(db);
+            cursor = db.rawQuery(
+                    "SELECT 1 FROM gps_spoofed_devices WHERE UPPER(device_key) = ? LIMIT 1",
+                    new String[]{key}
+            );
+            return cursor != null && cursor.moveToFirst();
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking GPS spoof ignore for " + uniqueId + ": " + e.getMessage());
+            return false;
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+    }
+
+    private void markGpsSpoofIgnored(SQLiteDatabase db, String uniqueId,
+                                     double distanceMeters, double speedKmh, long timestamp) {
+        String key = normalizeDeviceKey(uniqueId);
+        if (key == null || key.isEmpty()) return;
+
+        try {
+            createGpsSpoofedDevicesTable(db);
+            ContentValues values = new ContentValues();
+            values.put("device_key", key);
+            values.put("distance_meters", distanceMeters);
+            values.put("speed_kmh", speedKmh);
+            values.put("timestamp", timestamp);
+            db.insertWithOnConflict("gps_spoofed_devices", null, values, SQLiteDatabase.CONFLICT_REPLACE);
+        } catch (Exception e) {
+            Log.e(TAG, "Error marking GPS spoof ignore for " + uniqueId + ": " + e.getMessage());
+        }
+    }
+
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        createGpsSpoofedDevicesTable(db);
         createCoreIndexes(db);
 //        if (oldVersion < 8) {
 //            try {
@@ -564,8 +619,14 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         values.put("status", "GREY");
         values.put("folder_name", tableName);
 
-        String selection = "cell_id = ? AND network_type = ?";
-        String[] selectionArgs = {String.valueOf(tower.getCellId()), tower.getNetworkType()};
+        String networkType = tower.getNetworkType() == null ? "" : tower.getNetworkType();
+        boolean lteLike = "LTE".equalsIgnoreCase(networkType) || "5G".equalsIgnoreCase(networkType);
+        String selection = "cell_id = ? AND network_type = ? AND " + (lteLike ? "tac" : "lac") + " = ?";
+        String[] selectionArgs = {
+                String.valueOf(tower.getCellId()),
+                networkType,
+                String.valueOf(lteLike ? tower.getTac() : tower.getLac())
+        };
         long result = addOrUpdateUnifiedDevice(tableName, values, selection, selectionArgs, tower.getTimestamp());
         if (result != -1) {
             OpenCellIdUnknownTowerNotifier.checkAndNotify(mContext, tower);
@@ -604,14 +665,16 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 if (cellId != null && cellId > 0 && cellId != 2147483647) {
                     if ("LTE".equals(networkType) || "5G".equals(networkType)) {
                         // Для LTE/5G: MCC_MNC_TAC_CI
-                        uniqueId = String.format(Locale.US, "%d_%d_%d_%d",
+                        uniqueId = String.format(Locale.US, "%s_%d_%d_%d_%d",
+                                networkType,
                                 mcc != null ? mcc : 0,
                                 mnc != null ? mnc : 0,
                                 tac != null ? tac : 0,
                                 cellId);
                     } else {
                         // Для GSM/UMTS: MCC_MNC_LAC_CI
-                        uniqueId = String.format(Locale.US, "%d_%d_%d_%d",
+                        uniqueId = String.format(Locale.US, "%s_%d_%d_%d_%d",
+                                networkType != null ? networkType : "CELL",
                                 mcc != null ? mcc : 0,
                                 mnc != null ? mnc : 0,
                                 lac != null ? lac : 0,
@@ -641,19 +704,26 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 };
             } else {
                 // Для сотовых вышек ищем по составному ключу
-                checkQuery = "SELECT COUNT(*) FROM \"" + tableName + "\" " +
-                        "WHERE type = 'Cell' AND " +
-                        "cell_id = ? AND mcc = ? AND mnc = ? AND " +
-                        "timestamp BETWEEN ? AND ?";
-
                 Long cellId = values.getAsLong("cell_id");
                 Integer mcc = values.getAsInteger("mcc");
                 Integer mnc = values.getAsInteger("mnc");
+                Long tac = values.getAsLong("tac");
+                Integer lac = values.getAsInteger("lac");
+                String networkType = values.getAsString("network_type");
+                boolean lteLike = "LTE".equalsIgnoreCase(networkType) || "5G".equalsIgnoreCase(networkType);
+
+                checkQuery = "SELECT COUNT(*) FROM \"" + tableName + "\" " +
+                        "WHERE type = 'Cell' AND " +
+                        "cell_id = ? AND mcc = ? AND mnc = ? AND network_type = ? AND " +
+                        (lteLike ? "tac" : "lac") + " = ? AND " +
+                        "timestamp BETWEEN ? AND ?";
 
                 checkArgs = new String[]{
                         String.valueOf(cellId),
                         String.valueOf(mcc),
                         String.valueOf(mnc),
+                        String.valueOf(networkType),
+                        String.valueOf(lteLike ? tac : lac),
                         String.valueOf(duplicateStart),
                         String.valueOf(duplicateEnd)
                 };
@@ -703,7 +773,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 notifyTarget = markedTargetAlarmEnabled;
             } else if (trackingAlarmEnabled && curLat != null && curLon != null && "GREY".equals(lastStatus)) {
                 try {
-                    String calculatedStatus = evaluateTargetStatus(uniqueId, curLat, curLon, newTimestamp, tableName);
+                    String calculatedStatus = evaluateTargetStatus(db, uniqueId, curLat, curLon, newTimestamp, tableName);
                     values.put("status", calculatedStatus);
                     Log.d(TAG, "Status for " + uniqueId + ": " + calculatedStatus);
                     notifyTarget = "TARGET".equals(calculatedStatus);
@@ -870,6 +940,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             // После очистки текущей папки служебные таблицы тоже должны очиститься
             db.delete("target_devices", null, null);
             db.delete("safe_devices", null, null);
+            db.delete("gps_spoofed_devices", null, null);
 
             db.setTransactionSuccessful();
             notifyDevicesChanged(folderName);
@@ -1398,6 +1469,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                             "AND name != 'unique_devices' " +
                             "AND name != 'target_devices' " +
                             "AND name != 'safe_devices' " +
+                            "AND name != 'gps_spoofed_devices' " +
                             "AND name NOT LIKE '%_unique'",
                     null
             );
@@ -1617,7 +1689,9 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     public void createTableIfNotExists(String tableName) {
         SQLiteDatabase db = this.getWritableDatabase();
         try {
-            if ("target_devices".equals(tableName) || "safe_devices".equals(tableName)) {
+            if ("target_devices".equals(tableName)
+                    || "safe_devices".equals(tableName)
+                    || "gps_spoofed_devices".equals(tableName)) {
                 return;
             }
             createFolderRawTableIfNotExists(db, tableName);
@@ -2048,23 +2122,27 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     }
 
     // 3. Проверка условий Target
-    private String evaluateTargetStatus(String uniqueId, double curLat, double curLon, long curTime, String tableName) {
+    private String evaluateTargetStatus(SQLiteDatabase db, String uniqueId, double curLat, double curLon, long curTime, String tableName) {
         if (uniqueId == null || uniqueId.isEmpty()) return "GREY";
+        if (isGpsSpoofIgnored(db, uniqueId)) {
+            Log.d("MATH_CHECK", "ID: " + uniqueId + " - ignored as GPS spoofing");
+            return "GREY";
+        }
 
-        SQLiteDatabase db = this.getReadableDatabase();
         String column = uniqueId.contains(":") ? "bssid" : "cell_id";
 
         Cursor cursor = db.query("\"" + tableName + "\"",
                 new String[]{"latitude", "longitude", "timestamp"},
                 "CAST(" + column + " AS TEXT) = ?",
                 new String[]{uniqueId},
-                null, null, "timestamp DESC", "1");
+                null, null, "timestamp DESC", "2");
 
         double speedKmH = 0;
         double dist24h = 0;
 
         try {
             if (cursor != null && cursor.moveToFirst()) {
+                boolean isSecondPoint = cursor.getCount() == 1;
                 double prevLat = cursor.getDouble(0);
                 double prevLon = cursor.getDouble(1);
                 long prevTime = cursor.getLong(2);
@@ -2082,6 +2160,18 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 double timeHours = (double) (curTime - prevTime) / 3600000.0;
                 if (timeHours > 0) {
                     speedKmH = (currentJumpMeters / 1000.0) / timeHours;
+                }
+
+                if (isSecondPoint
+                        && currentJumpMeters > GPS_SPOOF_DISTANCE_METERS
+                        && speedKmH > GPS_SPOOF_SPEED_KMH) {
+                    markGpsSpoofIgnored(db, uniqueId, currentJumpMeters, speedKmH, curTime);
+                    Log.d("MATH_CHECK", String.format(
+                            Locale.US,
+                            "ID: %s - GPS spoofing ignored: second point jump %.2f m at %.2f km/h",
+                            uniqueId, currentJumpMeters, speedKmH
+                    ));
+                    return "GREY";
                 }
 
                 // 3. Фильтры перед дальнейшим расчетом

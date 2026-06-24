@@ -34,8 +34,8 @@
     <!-- Уведомления (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- READ_PHONE_STATE - если используется для сотовых сетей -->
-    <!--<uses-permission android:name="android.permission.READ_PHONE_STATE" />-->
+    <!-- Сотовые сети -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
     <!-- Для карт -->
     <uses-feature

@@ -505,6 +505,12 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
         return "snapshot-" + sdf.format(new Date());
     }
 
+    private int snapshotDurationSeconds() {
+        int seconds = getSharedPreferences("AppSettings", MODE_PRIVATE)
+                .getInt("snapshot_duration_seconds", 60);
+        return seconds > 0 ? seconds : 60;
+    }
+
     private void startSnapshotScan() {
         if (isSnapshotRunning) {
             Toast.makeText(this, getString(R.string.toast_snapshot_already_running), Toast.LENGTH_SHORT).show();
@@ -542,9 +548,17 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
                     .start();
         }
 
-        Toast.makeText(this, getString(R.string.toast_snapshot_started), Toast.LENGTH_SHORT).show();
+        int snapshotDurationSeconds = snapshotDurationSeconds();
+        Toast.makeText(
+                this,
+                getString(R.string.toast_snapshot_started, snapshotDurationSeconds),
+                Toast.LENGTH_SHORT
+        ).show();
 
-        snapshotHandler.postDelayed(() -> finishSnapshotScan(wasScanning), 60_000);
+        snapshotHandler.postDelayed(
+                () -> finishSnapshotScan(wasScanning),
+                snapshotDurationSeconds * 1000L
+        );
     }
 
     private void animateSnapshotButton() {
@@ -1088,8 +1102,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
             permissionsToRequest.add(android.Manifest.permission.POST_NOTIFICATIONS);
         }
 
-        // READ_PHONE_STATE запрашивайте отдельно, только если действительно нужно
-        // permissionsToRequest.add(android.Manifest.permission.READ_PHONE_STATE);
+        permissionsToRequest.add(android.Manifest.permission.READ_PHONE_STATE);
 
         if (!permissionsToRequest.isEmpty()) {
             requestPermissionLauncher.launch(permissionsToRequest.toArray(new String[0]));
@@ -1126,6 +1139,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
     private void requestEssentialPermissions() {
         List<String> permissions = new ArrayList<>();
         permissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        permissions.add(Manifest.permission.READ_PHONE_STATE);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             permissions.add(Manifest.permission.BLUETOOTH_SCAN);

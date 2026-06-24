@@ -72,6 +72,10 @@ public class CellForegroundService extends Service {
                 if (intent.hasExtra("tableName")) {
                     currentTableName = intent.getStringExtra("tableName");
                 }
+                currentLatitude = intent.getDoubleExtra("latitude", currentLatitude);
+                currentLongitude = intent.getDoubleExtra("longitude", currentLongitude);
+                currentAltitude = intent.getDoubleExtra("altitude", currentAltitude);
+                currentAccuracy = intent.getFloatExtra("accuracy", currentAccuracy);
                 startForegroundService();
                 startScanning();
             } else if ("STOP_SCAN".equals(action)) {
@@ -113,29 +117,18 @@ public class CellForegroundService extends Service {
                         ActivityCompat.checkSelfPermission(CellForegroundService.this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                     Log.w(TAG, "Location permissions not granted. Cannot perform scan.");
                     scanInProgress = false;
+                    if (isScanning) {
+                        handler.postDelayed(this, scanInterval);
+                    }
                     return;
                 }
 
-                fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
-                        .addOnSuccessListener(location -> {
-                            if (location != null) {
-                                currentLatitude = location.getLatitude();
-                                currentLongitude = location.getLongitude();
-                                currentAltitude = location.getAltitude();
-                                currentAccuracy = location.getAccuracy();
-                            }
-
-                            try {
-                                scanAndSave();
-                            } finally {
-                                scanInProgress = false;
-                            }
-                        })
-                        .addOnFailureListener(e -> {
-                            Log.e(TAG, "Failed to get location: " + e.getMessage());
-                            scanAndSave(); // Даже без координат пробуем сохранить
-                            scanInProgress = false;
-                        });
+                try {
+                    scanAndSave();
+                    refreshLocationAsync();
+                } finally {
+                    scanInProgress = false;
+                }
 
                 if (isScanning) {
                     handler.postDelayed(this, scanInterval);
@@ -144,6 +137,24 @@ public class CellForegroundService extends Service {
         };
 
         handler.post(scanRunnable);
+    }
+
+    private void refreshLocationAsync() {
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, null)
+                .addOnSuccessListener(location -> {
+                    if (location != null) {
+                        currentLatitude = location.getLatitude();
+                        currentLongitude = location.getLongitude();
+                        currentAltitude = location.getAltitude();
+                        currentAccuracy = location.getAccuracy();
+                    }
+                })
+                .addOnFailureListener(e ->
+                        Log.w(TAG, "Failed to refresh cell scan location: " + e.getMessage()));
     }
 
     private void scanAndSave() {
