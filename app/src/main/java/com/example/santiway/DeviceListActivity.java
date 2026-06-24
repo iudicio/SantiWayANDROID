@@ -84,6 +84,9 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     private static final String KEY_DEVICE_LIST_TYPE_FILTER = "device_list_type_filter";
     private static final String KEY_DEVICE_LIST_STATUS_FILTER = "device_list_status_filter";
     private static final float FOLDER_TRIGGER_DISTANCE_METERS = 500f;
+    private static final String CELL_ALERT_FOLDER = "__cell_alert__";
+    private static final String CELL_SAFE_FOLDER = "__cell_safe__";
+    private static final String CELL_BLACKLIST_FOLDER = "__cell_blacklist__";
 
     private Toolbar toolbar;
     private TabLayout tabLayout;
@@ -291,6 +294,10 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
                 int selectedTabPos = tabLayout.getSelectedTabPosition();
                 if (selectedTabPos == -1) return;
                 String currentFolder = (String) tabLayout.getTabAt(selectedTabPos).getTag();
+                if (isCellSystemFolder(currentFolder)) {
+                    Toast.makeText(this, R.string.cell_system_folder_readonly, Toast.LENGTH_SHORT).show();
+                    return;
+                }
 
                 // 2. Создаем диалог подтверждения
                 AlertDialog dialog = new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
@@ -333,6 +340,10 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
                 int selectedTabPos = tabLayout.getSelectedTabPosition();
                 if (selectedTabPos == -1) return;
                 String oldName = (String) tabLayout.getTabAt(selectedTabPos).getTag();
+                if (isCellSystemFolder(oldName)) {
+                    Toast.makeText(this, R.string.cell_system_folder_readonly, Toast.LENGTH_SHORT).show();
+                    return;
+                }
                 showRenameFolderDialog(oldName);
             });
         }
@@ -458,6 +469,9 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
 
     // Метод для открытия карты устройства
     private void openDeviceMap(Device device, String tableName, int position) {
+        if (isCellSystemFolder(tableName) && device != null && !TextUtils.isEmpty(device.getSourceFolder())) {
+            tableName = device.getSourceFolder();
+        }
         if (tableName == null || tableName.isEmpty()) {
             Toast.makeText(this, getString(R.string.error_table_name_missing), Toast.LENGTH_SHORT).show();
             return;
@@ -496,21 +510,35 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     }
 
     public void shareDeviceAsJson(Device device) {
-        String jsonString = databaseHelper.getDeviceExportJson(currentTable, device.getMac());
+        String exportTable = device != null && isCellSystemFolder(currentTable) && !TextUtils.isEmpty(device.getSourceFolder())
+                ? device.getSourceFolder()
+                : currentTable;
+        if (device == null || TextUtils.isEmpty(device.getMac()) || TextUtils.isEmpty(exportTable)) {
+            Toast.makeText(this, getString(R.string.error_no_export_data), Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-        if (jsonString == null || jsonString.isEmpty()) {
+        String deviceKey = device.getMac().trim();
+        List<MainDatabaseHelper.DeviceLocation> history =
+                databaseHelper.getDeviceHistoryByKey(exportTable, deviceKey, device.getType());
+
+        if (history == null || history.isEmpty()) {
             Toast.makeText(this, getString(R.string.error_no_export_data), Toast.LENGTH_SHORT).show();
             return;
         }
 
         try {
-            java.io.File cachePath = new java.io.File(getExternalCacheDir(), "exports");
-            cachePath.mkdirs();
-            java.io.File tempFile = new java.io.File(cachePath, "device_" + device.getMac().replace(":", "") + ".json");
+            String jsonString = buildDeviceShareJson(device, deviceKey, exportTable, history);
+            java.io.File cacheRoot = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
+            java.io.File cachePath = new java.io.File(cacheRoot, "exports");
+            if (!cachePath.exists() && !cachePath.mkdirs()) {
+                throw new java.io.IOException("Cannot create export directory");
+            }
+            java.io.File tempFile = new java.io.File(cachePath, safeExportFileName(deviceKey));
 
-            java.io.FileOutputStream stream = new java.io.FileOutputStream(tempFile);
-            stream.write(jsonString.getBytes());
-            stream.close();
+            try (java.io.FileOutputStream stream = new java.io.FileOutputStream(tempFile)) {
+                stream.write(jsonString.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
 
             android.net.Uri contentUri = androidx.core.content.FileProvider.getUriForFile(
                     this, getPackageName() + ".provider", tempFile);
@@ -518,15 +546,81 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             Intent shareIntent = new Intent(Intent.ACTION_SEND);
             shareIntent.setType("application/json");
             shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+            shareIntent.putExtra(Intent.EXTRA_SUBJECT, tempFile.getName());
+            shareIntent.putExtra(Intent.EXTRA_TEXT, tempFile.getName());
+            shareIntent.setClipData(android.content.ClipData.newUri(getContentResolver(), tempFile.getName(), contentUri));
             shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivity(Intent.createChooser(shareIntent, getString(R.string.share_json_title)));
         } catch (Exception e) {
+            Log.e(TAG, "Failed to share device JSON", e);
             Toast.makeText(this, getString(R.string.error_with_message, e.getMessage()), Toast.LENGTH_SHORT).show();
         }
     }
 
+    private String buildDeviceShareJson(Device device,
+                                        String deviceKey,
+                                        String exportTable,
+                                        List<MainDatabaseHelper.DeviceLocation> history) throws org.json.JSONException {
+        org.json.JSONObject root = new org.json.JSONObject();
+        root.put("name", device.getName());
+        root.put("device_id", deviceKey);
+        root.put("type", device.getType());
+        root.put("status", device.getStatus());
+        root.put("folder", exportTable);
+        root.put("exported_at", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()));
+
+        JSONArray points = new JSONArray();
+        SimpleDateFormat detectedFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
+        for (MainDatabaseHelper.DeviceLocation location : history) {
+            org.json.JSONObject point = new org.json.JSONObject();
+            long timestamp = parseLongOrZero(location.timestamp);
+            point.put("latitude", location.latitude);
+            point.put("longitude", location.longitude);
+            point.put("timestamp", timestamp);
+            point.put("detected_at", timestamp > 0 ? detectedFormat.format(new Date(timestamp)) : location.timestamp);
+            points.put(point);
+        }
+        root.put("points_history", points);
+        return root.toString(4);
+    }
+
+    private long parseLongOrZero(String value) {
+        if (value == null) return 0L;
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
+
+    private String safeExportFileName(String deviceKey) {
+        String safeKey = deviceKey == null ? "unknown" : deviceKey.replaceAll("[^A-Za-z0-9._-]", "_");
+        if (safeKey.length() > 80) safeKey = safeKey.substring(0, 80);
+        return "device_" + safeKey + ".json";
+    }
+
     private String getDisplayTableName(String tableName) {
+        if (CELL_ALERT_FOLDER.equals(tableName)) return "Alert";
+        if (CELL_SAFE_FOLDER.equals(tableName)) return "Safe";
+        if (CELL_BLACKLIST_FOLDER.equals(tableName)) return "Blacklist";
         return FolderNameHelper.getDisplayName(this, tableName);
+    }
+
+    private boolean isCellSystemFolder(String folder) {
+        return CELL_ALERT_FOLDER.equals(folder)
+                || CELL_SAFE_FOLDER.equals(folder)
+                || CELL_BLACKLIST_FOLDER.equals(folder);
+    }
+
+    public boolean isCurrentCellSystemFolder() {
+        return isCellSystemFolder(currentTable);
+    }
+
+    private String statusForCellSystemFolder(String folder) {
+        if (CELL_ALERT_FOLDER.equals(folder)) return "TARGET";
+        if (CELL_SAFE_FOLDER.equals(folder)) return "SAFE";
+        if (CELL_BLACKLIST_FOLDER.equals(folder)) return "BLACKLIST";
+        return "GREY";
     }
 
     private void setupTabLayout() {
@@ -551,6 +645,9 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             tab.setTag(tableName);
             tabLayout.addTab(tab);
         }
+        addCellSystemTab(CELL_ALERT_FOLDER, "Alert");
+        addCellSystemTab(CELL_SAFE_FOLDER, "Safe");
+        addCellSystemTab(CELL_BLACKLIST_FOLDER, "Blacklist");
 
         tabLayout.clearOnTabSelectedListeners();
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
@@ -565,7 +662,9 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
 
                 getSharedPreferences("app_prefs", MODE_PRIVATE)
                         .edit()
-                        .putString("current_folder", currentTable)
+                        .putString("current_folder", isCellSystemFolder(currentTable)
+                                ? FolderNameHelper.MAIN_FOLDER_INTERNAL
+                                : currentTable)
                         .apply();
 
                 loadDevicesForTable(currentTable, true);
@@ -612,6 +711,12 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
 
         tabLayout.post(this::bindFolderLongPressActions);
         tabLayout.post(this::updateFolderTriggerVisuals);
+    }
+
+    private void addCellSystemTab(String tag, String title) {
+        TabLayout.Tab tab = tabLayout.newTab().setText(title);
+        tab.setTag(tag);
+        tabLayout.addTab(tab);
     }
 
     private void scrollTabIntoView(int position) {
@@ -671,6 +776,10 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             if (tab == null || tab.getTag() == null) continue;
             String folderName = (String) tab.getTag();
             tabView.setOnTouchListener(null);
+            if (isCellSystemFolder(folderName)) {
+                tabView.setOnLongClickListener(null);
+                continue;
+            }
             tabView.setOnLongClickListener(v -> {
                 showFolderActionsDialog(folderName);
                 return true;
@@ -1117,6 +1226,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
         for (int i = 0; i < count; i++) {
             TabLayout.Tab tab = tabLayout.getTabAt(i);
             if (tab == null || tab.getTag() == null) continue;
+            if (isCellSystemFolder((String) tab.getTag())) continue;
             View tabView = tabStrip.getChildAt(i);
             startFolderTremble(tabView);
             bindFolderDrag(tabStrip, tabView, (String) tab.getTag());
@@ -1263,7 +1373,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     }
 
     private View createFolderTabEditView(String folderName) {
-        boolean canDelete = !FolderNameHelper.isMainFolder(folderName);
+        boolean canDelete = !FolderNameHelper.isMainFolder(folderName) && !isCellSystemFolder(folderName);
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.HORIZONTAL);
         container.setGravity(Gravity.CENTER);
@@ -1517,6 +1627,9 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             List<Device> deviceList = new ArrayList<>();
 
             try {
+                if (isCellSystemFolder(tableName)) {
+                    deviceList = loadCellSystemFolderDevices(tableName, loadOffset, PAGE_SIZE);
+                } else {
                 String uniqueTableName = getUniqueTableName(tableName);
                 UniqueDevicesHelper uniqueHelper =
                         new UniqueDevicesHelper(DeviceListActivity.this, uniqueTableName);
@@ -1542,20 +1655,25 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
                         );
                     }
                 }
-
-                Set<String> deviceKeys = new LinkedHashSet<>();
-                for (Device device : deviceList) {
-                    if (device.getMac() != null) {
-                        deviceKeys.add(device.getMac());
-                    }
                 }
-                Map<String, String> actualStatuses = databaseHelper.getStatusesFromServiceTables(deviceKeys);
-                for (Device device : deviceList) {
-                    String deviceKey = device.getMac();
-                    if (deviceKey == null) continue;
-                    String normalizedKey = deviceKey.trim().toUpperCase(Locale.US);
-                    String actualStatus = actualStatuses.get(normalizedKey);
-                    device.setStatus(actualStatus != null ? actualStatus : "GREY");
+
+                if (!isCellSystemFolder(tableName)) {
+                    Set<String> deviceKeys = new LinkedHashSet<>();
+                    for (Device device : deviceList) {
+                        if (device.getMac() != null) {
+                            deviceKeys.add(device.getMac());
+                        }
+                    }
+                    Map<String, String> actualStatuses = databaseHelper.getStatusesFromServiceTables(deviceKeys);
+                    for (Device device : deviceList) {
+                        String deviceKey = device.getMac();
+                        if (deviceKey == null) continue;
+                        String normalizedKey = deviceKey.trim().toUpperCase(Locale.US);
+                        String actualStatus = actualStatuses.get(normalizedKey);
+                        if (actualStatus != null) {
+                            device.setStatus(actualStatus);
+                        }
+                    }
                 }
 
             } catch (Exception e) {
@@ -1580,6 +1698,78 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
         }).start();
     }
 
+    private List<Device> loadCellSystemFolderDevices(String systemFolder, int offset, int limit) {
+        List<Device> result = new ArrayList<>();
+        String requiredStatus = statusForCellSystemFolder(systemFolder);
+        String query = currentSearchQuery == null ? "" : currentSearchQuery.trim().toUpperCase(Locale.US);
+        databaseHelper.rebuildStatusTables(null);
+        Set<String> persistentKeys = databaseHelper.getPersistentStatusKeys(requiredStatus);
+        Set<String> seenKeys = new LinkedHashSet<>();
+
+        for (String folder : orderedTables) {
+            if (isCellSystemFolder(folder)) continue;
+            UniqueDevicesHelper helper = new UniqueDevicesHelper(this, getUniqueTableName(folder));
+            List<Device> devices = helper.getAllDevices();
+            Set<String> cellKeys = new LinkedHashSet<>();
+            for (Device device : devices) {
+                if (isCellDevice(device) && !TextUtils.isEmpty(device.getMac())) {
+                    cellKeys.add(device.getMac());
+                }
+            }
+            Map<String, String> serviceStatuses = databaseHelper.getStatusesFromServiceTables(cellKeys);
+            for (Device device : devices) {
+                if (!isCellDevice(device)) continue;
+                String normalizedKey = device.getMac() == null
+                        ? ""
+                        : device.getMac().trim().toUpperCase(Locale.US);
+                String serviceStatus = serviceStatuses.get(normalizedKey);
+                if (serviceStatus != null) {
+                    device.setStatus(serviceStatus);
+                }
+                String status = device.getStatus() == null ? "GREY" : device.getStatus().trim().toUpperCase(Locale.US);
+                if (!requiredStatus.equals(status)) continue;
+                if (!query.isEmpty() && !matchesDeviceQuery(device, query)) continue;
+                device.setSourceFolder(folder);
+                if (!normalizedKey.isEmpty()) {
+                    seenKeys.add(normalizedKey);
+                }
+                result.add(device);
+            }
+        }
+
+        for (String key : persistentKeys) {
+            if (seenKeys.contains(key)) continue;
+            Device persisted = new Device(
+                    "Cell Tower [" + key + "]",
+                    "Cell",
+                    "",
+                    "",
+                    key,
+                    requiredStatus,
+                    0L
+            );
+            if (!query.isEmpty() && !matchesDeviceQuery(persisted, query)) continue;
+            result.add(persisted);
+        }
+
+        result.sort((a, b) -> Long.compare(b.getTimestamp(), a.getTimestamp()));
+        int start = Math.max(0, offset);
+        if (start >= result.size()) return new ArrayList<>();
+        int end = Math.min(result.size(), start + Math.max(1, limit));
+        return new ArrayList<>(result.subList(start, end));
+    }
+
+    private boolean matchesDeviceQuery(Device device, String query) {
+        return containsIgnoreCase(device.getName(), query)
+                || containsIgnoreCase(device.getMac(), query)
+                || containsIgnoreCase(device.getType(), query)
+                || containsIgnoreCase(device.getStatus(), query);
+    }
+
+    private boolean containsIgnoreCase(String value, String upperQuery) {
+        return value != null && value.toUpperCase(Locale.US).contains(upperQuery);
+    }
+
     private void updateAllDevicesStatus(String status) {
         int pos = tabLayout.getSelectedTabPosition();
         if (pos == -1) {
@@ -1589,6 +1779,10 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
 
         if (tabLayout.getTabAt(pos) == null) return;
         String folder = (String) tabLayout.getTabAt(pos).getTag();
+        if (isCellSystemFolder(folder)) {
+            Toast.makeText(this, R.string.cell_system_folder_readonly, Toast.LENGTH_SHORT).show();
+            return;
+        }
         if ("TARGET".equalsIgnoreCase(status)) {
             showBulkTargetOptionsDialog(folder);
             return;
@@ -1784,6 +1978,11 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     }
 
     private void applyCurrentFilter() {
+        if (isCellSystemFolder(currentTable)) {
+            adapter.updateData(new ArrayList<>(allLoadedDevices));
+            return;
+        }
+
         List<Device> filteredList = new ArrayList<>();
 
         for (Device device : allLoadedDevices) {
@@ -1819,9 +2018,65 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             return "Bluetooth".equalsIgnoreCase(type);
         }
         if ("CELL".equals(currentTypeFilter)) {
-            return "Cell".equalsIgnoreCase(type) || "Cellular".equalsIgnoreCase(type);
+            return isCellType(type);
         }
         return true;
+    }
+
+    private boolean isCellDevice(Device device) {
+        return device != null && isCellType(device.getType());
+    }
+
+    private boolean isCellType(String type) {
+        return "Cell".equalsIgnoreCase(type) || "Cellular".equalsIgnoreCase(type);
+    }
+
+    public void removeDeviceFromCurrentCellSystemFolder(Device device) {
+        if (!isCurrentCellSystemFolder() || device == null || TextUtils.isEmpty(device.getMac())) return;
+        String statusToRemove = statusForCellSystemFolder(currentTable);
+        String sourceFolder = device.getSourceFolder();
+
+        new Thread(() -> {
+            int affected = databaseHelper.removeDeviceFromPersistentStatus(device.getMac(), statusToRemove);
+            if (!TextUtils.isEmpty(sourceFolder)) {
+                int updated = databaseHelper.updateDeviceStatus(sourceFolder, device.getMac(), "GREY");
+                if (affected <= 0) affected = updated;
+            }
+            int finalAffected = affected;
+            runOnUiThread(() -> {
+                Toast.makeText(
+                        this,
+                        finalAffected > 0 ? R.string.toast_removed_from_list : R.string.error_status_update,
+                        Toast.LENGTH_SHORT
+                ).show();
+                resetPagination();
+                loadDevicesForTable(currentTable, true);
+            });
+        }).start();
+    }
+
+    public void addCellDeviceToBlacklist(Device device) {
+        if (device == null || !isCellDevice(device) || TextUtils.isEmpty(device.getMac())) return;
+        String sourceFolder = isCellSystemFolder(currentTable) && !TextUtils.isEmpty(device.getSourceFolder())
+                ? device.getSourceFolder()
+                : currentTable;
+        if (TextUtils.isEmpty(sourceFolder) || isCellSystemFolder(sourceFolder)) {
+            Toast.makeText(this, R.string.error_table_name_missing, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        new Thread(() -> {
+            int affected = databaseHelper.updateDeviceStatus(sourceFolder, device.getMac(), "BLACKLIST");
+            runOnUiThread(() -> {
+                Toast.makeText(
+                        this,
+                        affected > 0 ? R.string.toast_added_to_blacklist : R.string.error_status_update,
+                        Toast.LENGTH_SHORT
+                ).show();
+                resetPagination();
+                loadDevicesForTable(currentTable, true);
+            });
+        }).start();
     }
     private void setupRecyclerSwipe() {
         devicesRecyclerView.setOnTouchListener((v, event) -> {
@@ -1929,6 +2184,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
         String mac;
         String status;
         long timestamp;
+        String sourceFolder;
 
         public Device(String name, String type, String location, String time) {
             this.name = name;
@@ -1966,6 +2222,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             mac = in.readString();
             status = in.readString();
             timestamp = in.readLong();
+            sourceFolder = in.readString();
         }
 
         public static final Creator<Device> CREATOR = new Creator<Device>() {
@@ -1994,6 +2251,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             dest.writeString(mac);
             dest.writeString(status);
             dest.writeLong(timestamp);
+            dest.writeString(sourceFolder);
         }
 
         public String getName() { return name; }
@@ -2003,8 +2261,10 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
         public String getMac() { return mac; }
         public String getStatus() { return status; }
         public long getTimestamp() { return timestamp; }
+        public String getSourceFolder() { return sourceFolder; }
 
         public void setStatus(String status) { this.status = status; }
         public void setMac(String mac) { this.mac = mac; }
+        public void setSourceFolder(String sourceFolder) { this.sourceFolder = sourceFolder; }
     }
 }

@@ -97,6 +97,7 @@
     <string name="type_placeholder">类型</string>
     <string name="time_placeholder">时间</string>
     <string name="content_desc_share_json">分享 JSON</string>
+    <string name="content_desc_remove_from_list">从列表中移除</string>
     <string name="info_action">信息</string>
 
     <string name="content_desc_delete_icon">删除图标</string>
@@ -273,6 +274,9 @@
     <string name="toast_all_notifications_cleared">所有通知已清除</string>
     <string name="error_opening_map">打开地图时出错</string>
     <string name="toast_deleted">已删除</string>
+    <string name="toast_removed_from_list">已从列表中移除</string>
+    <string name="toast_added_to_blacklist">已添加到 Blacklist</string>
+    <string name="cell_system_folder_readonly">这是系统蜂窝文件夹。请使用行内按钮移除设备。</string>
 
     <string name="device_map_title">设备地图</string>
     <string name="toast_device_marked_target">设备已标记为 TARGET</string>
@@ -439,6 +443,14 @@
     <string name="map_cell_tower_search_not_found">未找到蜂窝基站</string>
     <string name="map_cell_tower_search_invalid">请输入数字 Cell ID 或 Area</string>
     <string name="map_cell_tower_search_results">找到基站：%1$d</string>
+    <string name="map_current_cell_tower_title">当前连接的蜂窝基站</string>
+    <string name="map_current_cell_tower_loading">正在检测连接的基站...</string>
+    <string name="map_current_cell_tower_unavailable">当前连接的蜂窝基站不可用</string>
+    <string name="map_current_cell_tower_change_action">更换蜂窝基站</string>
+    <string name="map_current_cell_tower_blacklisted">基站已添加到 SantiWay 本地黑名单。Android 不允许普通应用强制调制解调器断开某个基站或选择另一个基站。</string>
+    <string name="map_current_cell_tower_root_reconnect_requested">基站已加入黑名单。已获得 root 权限，并已请求无线模块重新连接。下一个基站由调制解调器和运营商网络选择。</string>
+    <string name="map_current_cell_tower_root_reconnect_failed">基站已加入黑名单，但此设备上的 root 重新连接命令执行失败。</string>
+    <string name="map_current_cell_tower_blacklisted_status">已在本地黑名单中：\n%1$s</string>
     <string name="map_layer_osm_standard">OSM · 标准</string>
     <string name="map_layer_osm_humanitarian">OSM · 高对比</string>
     <string name="map_layer_google_standard">Google · 地图</string>
@@ -571,17 +583,17 @@
     <string name="gray_search_device_row">%1$s · 发现：%2$d · 最近：%3$s</string>
     <string name="manual_quick_start_detail_v2">1. 授予定位、Bluetooth、通知和前台服务权限。没有这些权限，Android 会阻止 Wi-Fi、Bluetooth 和蜂窝扫描。\n\n2. 打开设置，检查手机名称、语言、服务器、API、坐标协议、需要时的静态点、地图图层、标记大小、点数限制和数据保留时间。\n\n3. 选择 ALARM 通道：跟踪设备为蓝色，未知蜂窝基站为黄色，手动标记 TARGET 的设备为红色。通道可以组合；静默模式会把新的非 SAFE 设备变为 TARGET。\n\n4. 如果使用 ESP32 mesh，先连接 ESP32，给至少三个固定节点设置坐标，并确认它们能通过 Wi-Fi/ESP-NOW 互相听到。\n\n5. 长时间会话使用普通扫描，控制点使用快照。快照后可启用触发按钮：离开快照点 500 米后，快照文件夹内的设备会变为 TARGET，SAFE 设备不会改变。\n\n6. 收集数据后，用设备数据库、普通地图、ESP32 地图、蜂窝基站图层、通知、三角定位表和灰色设备搜索检查结果。</string>
     <string name="manual_scan_detail_v2">普通扫描按周期运行：应用收集 Wi-Fi、Bluetooth 和蜂窝观测，加入当前坐标来源，并把记录保存到所选文件夹。\n\nWi-Fi 扫描器保存 SSID、BSSID、RSSI、频率、capabilities/vendor 和坐标。Bluetooth 扫描器结合 BLE 与 classic discovery，保存名称、MAC、RSSI 和 vendor。蜂窝扫描器保存 GSM/UMTS/LTE/5G 参数：cell id、LAC/TAC、MCC、MNC、PSC/PCI、频率、信号和注册类型。\n\n快照用于短控制点。它创建 snapshot-yyyy-MM-dd-HH-mm 文件夹，按设置中的时长扫描，默认 60 秒，然后恢复之前的文件夹和扫描状态。\n\n快照后，触发按钮会记住快照位置；只有当用户离开 500 米后，才把该文件夹内的设备变成 TARGET。标记为 SAFE 的设备保持绿色。\n\n坐标来源可以是实时 GPS、静态点或 ESP32 mesh。如果 ESP32 mesh 提供新的手机坐标，新记录会使用它；如果 mesh 坐标过期，应用会回退到普通来源。\n\n长时间扫描时，服务使用非阻塞的 best-effort 坐标，在周期之间清理临时去重集合，并且不会在内存中保存无限历史。旧历史按保留时间删除。</string>
-    <string name="manual_devices_detail_v2">设备数据库显示手机扫描器和 ESP32 节点发现的 Wi-Fi、Bluetooth 和蜂窝记录。\n\nTARGET 表示需要重点观察的设备。SAFE 表示已知或允许的设备。GREY 保持中性。\n\n列表有两个独立切换器。第一个选择记录类型：Wi-Fi、Bluetooth 或蜂窝基站。第二个选择状态：TARGET、全部或 SAFE。选择会被保存，并在下次打开列表时恢复。\n\n搜索可按名称、MAC/BSSID 和保存字段进行。批量操作可把可见设备改为 SAFE、TARGET 或 GREY。\n\n文件夹用于分离不同调查。可以创建、重命名、删除和排序。移动模式下文件夹会抖动，可拖动，叉号会打开删除确认对话框。\n\n当整个文件夹被标记为 TARGET 时，应用会询问是否也把蜂窝基站变为 TARGET，以及是否把绿色 SAFE 设备变为 TARGET。默认情况下，SAFE 设备不会在没有明确选择时改变。\n\n长按文件夹可启动灰色设备搜索。第一个时间段从该文件夹选择唯一灰色 MAC；第二个时间段在指定文件夹或全部文件夹中搜索这些 MAC。日期字段会打开日历和时间选择器，然后填写 yyyy-MM-dd HH:mm。结果会打开地图、带发现次数的唯一 MAC 列表和交互式直方图；选择 MAC 后地图清空，只显示该设备的点。\n\n设备历史会打开包含最新坐标和移动路线的地图。如果记录来自 ESP32 三角定位，它会镜像到主数据库，并可通过普通上传流程发送到服务器。</string>
-    <string name="manual_map_detail_v2">普通地图显示所选设备的历史。最新点使用主标记，中间点用线连接，以便查看随时间变化的移动。\n\n所有地图右侧都有全高抽屉：地址搜索、图层选择和当前地图的操作。图层包括 OSM、Google 和 Yandex，也包括卫星和混合图层。设置中选择的图层会默认打开。\n\n地址搜索像普通地图一样工作，例如 "Moscow, Mozhayskogo Street 32"。搜索后地图会居中到找到的点并添加标记。\n\n抽屉中有蜂窝基站开关。地图不会一次加载所有基站：OpenCellID 只查询当前可见区域内的基站，手机当前连接的基站会单独高亮。\n\n下载的瓦片会缓存。系统缩放按钮会隐藏，统一使用 + 和 - 按钮。标记大小在设置中配置，并应用到所有地图。\n\n地图点数限制只影响显示，不影响存储。它用于避免大型会话拖慢地图。\n\nESP32 地图显示 ESP32 节点、手机 mesh 估计位置，以及发现设备的独立三角定位结果。没有三角定位结果的设备不会显示在该地图上。</string>
+    <string name="manual_devices_detail_v2">设备数据库显示手机扫描器和 ESP32 节点发现的 Wi-Fi、Bluetooth 和蜂窝记录。\n\nTARGET 表示需要重点观察的设备。SAFE 表示已知或允许的设备。GREY 保持中性。\n\n列表有两个独立切换器。第一个选择记录类型：All、Wi-Fi、Bluetooth 或 Cell towers。第二个选择状态：TARGET、全部或 SAFE。选择会被保存，并在下次打开列表时恢复。\n\n蜂窝系统文件夹 Alert、Safe 和 Blacklist 显示对应的基站分组；可以用行内按钮从这些分组移除记录。\n\n搜索可按名称、MAC/BSSID 和保存字段进行。批量操作可把可见设备改为 SAFE、TARGET 或 GREY。\n\n文件夹用于分离不同调查。可以创建、重命名、删除和排序。移动模式下文件夹会抖动，可拖动，叉号会打开删除确认对话框。\n\n当整个文件夹被标记为 TARGET 时，应用会询问是否也把蜂窝基站变为 TARGET，以及是否把绿色 SAFE 设备变为 TARGET。默认情况下，SAFE 设备不会在没有明确选择时改变。\n\n长按文件夹可启动灰色设备搜索。第一个时间段从该文件夹选择唯一灰色 MAC；第二个时间段在指定文件夹或全部文件夹中搜索这些 MAC。日期字段会打开日历和时间选择器，然后填写 yyyy-MM-dd HH:mm。结果会打开地图、带发现次数的唯一 MAC 列表和交互式直方图；选择 MAC 后地图清空，只显示该设备的点。\n\n设备历史会打开包含最新坐标和移动路线的地图。如果记录来自 ESP32 三角定位，它会镜像到主数据库，并可通过普通上传流程发送到服务器。</string>
+    <string name="manual_map_detail_v2">普通地图显示所选设备的历史。最新点使用主标记，中间点用线连接，以便查看随时间变化的移动。\n\n所有地图右侧都有全高抽屉：地址搜索、图层选择和当前地图的操作。抽屉打开时，除系统返回箭头外，地图按钮和信息面板会隐藏。\n\n图层包括 OSM、Google 和 Yandex，也包括卫星和混合图层。设置中选择的图层会默认打开。\n\n地址搜索像普通地图一样工作，例如 "Moscow, Mozhayskogo Street 32"。搜索后地图会居中到找到的点并添加标记。\n\n抽屉中有蜂窝基站开关，并可按数字 Cell ID 或 Area 搜索。地图不会一次加载所有基站：OpenCellID 只查询当前可见区域内的基站，手机当前连接的基站会单独高亮。\n\n抽屉还会显示当前连接的基站。更换按钮会把它加入本地黑名单。普通手机上 Android 不允许应用强制选择另一个基站；root 手机上应用会额外通过 su 请求无线模块重新连接，但下一个基站仍由调制解调器和运营商网络选择。\n\n下载的瓦片会缓存。系统缩放按钮和旧的居中缩放按钮会隐藏，统一使用右下角圆形 + 和 - 按钮；每次点击的缩放强度比之前大 3 倍。标记大小在设置中配置，并应用到所有地图。\n\n地图点数限制只影响显示，不影响存储。它用于避免大型会话拖慢地图。\n\nESP32 地图显示 ESP32 节点、手机 mesh 估计位置，以及发现设备的独立三角定位结果。没有三角定位结果的设备不会显示在该地图上。</string>
     <string name="manual_alarm_body_v2">ALARM 有三个独立通道：跟踪设备、未知蜂窝基站和手动标记 TARGET 的设备。它们可以单独或组合启用，铃铛颜色显示当前组合。</string>
     <string name="manual_alarm_detail_v2">ALARM 有三个独立通道：非法蜂窝基站为黄色，基于移动的跟踪检测为蓝色，已标记 TARGET 的设备为红色。通道可以组合，因此共有 8 个状态：关闭、三个单通道、三种双通道组合，以及全部通道。铃铛颜色由通道混合得到：蓝色+黄色为绿色，红色+黄色为橙色，红色+蓝色为紫色，三者全部启用为白色。\n\n跟踪算法分析设备历史。第一次发现保持 GREY。小于 10 米的跳动视为噪声。如果第一点和第二点之间距离超过 10 km，且速度超过 400 km/h，设备会被标记为 GPS spoofing，之后不会被自动转为 TARGET。其他较大的移动和 24 小时累计距离仍可能把设备标记为 TARGET 并创建警报。\n\n红色通道只响应用户已经标记为 TARGET 的设备。如果只启用红色通道，应用不会运行跟踪检测，也不会对蜂窝基站报警。\n\n静默模式会把所有不是绿色 SAFE 的新设备自动变为 TARGET。开始扫描时，应用会询问使用哪种方式：把蜂窝基站也视为 TARGET，或不视为 TARGET。主屏幕铃铛可快速切换关闭/全部通道，详细通道掩码保存在设置中。</string>
     <string name="manual_settings_detail_v2">语言会改变界面本地化。每个新的界面元素都应该在基础、英文、阿拉伯文和中文 locale 中有字符串；添加设置时，需要更新所有 `values-*` 文件，并保持 %1$d 这类占位符一致。\n\n坐标协议决定新扫描保存的位置来源：GPS、静态点或最新 ESP32 mesh 估计。静态点适合测试、室内工作和固定测量。可在地图上选择点，也可手动输入纬度和经度。\n\n发送数据开关控制全部服务器上传。关闭时，不会对发现记录、坐标、名称和文件夹执行新的网络发送；本地记录会保留在数据库中。\n\n服务器和 API key 在上传启用时用于上传发现记录、手机坐标、设备名称和文件夹。手机名称会随数据一起发送，用来区分来源。\n\n快照时长以秒设置，默认 60。快照启动时使用这个值，并在通知/消息中显示。\n\n默认地图图层决定所有地图打开时使用哪种瓦片：OSM、Google 或 Yandex。Yandex 可能需要 Tiles API key。标记大小以 dp 设置，并应用到所有地图。\n\n扫描器设置控制 Wi-Fi、Bluetooth 和 Cell 是否启用、间隔和信号阈值。地图点数限制只影响历史显示，不影响存储。\n\nALARM 使用独立开关配置：蓝色跟踪通道、黄色未知基站通道、红色已标记 TARGET 通道、全部通道和关闭。静默模式单独保存，并可在扫描开始时包含或排除蜂窝基站。\n\n如果用户修改设置后未保存就离开，应用会询问保存更改还是不保存退出。\n\n数据保留会影响数据库：旧主记录和临时 ESP32 表会自动清理。默认保留 7 天，用户可以选择其他值。普通清理不会删除 ESP32 位置。</string>
-    <string name="manual_troubleshooting_detail_v2">如果 ESP32 无法连接：检查 Bluetooth、Nearby devices/Location 权限、ESP32 供电，以及模块是否已烧录 SantiWay 固件。\n\n如果 mesh 不转发远端记录：ESP32 必须运行同一 mesh 固件，彼此处于 Wi-Fi/ESP-NOW 可听范围内，并在扫描期间保持供电。\n\n如果 ESP32 坐标不更新：至少三台有最新或静态坐标的 ESP32 必须在 15 秒内听到它。固定节点的手动坐标会被视为锚点。\n\n如果发现设备没有出现在 ESP32 地图上：它必须被至少三台有坐标的 ESP32 听到，测量必须落在 15 秒窗口内，并且三角定位必须得到有效结果。\n\n如果没有基站警报：确认 OpenCellID 已下载基线，ALARM 包含蜂窝基站，且该基站确实不在本地缓存中。\n\n如果蜂窝基站图层为空：缩放到需要的区域，在右侧抽屉启用基站图层，并等待可见区域加载。\n\n如果长时间扫描后界面变慢：降低地图点数限制，检查数据保留时间，并重新启动扫描。服务会在周期之间清理临时集合，但非常大的本地数据库仍然需要定期清理。\n\n如果 USB 烧录看不到 ESP32：检查 OTG、数据线、USB 权限、板子供电，必要时将 ESP32 切换到 bootloader mode。</string>
+    <string name="manual_troubleshooting_detail_v2">如果 ESP32 无法连接：检查 Bluetooth、Nearby devices/Location 权限、ESP32 供电，以及模块是否已烧录 SantiWay 固件。\n\n如果 mesh 不转发远端记录：ESP32 必须运行同一 mesh 固件，彼此处于 Wi-Fi/ESP-NOW 可听范围内，并在扫描期间保持供电。\n\n如果 ESP32 坐标不更新：至少三台有最新或静态坐标的 ESP32 必须在 15 秒内听到它。固定节点的手动坐标会被视为锚点。\n\n如果发现设备没有出现在 ESP32 地图上：它必须被至少三台有坐标的 ESP32 听到，测量必须落在 15 秒窗口内，并且三角定位必须得到有效结果。\n\n如果没有基站警报：确认 OpenCellID 已下载基线，ALARM 包含蜂窝基站，且该基站确实不在本地缓存中。\n\n如果蜂窝基站图层为空：缩放到需要的区域，在右侧抽屉启用基站图层，并等待可见区域加载。\n\n如果更换基站后连接没有断开：在非 root 手机上这是 Android 限制。在 root 手机上，请确认 root 管理器已授予 SantiWay su 权限；即使命令成功，具体下一个基站仍由调制解调器选择。\n\n如果长时间扫描后界面变慢：降低地图点数限制，检查数据保留时间，并重新启动扫描。服务会在周期之间清理临时集合，但非常大的本地数据库仍然需要定期清理。\n\n如果 USB 烧录看不到 ESP32：检查 OTG、数据线、USB 权限、板子供电，必要时将 ESP32 切换到 bootloader mode。</string>
     <string name="device_type_bluetooth_filter">Bluetooth</string>
     <string name="device_type_cell_towers_filter">Cell towers</string>
     <string name="device_type_all_filter">All</string>
     <string name="server_upload_enabled_label">Send data to server</string>
-    <string name="snapshot_duration_seconds_hint">Snapshot duration, sec.</string>
+    <string name="snapshot_duration_seconds_hint">快照时长，秒</string>
     <string name="opencellid_far_tower_message">Reason: the tower exists in OpenCellID, but was detected too far from its legitimate location. Data: %1$s. Distance: %2$s, allowed up to %3$s. Legitimate point: %4$.6f, %5$.6f. Current point: %6$.6f, %7$.6f.</string>
     <string name="opencellid_reference_location_title">Legitimate OpenCellID location</string>
 </resources>

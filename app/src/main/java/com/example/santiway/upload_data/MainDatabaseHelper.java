@@ -123,19 +123,37 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         db.execSQL(createUnifiedTable);
         db.execSQL(createTargetTable);
         db.execSQL(createSafeTable);
+        createPersistentStatusTables(db);
         createGpsSpoofedDevicesTable(db);
         createCoreIndexes(db);
     }
 
     private void createCoreIndexes(SQLiteDatabase db) {
         try {
+            createPersistentStatusTables(db);
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_target_devices_key ON target_devices(device_key)");
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_safe_devices_key ON safe_devices(device_key)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_blacklist_devices_key ON blacklist_devices(device_key)");
             db.execSQL("CREATE INDEX IF NOT EXISTS idx_gps_spoofed_devices_key ON gps_spoofed_devices(device_key)");
         } catch (Exception e) {
             Log.e(TAG, "Error creating status indexes: " + e.getMessage());
         }
         createIndexesForExistingScannerTables(db);
+    }
+
+    private void createPersistentStatusTables(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS target_devices (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "device_key TEXT NOT NULL UNIQUE" +
+                ");");
+        db.execSQL("CREATE TABLE IF NOT EXISTS safe_devices (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "device_key TEXT NOT NULL UNIQUE" +
+                ");");
+        db.execSQL("CREATE TABLE IF NOT EXISTS blacklist_devices (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "device_key TEXT NOT NULL UNIQUE" +
+                ");");
     }
 
     private void createGpsSpoofedDevicesTable(SQLiteDatabase db) {
@@ -161,6 +179,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 if (table == null
                         || "target_devices".equals(table)
                         || "safe_devices".equals(table)
+                        || "blacklist_devices".equals(table)
                         || "gps_spoofed_devices".equals(table)
                         || "unique_devices".equals(table)) {
                     continue;
@@ -254,6 +273,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
                 if ("target_devices".equals(table)
                         || "safe_devices".equals(table)
+                        || "blacklist_devices".equals(table)
                         || "gps_spoofed_devices".equals(table)
                         || "unique_devices".equals(table)) {
                     continue;
@@ -762,9 +782,13 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             boolean quietIncludesCells = AlarmModeConfig.isQuietModeIncludeCellTowers(mContext);
             boolean isCellRecord = "Cell".equalsIgnoreCase(values.getAsString("type"));
             boolean notifyTarget = false;
+            boolean persistentAlert = "TARGET".equalsIgnoreCase(getStatusFromServiceTables(uniqueId));
 
-            if ("SAFE".equalsIgnoreCase(lastStatus)) {
+            if ("SAFE".equalsIgnoreCase(getStatusFromServiceTables(uniqueId)) || "SAFE".equalsIgnoreCase(lastStatus)) {
                 values.put("status", "SAFE");
+            } else if (persistentAlert) {
+                values.put("status", "TARGET");
+                notifyTarget = markedTargetAlarmEnabled;
             } else if (quietModeEnabled && (!isCellRecord || quietIncludesCells)) {
                 values.put("status", "TARGET");
                 notifyTarget = true;
@@ -786,7 +810,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             }
 
             if (notifyTarget && curLat != null && curLon != null) {
-                createTargetNotification(values, uniqueId, curLat, curLon);
+                createTargetNotification(values, uniqueId, curLat, curLon, persistentAlert);
             }
 
             // 7. Добавляем запись в основную таблицу
@@ -822,6 +846,10 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
      * Создает уведомление для Target устройств
      */
     private void createTargetNotification(ContentValues values, String uniqueId, double lat, double lon) {
+        createTargetNotification(values, uniqueId, lat, lon, false);
+    }
+
+    private void createTargetNotification(ContentValues values, String uniqueId, double lat, double lon, boolean forceSound) {
         NotificationDatabaseHelper notifDb = null;
         try {
             String type = values.getAsString("type");
@@ -832,7 +860,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
             // 1. Сохраняем уведомление в БД
             notifDb = new NotificationDatabaseHelper(mContext);
-            if (!notifDb.isUniqueAlert(uniqueId)) {
+            if (!forceSound && !notifDb.isUniqueAlert(uniqueId)) {
                 return;
             }
 
@@ -889,7 +917,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
             // 5. Получаем флаг "первое ли уведомление" из SharedPreferences
             SharedPreferences prefs = mContext.getSharedPreferences("notif_prefs", Context.MODE_PRIVATE);
-            boolean isFirstAlert = prefs.getBoolean("is_first_alert", true);
+            boolean isFirstAlert = forceSound || prefs.getBoolean("is_first_alert", true);
 
             // 6. Строим базовое уведомление
             NotificationCompat.Builder builder = new NotificationCompat.Builder(mContext, TARGET_NOTIFICATION_CHANNEL_ID)
@@ -907,7 +935,9 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                         .setVibrate(new long[]{0, 500, 200, 500});
 
                 // Сохраняем, что первый alert уже был
-                prefs.edit().putBoolean("is_first_alert", false).apply();
+                if (!forceSound) {
+                    prefs.edit().putBoolean("is_first_alert", false).apply();
+                }
                 Log.d(TAG, "🔊 FIRST ALERT: with sound and vibration");
             } else {
                 builder.setPriority(NotificationCompat.PRIORITY_LOW)
@@ -938,8 +968,6 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             db.delete("\"" + folderName + "_unique\"", null, null);
 
             // После очистки текущей папки служебные таблицы тоже должны очиститься
-            db.delete("target_devices", null, null);
-            db.delete("safe_devices", null, null);
             db.delete("gps_spoofed_devices", null, null);
 
             db.setTransactionSuccessful();
@@ -1206,7 +1234,11 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             );
 
             // 3. Полностью пересобираем служебные таблицы
-            rebuildStatusTables(tableName);
+            if ("GREY".equalsIgnoreCase(newStatus) || "IGNORE".equalsIgnoreCase(newStatus)) {
+                removeDeviceFromAllPersistentStatuses(db, deviceKey);
+            } else {
+                syncStatusTables(db, deviceKey, newStatus);
+            }
 
             db.setTransactionSuccessful();
 
@@ -1275,6 +1307,34 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         db.delete("safe_devices", "device_key = ?", new String[]{deviceKey});
     }
 
+    private void addDeviceToBlacklist(SQLiteDatabase db, String deviceKey) {
+        deviceKey = normalizeDeviceKey(deviceKey);
+        if (deviceKey == null || deviceKey.isEmpty()) return;
+
+        ContentValues values = new ContentValues();
+        values.put("device_key", deviceKey);
+
+        db.insertWithOnConflict(
+                "blacklist_devices",
+                null,
+                values,
+                SQLiteDatabase.CONFLICT_IGNORE
+        );
+    }
+
+    private void removeDeviceFromBlacklist(SQLiteDatabase db, String deviceKey) {
+        deviceKey = normalizeDeviceKey(deviceKey);
+        if (deviceKey == null || deviceKey.isEmpty()) return;
+
+        db.delete("blacklist_devices", "device_key = ?", new String[]{deviceKey});
+    }
+
+    private void removeDeviceFromAllPersistentStatuses(SQLiteDatabase db, String deviceKey) {
+        removeDeviceFromTarget(db, deviceKey);
+        removeDeviceFromSafe(db, deviceKey);
+        removeDeviceFromBlacklist(db, deviceKey);
+    }
+
     private void syncStatusTables(SQLiteDatabase db, String deviceKey, String status) {
         deviceKey = normalizeDeviceKey(deviceKey);
         if (deviceKey == null || deviceKey.isEmpty()) return;
@@ -1285,21 +1345,35 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             case "TARGET":
                 addDeviceToTarget(db, deviceKey);
                 removeDeviceFromSafe(db, deviceKey);
+                removeDeviceFromBlacklist(db, deviceKey);
                 break;
 
             case "SAFE":
                 addDeviceToSafe(db, deviceKey);
                 removeDeviceFromTarget(db, deviceKey);
+                removeDeviceFromBlacklist(db, deviceKey);
+                break;
+
+            case "BLACKLIST":
+                addDeviceToBlacklist(db, deviceKey);
+                removeDeviceFromTarget(db, deviceKey);
+                removeDeviceFromSafe(db, deviceKey);
+                break;
+
+            case "GREY":
+                removeDeviceFromTarget(db, deviceKey);
+                removeDeviceFromSafe(db, deviceKey);
+                removeDeviceFromBlacklist(db, deviceKey);
                 break;
 
             default:
-                removeDeviceFromTarget(db, deviceKey);
-                removeDeviceFromSafe(db, deviceKey);
                 break;
         }
     }
 
     public void rebuildStatusTables(String folderName) {
+        rebuildAllStatusTables();
+        if (folderName != null || folderName == null) return;
         SQLiteDatabase db = this.getWritableDatabase();
         Cursor cursor = null;
         boolean ownsTransaction = false;
@@ -1348,6 +1422,98 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     }
 
     // Добавлен метод из dev для массового обновления статуса
+    private void rebuildAllStatusTables() {
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor cursor = null;
+        boolean ownsTransaction = false;
+
+        try {
+            ownsTransaction = !db.inTransaction();
+            if (ownsTransaction) db.beginTransaction();
+
+            createPersistentStatusTables(db);
+
+            for (String folder : getAllUserTables(db)) {
+                if (!tableExists(db, folder + "_unique")) continue;
+
+                if (cursor != null) {
+                    cursor.close();
+                    cursor = null;
+                }
+
+                cursor = db.rawQuery(
+                        "SELECT unique_identifier, bssid, cell_id, status " +
+                                "FROM \"" + folder + "_unique\"",
+                        null
+                );
+
+                while (cursor != null && cursor.moveToNext()) {
+                    String uniqueIdentifier = cursor.getString(0);
+                    String bssid = cursor.getString(1);
+                    int cellId = cursor.getInt(2);
+                    String status = cursor.getString(3);
+
+                    String deviceKey = null;
+                    if (uniqueIdentifier != null && !uniqueIdentifier.trim().isEmpty()) {
+                        deviceKey = uniqueIdentifier;
+                    } else if (bssid != null && !bssid.trim().isEmpty()) {
+                        deviceKey = bssid;
+                    } else if (cellId > 0) {
+                        deviceKey = String.valueOf(cellId);
+                    }
+
+                    syncStatusTables(db, deviceKey, status);
+                }
+            }
+
+            if (ownsTransaction) db.setTransactionSuccessful();
+        } catch (Exception e) {
+            Log.e(TAG, "Error rebuilding all status tables: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            if (ownsTransaction && db.inTransaction()) db.endTransaction();
+        }
+    }
+
+    private List<String> getAllUserTables(SQLiteDatabase db) {
+        List<String> tables = new ArrayList<>();
+        Cursor cursor = null;
+        try {
+            cursor = db.rawQuery(
+                    "SELECT name FROM sqlite_master " +
+                            "WHERE type='table' " +
+                            "AND name NOT LIKE 'sqlite_%' " +
+                            "AND name NOT LIKE 'android_%' " +
+                            "AND name != 'unique_devices' " +
+                            "AND name != 'target_devices' " +
+                            "AND name != 'safe_devices' " +
+                            "AND name != 'blacklist_devices' " +
+                            "AND name != 'gps_spoofed_devices' " +
+                            "AND name NOT LIKE '%_unique'",
+                    null
+            );
+            while (cursor != null && cursor.moveToNext()) {
+                tables.add(cursor.getString(0));
+            }
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return tables;
+    }
+
+    private boolean tableExists(SQLiteDatabase db, String tableName) {
+        Cursor cursor = null;
+        try {
+            cursor = db.rawQuery(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+                    new String[]{tableName}
+            );
+            return cursor != null && cursor.moveToFirst();
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+    }
+
     public int updateAllDeviceStatusForTable(String folderName, String newStatus) {
         return updateAllDeviceStatusForTable(folderName, newStatus, true, false);
     }
@@ -1469,6 +1635,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                             "AND name != 'unique_devices' " +
                             "AND name != 'target_devices' " +
                             "AND name != 'safe_devices' " +
+                            "AND name != 'blacklist_devices' " +
                             "AND name != 'gps_spoofed_devices' " +
                             "AND name NOT LIKE '%_unique'",
                     null
@@ -1691,6 +1858,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         try {
             if ("target_devices".equals(tableName)
                     || "safe_devices".equals(tableName)
+                    || "blacklist_devices".equals(tableName)
                     || "gps_spoofed_devices".equals(tableName)) {
                 return;
             }
@@ -2459,10 +2627,11 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     public void notifyTargetDeviceNow(String tableName, String deviceKey) {
         if (!AlarmModeConfig.isMarkedTargetAlarmEnabled(mContext)) return;
 
-        SQLiteDatabase db = this.getReadableDatabase();
+        SQLiteDatabase db = this.getWritableDatabase();
         Cursor cursor = null;
 
         try {
+            createPersistentStatusTables(db);
             deviceKey = normalizeDeviceKey(deviceKey);
             if (deviceKey == null || deviceKey.isEmpty()) return;
 
@@ -2513,6 +2682,18 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             }
 
             cursor = db.rawQuery(
+                    "SELECT 1 FROM blacklist_devices WHERE UPPER(device_key) = ? LIMIT 1",
+                    new String[]{deviceKey}
+            );
+            if (cursor != null && cursor.moveToFirst()) {
+                return "BLACKLIST";
+            }
+            if (cursor != null) {
+                cursor.close();
+                cursor = null;
+            }
+
+            cursor = db.rawQuery(
                     "SELECT 1 FROM target_devices WHERE UPPER(device_key) = ? LIMIT 1",
                     new String[]{deviceKey}
             );
@@ -2555,10 +2736,67 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         }
         if (normalizedKeys.isEmpty()) return statuses;
 
-        SQLiteDatabase db = this.getReadableDatabase();
+        SQLiteDatabase db = this.getWritableDatabase();
+        createPersistentStatusTables(db);
+        fillStatusesFromTable(db, "blacklist_devices", "BLACKLIST", normalizedKeys, statuses);
         fillStatusesFromTable(db, "target_devices", "TARGET", normalizedKeys, statuses);
         fillStatusesFromTable(db, "safe_devices", "SAFE", normalizedKeys, statuses);
         return statuses;
+    }
+
+    public Set<String> getPersistentStatusKeys(String status) {
+        Set<String> keys = new LinkedHashSet<>();
+        String tableName = statusTableForStatus(status);
+        if (tableName == null) return keys;
+
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor cursor = null;
+        try {
+            createPersistentStatusTables(db);
+            cursor = db.rawQuery(
+                    "SELECT UPPER(device_key) FROM " + tableName + " ORDER BY id DESC",
+                    null
+            );
+            while (cursor != null && cursor.moveToNext()) {
+                String key = cursor.getString(0);
+                if (key != null && !key.trim().isEmpty()) {
+                    keys.add(key);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading persistent status keys: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return keys;
+    }
+
+    public int removeDeviceFromPersistentStatus(String deviceKey, String status) {
+        String tableName = statusTableForStatus(status);
+        String normalizedKey = normalizeDeviceKey(deviceKey);
+        if (tableName == null || normalizedKey == null || normalizedKey.isEmpty()) return 0;
+
+        SQLiteDatabase db = this.getWritableDatabase();
+        try {
+            createPersistentStatusTables(db);
+            return db.delete(tableName, "UPPER(device_key) = ?", new String[]{normalizedKey});
+        } catch (Exception e) {
+            Log.e(TAG, "Error removing persistent status key: " + e.getMessage());
+            return 0;
+        }
+    }
+
+    private String statusTableForStatus(String status) {
+        if ("TARGET".equalsIgnoreCase(status) || "ALERT".equalsIgnoreCase(status)) {
+            return "target_devices";
+        }
+        if ("SAFE".equalsIgnoreCase(status)) {
+            return "safe_devices";
+        }
+        if ("BLACKLIST".equalsIgnoreCase(status)) {
+            return "blacklist_devices";
+        }
+        return null;
     }
 
     private void fillStatusesFromTable(SQLiteDatabase db,
@@ -2586,6 +2824,13 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 );
                 while (cursor != null && cursor.moveToNext()) {
                     String key = cursor.getString(0);
+                    if ("BLACKLIST".equals(status)) {
+                        statuses.put(key, status);
+                        continue;
+                    }
+                    if ("BLACKLIST".equals(statuses.get(key))) {
+                        continue;
+                    }
                     if ("SAFE".equals(status) && "TARGET".equals(statuses.get(key))) {
                         continue;
                     }

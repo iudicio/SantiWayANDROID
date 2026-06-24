@@ -4,16 +4,19 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.telephony.CellInfo;
+import android.telephony.CellInfoCdma;
 import android.telephony.CellInfoGsm;
 import android.telephony.CellInfoLte;
 import android.telephony.CellInfoNr;
 import android.telephony.CellInfoWcdma;
 import android.telephony.CellIdentityNr;
 import android.telephony.CellSignalStrength;
+import android.telephony.CellSignalStrengthCdma;
 import android.telephony.CellSignalStrengthGsm;
 import android.telephony.CellSignalStrengthLte;
 import android.telephony.CellSignalStrengthNr;
 import android.telephony.CellSignalStrengthWcdma;
+import android.telephony.NeighboringCellInfo;
 import android.telephony.TelephonyManager;
 import android.telephony.gsm.GsmCellLocation;
 import android.telephony.cdma.CdmaCellLocation;
@@ -24,6 +27,9 @@ import java.util.List;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.Locale;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class CellScanner {
     private static final String TAG = "CellScanner";
@@ -107,7 +113,7 @@ public class CellScanner {
                 Log.w(TAG, "Location permission not granted for getAllCellInfo");
                 return towers;
             }
-            List<CellInfo> cellInfos = telephonyManager.getAllCellInfo();
+            List<CellInfo> cellInfos = getFreshCellInfo();
             
             if (cellInfos != null) {
                 Log.d(TAG, "Raw cell info count: " + cellInfos.size());
@@ -129,8 +135,10 @@ public class CellScanner {
                     }
                 }
             } else {
-                Log.d(TAG, "TelephonyManager.getAllCellInfo returned null");
+                Log.d(TAG, "TelephonyManager returned no cell info");
             }
+
+            appendNeighboringCellInfo(towers, currentTowerIds);
             
             knownTowerIds = currentTowerIds;
             
@@ -145,6 +153,7 @@ public class CellScanner {
                 if (!alreadyInList) {
                     Log.d(TAG, "Adding current cell tower: " + currentTower.getDescription());
                     towers.add(currentTower);
+                    currentTowerIds.add(currentTowerId);
                 }
             }
             
@@ -155,6 +164,95 @@ public class CellScanner {
         }
         
         return towers;
+    }
+
+    @SuppressWarnings("deprecation")
+    private void appendNeighboringCellInfo(List<CellTower> towers, Set<String> currentTowerIds) {
+        try {
+            Object result = TelephonyManager.class
+                    .getMethod("getNeighboringCellInfo")
+                    .invoke(telephonyManager);
+            if (!(result instanceof List)) {
+                Log.d(TAG, "TelephonyManager.getNeighboringCellInfo returned no neighbors");
+                return;
+            }
+
+            List<?> neighbors = (List<?>) result;
+            if (neighbors.isEmpty()) {
+                Log.d(TAG, "TelephonyManager.getNeighboringCellInfo returned empty neighbors");
+                return;
+            }
+            Log.d(TAG, "Raw neighboring cell info count: " + neighbors.size());
+            for (Object item : neighbors) {
+                if (!(item instanceof NeighboringCellInfo)) continue;
+                NeighboringCellInfo neighbor = (NeighboringCellInfo) item;
+                CellTower tower = parseNeighboringCellInfo(neighbor);
+                if (tower == null || !isValidTower(tower)) {
+                    if (tower != null) Log.d(TAG, "Rejected neighboring cell tower: " + tower.getDescription());
+                    continue;
+                }
+                String towerId = tower.getUniqueId();
+                if (currentTowerIds.contains(towerId)) continue;
+                currentTowerIds.add(towerId);
+                towers.add(tower);
+                Log.d(TAG, "Added neighboring cell tower: " + tower.getDescription());
+            }
+        } catch (SecurityException e) {
+            Log.w(TAG, "Permission error getting neighboring cell info: " + e.getMessage());
+        } catch (Exception e) {
+            Log.w(TAG, "Error getting neighboring cell info: " + e.getMessage());
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private CellTower parseNeighboringCellInfo(NeighboringCellInfo neighbor) {
+        if (neighbor == null) return null;
+        int cid = neighbor.getCid();
+        if (cid <= 0 || cid == NeighboringCellInfo.UNKNOWN_CID || cid == 2147483647) return null;
+
+        CellTower tower = new CellTower();
+        tower.setCellId(cid);
+        tower.setLac(neighbor.getLac());
+        tower.setPsc(neighbor.getPsc());
+        tower.setSignalStrength(neighborSignalDbm(neighbor));
+        tower.setSignalQuality(neighbor.getRssi());
+        tower.setNetworkType(networkTypeFromRadio(neighbor.getNetworkType()));
+        tower.setRegistered(false);
+        tower.setNeighbor(true);
+        String operatorName = telephonyManager.getNetworkOperatorName();
+        tower.setOperatorName(operatorName != null ? operatorName : "Unknown");
+        applyNetworkOperatorFallback(tower);
+        tower.setTimestamp(System.currentTimeMillis());
+        return tower;
+    }
+
+    private String networkTypeFromRadio(int networkType) {
+        switch (networkType) {
+            case TelephonyManager.NETWORK_TYPE_GPRS:
+            case TelephonyManager.NETWORK_TYPE_EDGE:
+                return "GSM";
+            case TelephonyManager.NETWORK_TYPE_UMTS:
+            case TelephonyManager.NETWORK_TYPE_HSDPA:
+            case TelephonyManager.NETWORK_TYPE_HSUPA:
+            case TelephonyManager.NETWORK_TYPE_HSPA:
+            case TelephonyManager.NETWORK_TYPE_HSPAP:
+                return "UMTS";
+            case TelephonyManager.NETWORK_TYPE_LTE:
+                return "LTE";
+            default:
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                        networkType == TelephonyManager.NETWORK_TYPE_NR) {
+                    return "5G";
+                }
+                return "CELL";
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private int neighborSignalDbm(NeighboringCellInfo neighbor) {
+        int rssi = neighbor.getRssi();
+        if (rssi == NeighboringCellInfo.UNKNOWN_RSSI || rssi < 0) return -999;
+        return -113 + (2 * rssi);
     }
     
     private boolean isValidTower(CellTower tower) {
@@ -196,6 +294,42 @@ public class CellScanner {
                 == PackageManager.PERMISSION_GRANTED
                 || ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private List<CellInfo> getFreshCellInfo() {
+        List<CellInfo> cachedCellInfo = telephonyManager.getAllCellInfo();
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || !hasLocationPermission()) {
+            return cachedCellInfo;
+        }
+
+        AtomicReference<List<CellInfo>> updatedCellInfo = new AtomicReference<>();
+        CountDownLatch latch = new CountDownLatch(1);
+        try {
+            telephonyManager.requestCellInfoUpdate(
+                    command -> new Thread(command, "CellInfoCallback").start(),
+                    new TelephonyManager.CellInfoCallback() {
+                        @Override
+                        public void onCellInfo(List<CellInfo> cellInfo) {
+                            updatedCellInfo.set(cellInfo);
+                            latch.countDown();
+                        }
+
+                        @Override
+                        public void onError(int errorCode, Throwable detail) {
+                            Log.w(TAG, "Cell info update failed: " + errorCode +
+                                    (detail == null ? "" : ", " + detail.getMessage()));
+                            latch.countDown();
+                        }
+                    });
+            latch.await(2500, TimeUnit.MILLISECONDS);
+        } catch (SecurityException e) {
+            throw e;
+        } catch (Exception e) {
+            Log.w(TAG, "Fresh cell info request failed: " + e.getMessage());
+        }
+
+        List<CellInfo> freshCellInfo = updatedCellInfo.get();
+        return freshCellInfo != null && !freshCellInfo.isEmpty() ? freshCellInfo : cachedCellInfo;
     }
 
     private CellTower parseCellInfo(CellInfo cellInfo) {
@@ -301,6 +435,23 @@ public class CellScanner {
                           ", TAC=" + tower.getTac() + 
                           ", PCI=" + tower.getPci() +
                           ", Signal=" + tower.getSignalStrength() + "dBm");
+            } else if (cellInfo instanceof CellInfoCdma) {
+                CellInfoCdma cdmaInfo = (CellInfoCdma) cellInfo;
+                CellSignalStrengthCdma cdmaSignal = cdmaInfo.getCellSignalStrength();
+
+                tower.setCellId(cdmaInfo.getCellIdentity().getBasestationId());
+                tower.setLac(cdmaInfo.getCellIdentity().getNetworkId());
+                tower.setMnc(cdmaInfo.getCellIdentity().getSystemId());
+                tower.setSignalStrength(cdmaSignal.getDbm());
+                tower.setSignalQuality(cdmaSignal.getLevel());
+                tower.setNetworkType("CDMA");
+                tower.setRegistered(cellInfo.isRegistered());
+                tower.setNeighbor(!cellInfo.isRegistered());
+
+                Log.d(TAG, "Parsed CDMA cell: BID=" + tower.getCellId() +
+                          ", NID=" + tower.getLac() +
+                          ", SID=" + tower.getMnc() +
+                          ", Signal=" + tower.getSignalStrength() + "dBm");
             } else {
                 Log.w(TAG, "Unknown cell info type: " + cellInfo.getClass().getSimpleName());
                 return null;
@@ -308,6 +459,7 @@ public class CellScanner {
             
             String operatorName = telephonyManager.getNetworkOperatorName();
             tower.setOperatorName(operatorName != null ? operatorName : "Unknown");
+            applyNetworkOperatorFallback(tower);
             
             tower.setTimestamp(System.currentTimeMillis());
             
@@ -317,6 +469,20 @@ public class CellScanner {
         }
         
         return tower;
+    }
+
+    private void applyNetworkOperatorFallback(CellTower tower) {
+        String networkOperator = telephonyManager.getNetworkOperator();
+        if (networkOperator == null || networkOperator.length() < 5) return;
+        try {
+            if (tower.getMcc() < 100 || tower.getMcc() > 999) {
+                tower.setMcc(Integer.parseInt(networkOperator.substring(0, 3)));
+            }
+            if (tower.getMnc() < 0 || tower.getMnc() > 999) {
+                tower.setMnc(Integer.parseInt(networkOperator.substring(3)));
+            }
+        } catch (NumberFormatException ignored) {
+        }
     }
 
     private int parseOperatorPart(String value) {
@@ -349,6 +515,8 @@ public class CellScanner {
                         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && cellInfo instanceof CellInfoNr) {
                             CellSignalStrength signalStrength = ((CellInfoNr) cellInfo).getCellSignalStrength();
                             return signalStrength.getDbm();
+                        } else if (cellInfo instanceof CellInfoCdma) {
+                            return ((CellInfoCdma) cellInfo).getCellSignalStrength().getDbm();
                         }
                     }
                 }

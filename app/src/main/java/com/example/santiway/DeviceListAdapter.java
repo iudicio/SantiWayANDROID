@@ -134,6 +134,7 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
         Button infoButton;
         View statusBar;
         ImageButton shareButton;
+        ImageButton removeFromSystemFolderButton;
 
         public DeviceViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -144,6 +145,7 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
             infoButton = itemView.findViewById(R.id.info_button);
             statusBar = itemView.findViewById(R.id.device_status_bar);
             shareButton = itemView.findViewById(R.id.share_button);
+            removeFromSystemFolderButton = itemView.findViewById(R.id.remove_from_system_folder_button);
         }
 
         private String formatRelativeTime(long diffMillis) {
@@ -220,6 +222,25 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                 });
             }
 
+            if (removeFromSystemFolderButton != null) {
+                boolean systemCellFolder = viewContextIsSystemCellFolder(itemView.getContext());
+                boolean normalCellRow = isCellDevice(device) && !systemCellFolder;
+                removeFromSystemFolderButton.setVisibility((systemCellFolder || normalCellRow) ? View.VISIBLE : View.GONE);
+                removeFromSystemFolderButton.setImageResource(systemCellFolder
+                        ? android.R.drawable.ic_menu_delete
+                        : R.drawable.ic_block);
+                removeFromSystemFolderButton.setOnClickListener(v -> {
+                    Context viewContext = v.getContext();
+                    if (viewContext instanceof DeviceListActivity) {
+                        if (systemCellFolder) {
+                            ((DeviceListActivity) viewContext).removeDeviceFromCurrentCellSystemFolder(device);
+                        } else {
+                            ((DeviceListActivity) viewContext).addCellDeviceToBlacklist(device);
+                        }
+                    }
+                });
+            }
+
             if (statusBar != null) {
                 statusBar.clearAnimation();
 
@@ -242,6 +263,10 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                         statusBar.setBackgroundColor(Color.parseColor("#34C759"));
                         break;
 
+                    case "BLACKLIST":
+                        statusBar.setBackgroundColor(Color.parseColor("#111111"));
+                        break;
+
                     case "GREY":
                     default:
                         statusBar.setBackgroundColor(Color.parseColor("#808080"));
@@ -256,6 +281,16 @@ public class DeviceListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
                     }
                 });
             }
+        }
+
+        private boolean viewContextIsSystemCellFolder(Context context) {
+            return context instanceof DeviceListActivity
+                    && ((DeviceListActivity) context).isCurrentCellSystemFolder();
+        }
+
+        private boolean isCellDevice(DeviceListActivity.Device device) {
+            String type = device == null ? null : device.getType();
+            return "Cell".equalsIgnoreCase(type) || "Cellular".equalsIgnoreCase(type);
         }
     }
 

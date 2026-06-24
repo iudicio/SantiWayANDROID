@@ -43,6 +43,7 @@ public class NotificationDetailActivity extends BaseLocalizedActivity implements
     private SupportMapFragment mapFragment;
     private GoogleMap googleMap;
     private TileOverlay mapTileOverlay;
+    private Toolbar toolbar;
     private static final String TAG = "NotifDetailActivity";
 
     @Override
@@ -50,7 +51,7 @@ public class NotificationDetailActivity extends BaseLocalizedActivity implements
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_notification_detail);
 
-        Toolbar toolbar = findViewById(R.id.toolbar);
+        toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
@@ -236,7 +237,15 @@ public class NotificationDetailActivity extends BaseLocalizedActivity implements
                     googleMap,
                     () -> mapTileOverlay = MapLayerManager.applyGoogleLayer(this, googleMap, mapTileOverlay),
                     null,
-                    12
+                    12,
+                    open -> {
+                        if (getSupportActionBar() != null) {
+                            getSupportActionBar().setTitle(open ? "" : getString(R.string.notification_details_title));
+                        } else if (toolbar != null) {
+                            toolbar.setTitle(open ? "" : getString(R.string.notification_details_title));
+                        }
+                    },
+                    legacyControls
             ));
         }
     }

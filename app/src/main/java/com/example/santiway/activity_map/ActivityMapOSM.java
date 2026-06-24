@@ -50,6 +50,13 @@ public class ActivityMapOSM extends Fragment {
     private String deviceMac;
     private String deviceName;
     private String deviceStatus = "scanned";
+    private View[] hideWhenDrawerOpen = new View[0];
+    private MapLayerManager.DrawerStateListener drawerStateListener;
+
+    public void setDrawerOverlayBehavior(MapLayerManager.DrawerStateListener listener, View... viewsToHide) {
+        drawerStateListener = listener;
+        hideWhenDrawerOpen = viewsToHide == null ? new View[0] : viewsToHide;
+    }
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -104,7 +111,14 @@ public class ActivityMapOSM extends Fragment {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
         root.addView(mapView);
-        root.addView(MapLayerManager.createOsmControls(requireContext(), mapView, 112));
+        root.addView(MapLayerManager.createOsmControls(
+                requireContext(),
+                mapView,
+                112,
+                null,
+                drawerStateListener,
+                hideWhenDrawerOpen
+        ));
         return root;
     }
 
@@ -382,13 +396,13 @@ public class ActivityMapOSM extends Fragment {
 
     public void zoomIn() {
         if (mapView != null) {
-            mapView.getController().zoomIn();
+            mapView.getController().setZoom(mapView.getZoomLevelDouble() + 3.0);
         }
     }
 
     public void zoomOut() {
         if (mapView != null) {
-            mapView.getController().zoomOut();
+            mapView.getController().setZoom(mapView.getZoomLevelDouble() - 3.0);
         }
     }
 }

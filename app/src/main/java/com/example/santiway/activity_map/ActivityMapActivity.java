@@ -50,10 +50,10 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
     private TextView tvFirstDetected;
     private TextView tvLastDetected;
     private TextView tvDetectionCount;
-    private TextView btnZoomInMap;
-    private TextView btnZoomOutMap;
     private Button btnMakeTarget;
     private Button btnMakeSafe;
+    private Toolbar toolbarMap;
+    private CharSequence toolbarTitle;
 
     // Данные устройства
     private String deviceMac;
@@ -85,7 +85,7 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
         initViews();
 
         View root = findViewById(R.id.root_activity_map);
-        Toolbar toolbar = findViewById(R.id.toolbar_map);
+        toolbarMap = findViewById(R.id.toolbar_map);
         View actionsContainer = findViewById(R.id.status_actions_container);
         View infoCard = findViewById(R.id.device_info_card);
 
@@ -94,16 +94,16 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
 
             int toolbarHeight = bars.top + dpToPx(56);
 
-            if (toolbar != null) {
-                ViewGroup.LayoutParams toolbarLp = toolbar.getLayoutParams();
+            if (toolbarMap != null) {
+                ViewGroup.LayoutParams toolbarLp = toolbarMap.getLayoutParams();
                 toolbarLp.height = toolbarHeight;
-                toolbar.setLayoutParams(toolbarLp);
+                toolbarMap.setLayoutParams(toolbarLp);
 
-                toolbar.setPadding(
-                        toolbar.getPaddingLeft(),
+                toolbarMap.setPadding(
+                        toolbarMap.getPaddingLeft(),
                         bars.top,
-                        toolbar.getPaddingRight(),
-                        toolbar.getPaddingBottom()
+                        toolbarMap.getPaddingRight(),
+                        toolbarMap.getPaddingBottom()
                 );
             }
 
@@ -151,8 +151,6 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
         // Настройка кнопок
         setupButtons();
 
-        setupMapZoomButtons();
-
         // Отображение данных
         displayDeviceInfo();
 
@@ -171,8 +169,6 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
         btnMakeTarget = findViewById(R.id.btn_make_target);
         btnMakeSafe = findViewById(R.id.btn_make_safe);
 
-        btnZoomInMap = findViewById(R.id.btn_zoom_in_map);
-        btnZoomOutMap = findViewById(R.id.btn_zoom_out_map);
     }
 
     private int dpToPx(int dp) {
@@ -297,40 +293,23 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
     }
 
     private void setupToolbar() {
-        Toolbar toolbar = findViewById(R.id.toolbar_map);
-        setSupportActionBar(toolbar);
-        toolbar.getNavigationIcon().setTint(Color.WHITE);
+        toolbarMap = findViewById(R.id.toolbar_map);
+        setSupportActionBar(toolbarMap);
+        toolbarMap.getNavigationIcon().setTint(Color.WHITE);
         if (getSupportActionBar() != null) {
             String title = (deviceName != null && !deviceName.isEmpty())
                     ? deviceName
                     : (deviceMac != null ? deviceMac : getString(R.string.device_map_title));
-            getSupportActionBar().setTitle(title);
+            toolbarTitle = title;
+            getSupportActionBar().setTitle(toolbarTitle);
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
-        toolbar.setNavigationOnClickListener(v -> onBackPressed());
+        toolbarMap.setNavigationOnClickListener(v -> onBackPressed());
     }
 
     private void setupButtons() {
         updateStatusToggle();
-    }
-
-    private void setupMapZoomButtons() {
-        if (btnZoomInMap != null) {
-            btnZoomInMap.setOnClickListener(v -> {
-                if (mapFragment != null) {
-                    mapFragment.zoomIn();
-                }
-            });
-        }
-
-        if (btnZoomOutMap != null) {
-            btnZoomOutMap.setOnClickListener(v -> {
-                if (mapFragment != null) {
-                    mapFragment.zoomOut();
-                }
-            });
-        }
     }
 
     private void updateStatusToggle() {
@@ -517,6 +496,11 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
 
     private void showMapFragment() {
         mapFragment = new ActivityMapOSM();
+        mapFragment.setDrawerOverlayBehavior(
+                this::setDrawerChromeHidden,
+                findViewById(R.id.status_actions_container),
+                deviceInfoCard
+        );
 
         // Передаем данные во фрагмент
         Bundle args = new Bundle();
@@ -549,6 +533,14 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
                 .beginTransaction()
                 .replace(R.id.map_container, mapFragment)
                 .commit();
+    }
+
+    private void setDrawerChromeHidden(boolean hidden) {
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle(hidden ? "" : toolbarTitle);
+        } else if (toolbarMap != null) {
+            toolbarMap.setTitle(hidden ? "" : toolbarTitle);
+        }
     }
 
     @Override

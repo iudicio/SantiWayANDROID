@@ -3,4 +3,10 @@
     <files-path
         name="apk_complete"
         path="apk_complete/" />
+    <cache-path
+        name="cache_exports"
+        path="exports/" />
+    <external-cache-path
+        name="external_cache_exports"
+        path="exports/" />
 </paths>

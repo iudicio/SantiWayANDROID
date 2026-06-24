@@ -3,10 +3,8 @@ package com.example.santiway;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
-import android.widget.TextView;
 import android.widget.Toast;
 import com.example.santiway.BaseLocalizedActivity;
 import com.example.santiway.activity_map.MapLayerManager;
@@ -21,8 +19,6 @@ public class StaticLocationMapActivity extends BaseLocalizedActivity {
 
     private MapView mapView;
     private Button selectButton;
-    private TextView zoomInButton;
-    private TextView zoomOutButton;
 
     @Override
     protected void attachBaseContext(Context newBase) {
@@ -38,15 +34,11 @@ public class StaticLocationMapActivity extends BaseLocalizedActivity {
 
         mapView = findViewById(R.id.static_map);
         selectButton = findViewById(R.id.btn_select_static_location);
-        zoomInButton = findViewById(R.id.btn_zoom_in);
-        zoomOutButton = findViewById(R.id.btn_zoom_out);
 
         mapView.setMultiTouchControls(true);
         MapLayerManager.applySavedLayer(this, mapView);
         FrameLayout root = findViewById(R.id.root_static_location_map);
-        root.addView(MapLayerManager.createOsmControls(this, mapView, 16));
-        View oldZoom = findViewById(R.id.custom_zoom_container);
-        if (oldZoom != null) oldZoom.setVisibility(View.GONE);
+        root.addView(MapLayerManager.createOsmControls(this, mapView, 16, null, selectButton));
 
         // Убираем стандартные кнопки приближения/отдаления osmdroid
         mapView.getZoomController().setVisibility(
@@ -62,14 +54,6 @@ public class StaticLocationMapActivity extends BaseLocalizedActivity {
 
         mapView.getController().setZoom(15.0);
         mapView.getController().setCenter(startPoint);
-
-        zoomInButton.setOnClickListener(v -> {
-            mapView.getController().zoomIn();
-        });
-
-        zoomOutButton.setOnClickListener(v -> {
-            mapView.getController().zoomOut();
-        });
 
         selectButton.setOnClickListener(v -> {
             GeoPoint centerPoint = (GeoPoint) mapView.getMapCenter();
