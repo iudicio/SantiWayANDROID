@@ -39,54 +39,93 @@
         app:layout_constraintEnd_toEndOf="parent" />
 
     <LinearLayout
-        android:id="@+id/status_filter_container"
+        android:id="@+id/filter_container"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
         android:layout_marginTop="12dp"
         android:layout_marginEnd="16dp"
-        android:orientation="horizontal"
-        android:weightSum="3"
+        android:orientation="vertical"
         app:layout_constraintTop_toBottomOf="@id/tab_layout"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_filter_target"
-            android:layout_width="0dp"
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/device_type_filter_group"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginEnd="6dp"
-            android:text="@string/status_target"
-            android:textAllCaps="false"
-            android:textColor="@android:color/black"
-            app:backgroundTint="#FF3B30"
-            app:cornerRadius="12dp" />
+            app:singleSelection="true"
+            app:selectionRequired="true">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_filter_all"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="3dp"
-            android:layout_marginEnd="3dp"
-            android:text="@string/status_all"
-            android:textAllCaps="false"
-            android:textColor="@android:color/white"
-            app:backgroundTint="#3A4A63"
-            app:cornerRadius="12dp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_filter_type_wifi"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/wifi_text"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_filter_safe"
-            android:layout_width="0dp"
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_filter_type_bluetooth"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/bluetooth_text"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_filter_type_cell"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/map_cell_towers_layer_action"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/status_filter_group"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="6dp"
-            android:text="@string/status_safe"
-            android:textAllCaps="false"
-            android:textColor="@android:color/black"
-            app:backgroundTint="#34C759"
-            app:cornerRadius="12dp" />
+            android:layout_marginTop="8dp"
+            app:singleSelection="true"
+            app:selectionRequired="true">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_filter_target"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/status_target"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_filter_all"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/status_all"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_filter_safe"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/status_safe"
+                android:textAllCaps="false"
+                android:textColor="@android:color/white" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
     </LinearLayout>
 
     <com.google.android.material.textfield.TextInputLayout
@@ -105,7 +144,7 @@
         app:hintTextColor="@android:color/white"
         app:startIconDrawable="@drawable/in_search_white"
         app:startIconTint="@android:color/white"
-        app:layout_constraintTop_toBottomOf="@id/status_filter_container"
+        app:layout_constraintTop_toBottomOf="@id/filter_container"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 

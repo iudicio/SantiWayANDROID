@@ -62,6 +62,7 @@ import com.example.santiway.opencellid.OpenCellIdSyncScheduler;
 import com.example.santiway.upload_data.ApiConfig;
 import com.example.santiway.upload_data.DeviceUploadManager;
 import com.example.santiway.upload_data.DeviceUploadService;
+import com.example.santiway.upload_data.ServerUploadConfig;
 import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.example.santiway.upload_data.UniqueDevicesHelper;
 import com.example.santiway.upload_name_device.UserDeviceSyncManager;
@@ -118,7 +119,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
     private static final String PREFS_APP = "app_prefs";
     private static final String KEY_CURRENT_FOLDER = "current_folder";
     private static final String KEY_OWNER_DEVICE_SYNCED_ONCE = "owner_device_synced_once";
-    private GestureDetector folderGestureDetector;
+    private GestureDetector mainNavigationGestureDetector;
     private ImageButton snapshotButton;
     private boolean isSnapshotRunning = false;
     private String folderBeforeSnapshot = null;
@@ -251,7 +252,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
         toolbarFolderTitleTextView.setOnClickListener(v -> showFolderSelectionDialog());
 
         setSupportActionBar(toolbar);
-        setupFolderSwipe();
+        setupMainNavigationSwipe();
 
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(false);
@@ -408,10 +409,14 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
     }
 
     private void applyNavigationBarColor() {
+        getWindow().setStatusBarColor(Color.parseColor("#071427"));
         getWindow().setNavigationBarColor(Color.parseColor("#172A46"));
-        new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView())
-                .setAppearanceLightNavigationBars(false);
+        WindowInsetsControllerCompat controller =
+                new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
+        controller.setAppearanceLightStatusBars(false);
+        controller.setAppearanceLightNavigationBars(false);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            getWindow().setStatusBarContrastEnforced(false);
             getWindow().setNavigationBarContrastEnforced(false);
         }
     }
@@ -1302,6 +1307,10 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
     }
 
     private void startUploadService() {
+        if (!ServerUploadConfig.isEnabled(this)) {
+            Log.d(TAG, "Server upload disabled - upload service not started");
+            return;
+        }
         Intent serviceIntent = new Intent(this, DeviceUploadService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent);
@@ -1479,10 +1488,10 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
     }
 
     //Методы для свайпа папок
-    private void setupFolderSwipe() {
+    private void setupMainNavigationSwipe() {
         View swipeArea = findViewById(R.id.main_swipe_area);
 
-        folderGestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+        mainNavigationGestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
             private static final int SWIPE_THRESHOLD = 120;
             private static final int SWIPE_VELOCITY_THRESHOLD = 120;
 
@@ -1503,9 +1512,9 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
                         && Math.abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
 
                     if (diffX > 0) {
-                        switchFolderBySwipe(-1); // вправо
+                        viewAppConfig();
                     } else {
-                        switchFolderBySwipe(1);  // влево
+                        openDeviceListActivity();
                     }
 
                     return true;
@@ -1515,30 +1524,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
             }
         });
 
-        swipeArea.setOnTouchListener((v, event) -> folderGestureDetector.onTouchEvent(event));
-    }
-
-    private void switchFolderBySwipe(int direction) {
-        if (isSnapshotRunning) {
-            Toast.makeText(this, getString(R.string.toast_snapshot_blocks_scan), Toast.LENGTH_SHORT).show();
-            return;
-        }
-        List<String> folders = getAllFolders();
-        if (folders == null || folders.isEmpty()) return;
-
-        int currentIndex = folders.indexOf(currentScanFolder);
-        if (currentIndex == -1) currentIndex = 0;
-
-        int newIndex = currentIndex + direction;
-
-        if (newIndex < 0) {
-            newIndex = folders.size() - 1;
-        } else if (newIndex >= folders.size()) {
-            newIndex = 0;
-        }
-
-        String selectedFolder = folders.get(newIndex);
-        switchToFolder(selectedFolder);
+        swipeArea.setOnTouchListener((v, event) -> mainNavigationGestureDetector.onTouchEvent(event));
     }
 
     private void switchToFolder(String selectedFolder) {

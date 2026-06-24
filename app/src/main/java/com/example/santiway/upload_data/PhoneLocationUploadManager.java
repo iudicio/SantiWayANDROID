@@ -31,6 +31,10 @@ public class PhoneLocationUploadManager {
     }
 
     public void uploadCurrentLocation() {
+        if (!ServerUploadConfig.isEnabled(context)) {
+            Log.d(TAG, "Server upload disabled - skip phone location upload");
+            return;
+        }
         try {
             LocationManager locationManager = LocationManager.getInstance(context);
             locationManager.startLocationUpdates();

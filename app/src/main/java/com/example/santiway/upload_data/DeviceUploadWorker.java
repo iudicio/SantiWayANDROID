@@ -20,6 +20,10 @@ public class DeviceUploadWorker extends Worker {
     @Override
     public Result doWork() {
         Log.d(TAG, "Starting device upload work");
+        if (!ServerUploadConfig.isEnabled(getApplicationContext())) {
+            Log.d(TAG, "Server upload disabled");
+            return Result.success();
+        }
 
         try {
             DeviceUploadManager uploadManager = new DeviceUploadManager(getApplicationContext());

@@ -93,6 +93,10 @@ public class DeviceUploadManager {
      */
     public List<PendingUpload> getPendingUploadsBatch() {
         List<PendingUpload> items = new ArrayList<>();
+        if (!ServerUploadConfig.isEnabled(context)) {
+            Log.d(TAG, "Server upload disabled - no pending batch");
+            return items;
+        }
         SQLiteDatabase db = null;
         Cursor cursor = null;
 
@@ -256,6 +260,10 @@ public class DeviceUploadManager {
      * ОТПРАВКА БАТЧА ДАННЫХ НА СЕРВЕР
      */
     public boolean uploadBatch(List<PendingUpload> items) {
+        if (!ServerUploadConfig.isEnabled(context)) {
+            Log.d(TAG, "Server upload disabled - skip upload batch");
+            return false;
+        }
         if (items == null || items.isEmpty()) return false;
 
         Log.d(TAG, "=== UPLOAD BATCH START ===");

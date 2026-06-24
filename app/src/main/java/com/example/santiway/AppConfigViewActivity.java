@@ -4,6 +4,8 @@ import com.example.santiway.host_database.*;
 import com.example.santiway.esp32.Esp32DatabaseHelper;
 import com.example.santiway.activity_map.MapLayerManager;
 import com.example.santiway.upload_data.MainDatabaseHelper;
+import com.example.santiway.upload_data.DeviceUploadService;
+import com.example.santiway.upload_data.ServerUploadConfig;
 import com.example.santiway.upload_name_device.UserDeviceSyncManager;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
@@ -48,6 +50,7 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
     private EditText signalStrengthInput;
     private TextView serverIpInput;
     private TextView apiKeyDisplay;
+    private Switch serverUploadSwitch;
     private EditText deviceNameInput;
     private EditText mapPointLimitInput;
     private EditText dataRetentionDaysInput;
@@ -92,6 +95,7 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
         signalStrengthInput = findViewById(R.id.signal_strength_input);
         serverIpInput = findViewById(R.id.server_ip_input);
         apiKeyDisplay = findViewById(R.id.api_key_display);
+        serverUploadSwitch = findViewById(R.id.server_upload_switch);
         deviceNameInput = findViewById(R.id.device_scanner);
 
         alarmOffSwitch = findViewById(R.id.alarm_mode_off_switch);
@@ -107,6 +111,7 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
 
         SharedPreferences prefs = getSharedPreferences("AppSettings", MODE_PRIVATE);
 
+        serverUploadSwitch.setChecked(ServerUploadConfig.isEnabled(this));
         staticLocationSwitch.setChecked(prefs.getBoolean("static_location_enabled", false));
         staticLatitudeInput.setText(String.valueOf(prefs.getFloat("static_latitude", 0f)));
         staticLongitudeInput.setText(String.valueOf(prefs.getFloat("static_longitude", 0f)));
@@ -502,6 +507,10 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
         }
         AlarmModeConfig.saveMode(this, selectedAlarmMode);
         AlarmModeConfig.saveQuietModeEnabled(this, selectedQuietMode);
+        ServerUploadConfig.setEnabled(this, serverUploadSwitch.isChecked());
+        if (!serverUploadSwitch.isChecked()) {
+            stopService(new Intent(this, DeviceUploadService.class));
+        }
 
         repository.setGeoProtocol(selectedProtocol);
 
@@ -726,6 +735,7 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
 
         if (AlarmModeConfig.sanitizeMask(selectedAlarmMode) != AlarmModeConfig.getMode(this)) return true;
         if (selectedQuietMode != AlarmModeConfig.isQuietModeEnabled(this)) return true;
+        if (serverUploadSwitch.isChecked() != ServerUploadConfig.isEnabled(this)) return true;
 
         if (staticLocationSwitch.isChecked() != prefs.getBoolean("static_location_enabled", false)) return true;
         if (floatInputChanged(staticLatitudeInput, prefs.getFloat("static_latitude", 0f))) return true;

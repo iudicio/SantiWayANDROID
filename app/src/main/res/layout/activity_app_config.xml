@@ -195,6 +195,15 @@
                     android:textColor="@android:color/white"
                     android:textSize="12sp" />
 
+                <Switch
+                    android:id="@+id/server_upload_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:text="@string/server_upload_enabled_label"
+                    android:textColor="@android:color/white"
+                    android:textSize="14sp" />
+
                 <com.google.android.material.textfield.TextInputLayout
                     style="@style/SantiWayTextInputLayout"
                     android:layout_width="match_parent"

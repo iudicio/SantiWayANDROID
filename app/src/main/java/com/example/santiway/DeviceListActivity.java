@@ -3,6 +3,7 @@ import android.animation.ObjectAnimator;
 import android.animation.PropertyValuesHolder;
 import com.example.santiway.upload_folder_device.UserDeviceFolderSyncManager;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.textfield.TextInputEditText;
 
 import android.app.AlertDialog;
@@ -92,9 +93,12 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     private int currentOffset = 0;
     private final int PAGE_SIZE = 50; // Количество элементов на странице
     private String currentTable = "";
+    private MaterialButton btnTypeWifi, btnTypeBluetooth, btnTypeCell;
     private MaterialButton btnFilterTarget, btnFilterSafe, btnFilterAll;
+    private MaterialButtonToggleGroup deviceTypeFilterGroup, statusFilterGroup;
 
     private final List<Device> allLoadedDevices = new ArrayList<>();
+    private String currentTypeFilter = "WIFI";
     private String currentStatusFilter = "ALL";
     private TextInputEditText etSearchDevice;
     private String currentSearchQuery = "";
@@ -190,6 +194,11 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
         tabLayout = findViewById(R.id.tab_layout);
         devicesRecyclerView = findViewById(R.id.devices_recycler_view);
 
+        deviceTypeFilterGroup = findViewById(R.id.device_type_filter_group);
+        statusFilterGroup = findViewById(R.id.status_filter_group);
+        btnTypeWifi = findViewById(R.id.btn_filter_type_wifi);
+        btnTypeBluetooth = findViewById(R.id.btn_filter_type_bluetooth);
+        btnTypeCell = findViewById(R.id.btn_filter_type_cell);
         btnFilterTarget = findViewById(R.id.btn_filter_target);
         btnFilterSafe = findViewById(R.id.btn_filter_safe);
         btnFilterAll = findViewById(R.id.btn_filter_all);
@@ -1428,7 +1437,6 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
         hasMoreData = true;
         isLoading = false;
         allLoadedDevices.clear();
-        currentStatusFilter = "ALL";
         adapter.clearData();
         updateFilterButtonsUI();
     }
@@ -1609,25 +1617,33 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     }
 
     private void setupFilterButtons() {
-        if (btnFilterTarget != null) {
-            btnFilterTarget.setOnClickListener(v -> {
-                currentStatusFilter = "TARGET";
+        if (deviceTypeFilterGroup != null) {
+            deviceTypeFilterGroup.check(R.id.btn_filter_type_wifi);
+            deviceTypeFilterGroup.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+                if (!isChecked) return;
+                if (checkedId == R.id.btn_filter_type_wifi) {
+                    currentTypeFilter = "WIFI";
+                } else if (checkedId == R.id.btn_filter_type_bluetooth) {
+                    currentTypeFilter = "BLUETOOTH";
+                } else if (checkedId == R.id.btn_filter_type_cell) {
+                    currentTypeFilter = "CELL";
+                }
                 applyCurrentFilter();
                 updateFilterButtonsUI();
             });
         }
 
-        if (btnFilterSafe != null) {
-            btnFilterSafe.setOnClickListener(v -> {
-                currentStatusFilter = "SAFE";
-                applyCurrentFilter();
-                updateFilterButtonsUI();
-            });
-        }
-
-        if (btnFilterAll != null) {
-            btnFilterAll.setOnClickListener(v -> {
-                currentStatusFilter = "ALL";
+        if (statusFilterGroup != null) {
+            statusFilterGroup.check(R.id.btn_filter_all);
+            statusFilterGroup.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+                if (!isChecked) return;
+                if (checkedId == R.id.btn_filter_target) {
+                    currentStatusFilter = "TARGET";
+                } else if (checkedId == R.id.btn_filter_safe) {
+                    currentStatusFilter = "SAFE";
+                } else if (checkedId == R.id.btn_filter_all) {
+                    currentStatusFilter = "ALL";
+                }
                 applyCurrentFilter();
                 updateFilterButtonsUI();
             });
@@ -1668,21 +1684,39 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     private void applyCurrentFilter() {
         List<Device> filteredList = new ArrayList<>();
 
-        if ("ALL".equalsIgnoreCase(currentStatusFilter)) {
-            filteredList.addAll(allLoadedDevices);
-        } else {
-            for (Device device : allLoadedDevices) {
+        for (Device device : allLoadedDevices) {
+            if (!matchesCurrentTypeFilter(device)) {
+                continue;
+            }
+
+            if (!"ALL".equalsIgnoreCase(currentStatusFilter)) {
                 String status = device.getStatus() != null
                         ? device.getStatus().trim().toUpperCase(Locale.ROOT)
                         : "GREY";
-
-                if (status.equals(currentStatusFilter)) {
-                    filteredList.add(device);
+                if (!status.equals(currentStatusFilter)) {
+                    continue;
                 }
             }
+
+            filteredList.add(device);
         }
 
         adapter.updateData(filteredList);
+    }
+
+    private boolean matchesCurrentTypeFilter(Device device) {
+        if (device == null || device.getType() == null) return false;
+        String type = device.getType().trim();
+        if ("WIFI".equals(currentTypeFilter)) {
+            return "Wi-Fi".equalsIgnoreCase(type) || "WiFi".equalsIgnoreCase(type);
+        }
+        if ("BLUETOOTH".equals(currentTypeFilter)) {
+            return "Bluetooth".equalsIgnoreCase(type);
+        }
+        if ("CELL".equals(currentTypeFilter)) {
+            return "Cell".equalsIgnoreCase(type) || "Cellular".equalsIgnoreCase(type);
+        }
+        return true;
     }
     private void setupRecyclerSwipe() {
         devicesRecyclerView.setOnTouchListener((v, event) -> {
@@ -1740,11 +1774,23 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     }
 
     private void updateFilterButtonsUI() {
-        if (btnFilterTarget == null || btnFilterSafe == null || btnFilterAll == null) return;
+        styleToggleButton(btnTypeWifi, "WIFI".equals(currentTypeFilter), "#2D8CFF");
+        styleToggleButton(btnTypeBluetooth, "BLUETOOTH".equals(currentTypeFilter), "#6C63FF");
+        styleToggleButton(btnTypeCell, "CELL".equals(currentTypeFilter), "#FF9800");
+        styleToggleButton(btnFilterTarget, "TARGET".equals(currentStatusFilter), "#FF3B30");
+        styleToggleButton(btnFilterAll, "ALL".equals(currentStatusFilter), "#3A4A63");
+        styleToggleButton(btnFilterSafe, "SAFE".equals(currentStatusFilter), "#34C759");
+    }
 
-        btnFilterTarget.setAlpha("TARGET".equals(currentStatusFilter) ? 1.0f : 0.5f);
-        btnFilterSafe.setAlpha("SAFE".equals(currentStatusFilter) ? 1.0f : 0.5f);
-        btnFilterAll.setAlpha("ALL".equals(currentStatusFilter) ? 1.0f : 0.5f);
+    private void styleToggleButton(MaterialButton button, boolean selected, String selectedColor) {
+        if (button == null) return;
+        int color = selected ? Color.parseColor(selectedColor) : Color.TRANSPARENT;
+        int strokeColor = selected ? Color.parseColor(selectedColor) : Color.parseColor("#5D708E");
+        button.setAlpha(selected ? 1.0f : 0.72f);
+        button.setTextColor(Color.WHITE);
+        button.setBackgroundTintList(ColorStateList.valueOf(color));
+        button.setStrokeColor(ColorStateList.valueOf(strokeColor));
+        button.setStrokeWidth(dpToPx(1));
     }
 
     @Override

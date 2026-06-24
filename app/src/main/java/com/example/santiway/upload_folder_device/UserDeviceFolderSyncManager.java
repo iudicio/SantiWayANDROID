@@ -6,6 +6,7 @@ import android.util.Log;
 
 import com.example.santiway.upload_data.ApiConfig;
 import com.example.santiway.upload_data.ApiService;
+import com.example.santiway.upload_data.ServerUploadConfig;
 import com.example.santiway.upload_folder_device.DeviceFolderRequest;
 import com.example.santiway.upload_folder_device.DeviceFolderResponse;
 
@@ -40,6 +41,10 @@ public class UserDeviceFolderSyncManager {
     }
 
     public void syncFolderCreated(String folderName) {
+        if (!ServerUploadConfig.isEnabled(context)) {
+            Log.d(TAG, "Server upload disabled - skip folder create sync");
+            return;
+        }
         new Thread(() -> {
             try {
                 String apiKey = ApiConfig.getApiKey(context);
@@ -66,6 +71,10 @@ public class UserDeviceFolderSyncManager {
     }
 
     public void syncFolderDeleted(String folderName) {
+        if (!ServerUploadConfig.isEnabled(context)) {
+            Log.d(TAG, "Server upload disabled - skip folder delete sync");
+            return;
+        }
         new Thread(() -> {
             try {
                 String apiKey = ApiConfig.getApiKey(context);
@@ -97,6 +106,10 @@ public class UserDeviceFolderSyncManager {
     }
 
     public void syncFolderRenamed(String oldName, String newName) {
+        if (!ServerUploadConfig.isEnabled(context)) {
+            Log.d(TAG, "Server upload disabled - skip folder rename sync");
+            return;
+        }
         new Thread(() -> {
             try {
                 String apiKey = ApiConfig.getApiKey(context);

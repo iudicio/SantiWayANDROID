@@ -26,7 +26,9 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.maps.model.TileOverlay;
 
 import java.io.File;
@@ -194,7 +196,32 @@ public class NotificationDetailActivity extends BaseLocalizedActivity implements
                     .snippet(String.format(Locale.US, "%.6f, %.6f",
                             notification.getLatitude(), notification.getLongitude()))
                     .icon(MapLayerManager.googleMarkerDescriptor(this, notification.getType().getColor(), 1)));
-            googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(location, 15));
+            if (notification.getReferenceLatitude() != null
+                    && notification.getReferenceLongitude() != null) {
+                LatLng reference = new LatLng(
+                        notification.getReferenceLatitude(),
+                        notification.getReferenceLongitude()
+                );
+                googleMap.addMarker(new MarkerOptions()
+                        .position(reference)
+                        .title(getString(R.string.opencellid_reference_location_title))
+                        .snippet(String.format(Locale.US, "%.6f, %.6f",
+                                notification.getReferenceLatitude(),
+                                notification.getReferenceLongitude()))
+                        .icon(MapLayerManager.googleMarkerDescriptor(this, Color.parseColor("#3DDC84"), 1)));
+                googleMap.addPolyline(new PolylineOptions()
+                        .add(reference, location)
+                        .color(Color.parseColor("#FF9800"))
+                        .width(6f)
+                        .geodesic(true));
+                LatLngBounds bounds = LatLngBounds.builder()
+                        .include(reference)
+                        .include(location)
+                        .build();
+                googleMap.moveCamera(CameraUpdateFactory.newLatLngBounds(bounds, 72));
+            } else {
+                googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(location, 15));
+            }
         }
     }
 

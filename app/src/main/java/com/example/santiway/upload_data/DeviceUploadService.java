@@ -37,6 +37,11 @@ public class DeviceUploadService extends Service {
     public void onCreate() {
         super.onCreate();
         Log.d(TAG, "DeviceUploadService created");
+        if (!ServerUploadConfig.isEnabled(this)) {
+            Log.d(TAG, "Server upload disabled - stopping service");
+            stopSelf();
+            return;
+        }
 
         uploadManager = new DeviceUploadManager(this);
         phoneLocationUploadManager = new PhoneLocationUploadManager(this);
@@ -69,6 +74,11 @@ public class DeviceUploadService extends Service {
     }
 
     private void performUpload() {
+        if (!ServerUploadConfig.isEnabled(this)) {
+            Log.d(TAG, "Server upload disabled - skip upload tick");
+            stopSelf();
+            return;
+        }
         if (!isNetworkConnected()) {
             Log.d(TAG, "No network connection - skip upload tick");
             return;
