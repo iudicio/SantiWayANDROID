@@ -100,6 +100,14 @@
             android:name=".GrayDeviceSearchActivity"
             android:exported="false"
             android:theme="@style/Theme.SantiWay" />
+        <activity
+            android:name=".GrayDeviceSearchListActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SantiWay" />
+        <activity
+            android:name=".GrayDeviceHistogramActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SantiWay" />
 
         <activity
             android:name=".esp32.Esp32Activity"
@@ -125,6 +133,9 @@
 
         <activity android:name=".AppConfigViewActivity"
             android:exported="false" />
+        <activity android:name=".OpenCellIdStatusActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SantiWay" />
         <activity android:name=".AppManualActivity"
             android:exported="false" />
 

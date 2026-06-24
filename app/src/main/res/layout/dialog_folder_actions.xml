@@ -80,7 +80,7 @@
             android:textSize="16sp"
             app:backgroundTint="#172A46"
             app:cornerRadius="8dp"
-            app:icon="@drawable/ic_grey"
+            app:icon="@drawable/ic_search"
             app:iconGravity="textStart"
             app:iconPadding="14dp"
             app:iconTint="#B8C7DA"

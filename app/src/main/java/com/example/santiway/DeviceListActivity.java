@@ -1212,7 +1212,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
         if (canDelete) {
             TextView deleteButton = new TextView(this);
             deleteButton.setText("\u00D7");
-            deleteButton.setTextColor(Color.BLACK);
+            deleteButton.setTextColor(Color.WHITE);
             deleteButton.setTextSize(11);
             deleteButton.setGravity(Gravity.CENTER);
             deleteButton.setIncludeFontPadding(false);

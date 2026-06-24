@@ -69,6 +69,20 @@
                     app:cornerRadius="8dp"
                     app:icon="@drawable/ic_apps"
                     app:iconTint="#071427" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/open_opencellid_status_btn"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/opencellid_status_open_action"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
+                    android:textStyle="bold"
+                    app:backgroundTint="#2D4566"
+                    app:cornerRadius="8dp"
+                    app:icon="@drawable/ic_cell"
+                    app:iconTint="#F5C542" />
             </LinearLayout>
 
             <LinearLayout

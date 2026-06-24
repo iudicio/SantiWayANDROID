@@ -117,6 +117,8 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
         });
         findViewById(R.id.open_manual_btn).setOnClickListener(v ->
                 startActivity(new Intent(this, AppManualActivity.class)));
+        findViewById(R.id.open_opencellid_status_btn).setOnClickListener(v ->
+                startActivity(new Intent(this, OpenCellIdStatusActivity.class)));
 
         selectedAlarmMode = AlarmModeConfig.getMode(this);
         selectedQuietMode = AlarmModeConfig.isQuietModeEnabled(this);
