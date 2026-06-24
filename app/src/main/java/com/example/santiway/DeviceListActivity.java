@@ -111,6 +111,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     private TextInputEditText etSearchDevice;
     private String currentSearchQuery = "";
     private boolean autoRefreshStarted = false;
+    private boolean selectingTabBySwipe = false;
     private GestureDetector folderGestureDetector;
     private float downX;
     private float downY;
@@ -660,12 +661,14 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
                 resetPagination();
                 currentTable = (String) tab.getTag();
 
-                getSharedPreferences("app_prefs", MODE_PRIVATE)
-                        .edit()
-                        .putString("current_folder", isCellSystemFolder(currentTable)
-                                ? FolderNameHelper.MAIN_FOLDER_INTERNAL
-                                : currentTable)
-                        .apply();
+                if (!selectingTabBySwipe) {
+                    getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                            .edit()
+                            .putString("current_folder", isCellSystemFolder(currentTable)
+                                    ? FolderNameHelper.MAIN_FOLDER_INTERNAL
+                                    : currentTable)
+                            .apply();
+                }
 
                 loadDevicesForTable(currentTable, true);
             }
@@ -2129,7 +2132,12 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
 
         TabLayout.Tab tab = tabLayout.getTabAt(newIndex);
         if (tab != null) {
-            tab.select();
+            selectingTabBySwipe = true;
+            try {
+                tab.select();
+            } finally {
+                selectingTabBySwipe = false;
+            }
         }
     }
 
