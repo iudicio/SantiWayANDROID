@@ -25,7 +25,7 @@
         android:layout_height="wrap_content"
         android:hint="@string/enter_folder_name_hint"
 
-        app:hintTextColor="#3DDC84"
+        app:hintTextColor="@android:color/white"
         app:boxStrokeColor="#3DDC84"
         app:boxStrokeWidth="1dp"
         app:boxBackgroundColor="#172A46"
@@ -45,7 +45,7 @@
             android:paddingEnd="12dp"
             android:singleLine="true"
             android:textColor="@android:color/white"
-            android:textColorHint="#E0E0E0" />
+            android:textColorHint="@android:color/white" />
 
     </com.google.android.material.textfield.TextInputLayout>
 

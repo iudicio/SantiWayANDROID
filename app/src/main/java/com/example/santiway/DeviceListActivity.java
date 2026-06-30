@@ -1,13 +1,19 @@
 package com.example.santiway;
 import android.animation.ObjectAnimator;
+import android.animation.PropertyValuesHolder;
 import com.example.santiway.upload_folder_device.UserDeviceFolderSyncManager;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.textfield.TextInputEditText;
 
 import android.app.AlertDialog;
+import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.location.Location;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -15,11 +21,14 @@ import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MenuItem;
 import android.text.Editable;
+import android.text.InputType;
 import android.text.TextWatcher;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.drawable.GradientDrawable;
+import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.widget.Toolbar;
@@ -37,26 +46,47 @@ import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.Calendar;
+import java.text.SimpleDateFormat;
 import org.json.JSONArray;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Gravity;
 import android.view.animation.LinearInterpolator;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.CheckBox;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 public class DeviceListActivity extends BaseLocalizedActivity implements DeviceListAdapter.OnDeviceClickListener, StatusUpdateListener {
 
     private static final String TAG = "DeviceListActivity";
+    private static final String PREFS_APP = "app_prefs";
+    private static final String KEY_LAST_SNAPSHOT_TRIGGER_FOLDER = "last_snapshot_trigger_folder";
+    private static final String KEY_LAST_SNAPSHOT_TRIGGER_LAT = "last_snapshot_trigger_lat";
+    private static final String KEY_LAST_SNAPSHOT_TRIGGER_LON = "last_snapshot_trigger_lon";
+    private static final String KEY_LAST_SNAPSHOT_TRIGGER_HAS_ORIGIN = "last_snapshot_trigger_has_origin";
+    private static final String KEY_LAST_SNAPSHOT_TRIGGER_ARMED = "last_snapshot_trigger_armed";
+    private static final String KEY_LAST_SNAPSHOT_TRIGGER_APPLIED = "last_snapshot_trigger_applied";
+    private static final String KEY_DEVICE_LIST_TYPE_FILTER = "device_list_type_filter";
+    private static final String KEY_DEVICE_LIST_STATUS_FILTER = "device_list_status_filter";
+    private static final float FOLDER_TRIGGER_DISTANCE_METERS = 500f;
+    private static final String CELL_ALERT_FOLDER = "__cell_alert__";
+    private static final String CELL_SAFE_FOLDER = "__cell_safe__";
+    private static final String CELL_BLACKLIST_FOLDER = "__cell_blacklist__";
 
     private Toolbar toolbar;
     private TabLayout tabLayout;
@@ -71,13 +101,17 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     private int currentOffset = 0;
     private final int PAGE_SIZE = 50; // Количество элементов на странице
     private String currentTable = "";
+    private MaterialButton btnTypeAll, btnTypeWifi, btnTypeBluetooth, btnTypeCell;
     private MaterialButton btnFilterTarget, btnFilterSafe, btnFilterAll;
+    private MaterialButtonToggleGroup deviceTypeFilterGroup, statusFilterGroup;
 
     private final List<Device> allLoadedDevices = new ArrayList<>();
+    private String currentTypeFilter = "ALL";
     private String currentStatusFilter = "ALL";
     private TextInputEditText etSearchDevice;
     private String currentSearchQuery = "";
     private boolean autoRefreshStarted = false;
+    private boolean selectingTabBySwipe = false;
     private GestureDetector folderGestureDetector;
     private float downX;
     private float downY;
@@ -121,10 +155,20 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
                 if (!isLoading) {
                     loadDevicesForTable(currentTable, true);
                 }
-                handler.postDelayed(this, 1500); // 1.5 сек
+                handler.postDelayed(this, 5000);
             }
         }
     };
+    private final Runnable folderTriggerCheckRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!isFinishing() && !isDestroyed()) {
+                checkArmedFolderTrigger();
+                handler.postDelayed(this, 15000L);
+            }
+        }
+    };
+    private Runnable searchDebounceRunnable;
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent event) {
@@ -159,10 +203,17 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
         tabLayout = findViewById(R.id.tab_layout);
         devicesRecyclerView = findViewById(R.id.devices_recycler_view);
 
+        deviceTypeFilterGroup = findViewById(R.id.device_type_filter_group);
+        statusFilterGroup = findViewById(R.id.status_filter_group);
+        btnTypeAll = findViewById(R.id.btn_filter_type_all);
+        btnTypeWifi = findViewById(R.id.btn_filter_type_wifi);
+        btnTypeBluetooth = findViewById(R.id.btn_filter_type_bluetooth);
+        btnTypeCell = findViewById(R.id.btn_filter_type_cell);
         btnFilterTarget = findViewById(R.id.btn_filter_target);
         btnFilterSafe = findViewById(R.id.btn_filter_safe);
         btnFilterAll = findViewById(R.id.btn_filter_all);
         etSearchDevice = findViewById(R.id.et_search_device);
+        loadSavedFilters();
 
         TextInputLayout searchInputLayout = findViewById(R.id.search_input_layout);
 
@@ -244,6 +295,10 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
                 int selectedTabPos = tabLayout.getSelectedTabPosition();
                 if (selectedTabPos == -1) return;
                 String currentFolder = (String) tabLayout.getTabAt(selectedTabPos).getTag();
+                if (isCellSystemFolder(currentFolder)) {
+                    Toast.makeText(this, R.string.cell_system_folder_readonly, Toast.LENGTH_SHORT).show();
+                    return;
+                }
 
                 // 2. Создаем диалог подтверждения
                 AlertDialog dialog = new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
@@ -276,8 +331,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
                 dialog.show();
 
                 // 3. Стилизация кнопок (после вызова .show())
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.parseColor("#FF6B6B"));
-                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(Color.parseColor("#3DDC84"));
+                DialogStyleUtils.tintButtons(dialog);
             });
         }
         LinearLayout renameButton = findViewById(R.id.action_rename);
@@ -287,6 +341,10 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
                 int selectedTabPos = tabLayout.getSelectedTabPosition();
                 if (selectedTabPos == -1) return;
                 String oldName = (String) tabLayout.getTabAt(selectedTabPos).getTag();
+                if (isCellSystemFolder(oldName)) {
+                    Toast.makeText(this, R.string.cell_system_folder_readonly, Toast.LENGTH_SHORT).show();
+                    return;
+                }
                 showRenameFolderDialog(oldName);
             });
         }
@@ -388,6 +446,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             handler.post(autoRefreshRunnable);
             autoRefreshStarted = true;
         }
+        handler.post(folderTriggerCheckRunnable);
     }
 
     @Override
@@ -396,6 +455,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
 
         if (folderMoveMode) stopFolderMoveMode();
         handler.removeCallbacks(autoRefreshRunnable);
+        handler.removeCallbacks(folderTriggerCheckRunnable);
         autoRefreshStarted = false;
     }
 
@@ -410,6 +470,9 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
 
     // Метод для открытия карты устройства
     private void openDeviceMap(Device device, String tableName, int position) {
+        if (isCellSystemFolder(tableName) && device != null && !TextUtils.isEmpty(device.getSourceFolder())) {
+            tableName = device.getSourceFolder();
+        }
         if (tableName == null || tableName.isEmpty()) {
             Toast.makeText(this, getString(R.string.error_table_name_missing), Toast.LENGTH_SHORT).show();
             return;
@@ -428,11 +491,13 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
                 dbHelper.getDeviceHistoryByKey(tableName, deviceKey, device.getType());
 
         if (history == null || history.isEmpty()) {
+            dbHelper.close();
             Toast.makeText(this, getString(R.string.error_no_device_location_data), Toast.LENGTH_SHORT).show();
             return;
         }
 
         MainDatabaseHelper.DeviceLocation lastLocation = history.get(history.size() - 1);
+        dbHelper.close();
 
         Intent intent = new Intent(this, ActivityMapActivity.class);
         intent.putExtra("latitude", lastLocation.latitude);
@@ -446,21 +511,35 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     }
 
     public void shareDeviceAsJson(Device device) {
-        String jsonString = databaseHelper.getDeviceExportJson(currentTable, device.getMac());
+        String exportTable = device != null && isCellSystemFolder(currentTable) && !TextUtils.isEmpty(device.getSourceFolder())
+                ? device.getSourceFolder()
+                : currentTable;
+        if (device == null || TextUtils.isEmpty(device.getMac()) || TextUtils.isEmpty(exportTable)) {
+            Toast.makeText(this, getString(R.string.error_no_export_data), Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-        if (jsonString == null || jsonString.isEmpty()) {
+        String deviceKey = device.getMac().trim();
+        List<MainDatabaseHelper.DeviceLocation> history =
+                databaseHelper.getDeviceHistoryByKey(exportTable, deviceKey, device.getType());
+
+        if (history == null || history.isEmpty()) {
             Toast.makeText(this, getString(R.string.error_no_export_data), Toast.LENGTH_SHORT).show();
             return;
         }
 
         try {
-            java.io.File cachePath = new java.io.File(getExternalCacheDir(), "exports");
-            cachePath.mkdirs();
-            java.io.File tempFile = new java.io.File(cachePath, "device_" + device.getMac().replace(":", "") + ".json");
+            String jsonString = buildDeviceShareJson(device, deviceKey, exportTable, history);
+            java.io.File cacheRoot = getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir();
+            java.io.File cachePath = new java.io.File(cacheRoot, "exports");
+            if (!cachePath.exists() && !cachePath.mkdirs()) {
+                throw new java.io.IOException("Cannot create export directory");
+            }
+            java.io.File tempFile = new java.io.File(cachePath, safeExportFileName(deviceKey));
 
-            java.io.FileOutputStream stream = new java.io.FileOutputStream(tempFile);
-            stream.write(jsonString.getBytes());
-            stream.close();
+            try (java.io.FileOutputStream stream = new java.io.FileOutputStream(tempFile)) {
+                stream.write(jsonString.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            }
 
             android.net.Uri contentUri = androidx.core.content.FileProvider.getUriForFile(
                     this, getPackageName() + ".provider", tempFile);
@@ -468,15 +547,81 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             Intent shareIntent = new Intent(Intent.ACTION_SEND);
             shareIntent.setType("application/json");
             shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+            shareIntent.putExtra(Intent.EXTRA_SUBJECT, tempFile.getName());
+            shareIntent.putExtra(Intent.EXTRA_TEXT, tempFile.getName());
+            shareIntent.setClipData(android.content.ClipData.newUri(getContentResolver(), tempFile.getName(), contentUri));
             shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivity(Intent.createChooser(shareIntent, getString(R.string.share_json_title)));
         } catch (Exception e) {
+            Log.e(TAG, "Failed to share device JSON", e);
             Toast.makeText(this, getString(R.string.error_with_message, e.getMessage()), Toast.LENGTH_SHORT).show();
         }
     }
 
+    private String buildDeviceShareJson(Device device,
+                                        String deviceKey,
+                                        String exportTable,
+                                        List<MainDatabaseHelper.DeviceLocation> history) throws org.json.JSONException {
+        org.json.JSONObject root = new org.json.JSONObject();
+        root.put("name", device.getName());
+        root.put("device_id", deviceKey);
+        root.put("type", device.getType());
+        root.put("status", device.getStatus());
+        root.put("folder", exportTable);
+        root.put("exported_at", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()));
+
+        JSONArray points = new JSONArray();
+        SimpleDateFormat detectedFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
+        for (MainDatabaseHelper.DeviceLocation location : history) {
+            org.json.JSONObject point = new org.json.JSONObject();
+            long timestamp = parseLongOrZero(location.timestamp);
+            point.put("latitude", location.latitude);
+            point.put("longitude", location.longitude);
+            point.put("timestamp", timestamp);
+            point.put("detected_at", timestamp > 0 ? detectedFormat.format(new Date(timestamp)) : location.timestamp);
+            points.put(point);
+        }
+        root.put("points_history", points);
+        return root.toString(4);
+    }
+
+    private long parseLongOrZero(String value) {
+        if (value == null) return 0L;
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
+
+    private String safeExportFileName(String deviceKey) {
+        String safeKey = deviceKey == null ? "unknown" : deviceKey.replaceAll("[^A-Za-z0-9._-]", "_");
+        if (safeKey.length() > 80) safeKey = safeKey.substring(0, 80);
+        return "device_" + safeKey + ".json";
+    }
+
     private String getDisplayTableName(String tableName) {
+        if (CELL_ALERT_FOLDER.equals(tableName)) return "Alert";
+        if (CELL_SAFE_FOLDER.equals(tableName)) return "Safe";
+        if (CELL_BLACKLIST_FOLDER.equals(tableName)) return "Blacklist";
         return FolderNameHelper.getDisplayName(this, tableName);
+    }
+
+    private boolean isCellSystemFolder(String folder) {
+        return CELL_ALERT_FOLDER.equals(folder)
+                || CELL_SAFE_FOLDER.equals(folder)
+                || CELL_BLACKLIST_FOLDER.equals(folder);
+    }
+
+    public boolean isCurrentCellSystemFolder() {
+        return isCellSystemFolder(currentTable);
+    }
+
+    private String statusForCellSystemFolder(String folder) {
+        if (CELL_ALERT_FOLDER.equals(folder)) return "TARGET";
+        if (CELL_SAFE_FOLDER.equals(folder)) return "SAFE";
+        if (CELL_BLACKLIST_FOLDER.equals(folder)) return "BLACKLIST";
+        return "GREY";
     }
 
     private void setupTabLayout() {
@@ -501,6 +646,9 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             tab.setTag(tableName);
             tabLayout.addTab(tab);
         }
+        addCellSystemTab(CELL_ALERT_FOLDER, "Alert");
+        addCellSystemTab(CELL_SAFE_FOLDER, "Safe");
+        addCellSystemTab(CELL_BLACKLIST_FOLDER, "Blacklist");
 
         tabLayout.clearOnTabSelectedListeners();
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
@@ -508,13 +656,19 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             public void onTabSelected(TabLayout.Tab tab) {
                 if (tab == null || tab.getTag() == null) return;
 
+                scrollTabIntoView(tab.getPosition());
+
                 resetPagination();
                 currentTable = (String) tab.getTag();
 
-                getSharedPreferences("app_prefs", MODE_PRIVATE)
-                        .edit()
-                        .putString("current_folder", currentTable)
-                        .apply();
+                if (!selectingTabBySwipe) {
+                    getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                            .edit()
+                            .putString("current_folder", isCellSystemFolder(currentTable)
+                                    ? FolderNameHelper.MAIN_FOLDER_INTERNAL
+                                    : currentTable)
+                            .apply();
+                }
 
                 loadDevicesForTable(currentTable, true);
             }
@@ -555,9 +709,34 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
         TabLayout.Tab initialTab = tabLayout.getTabAt(selectedIndex);
         if (initialTab != null) {
             initialTab.select();
+            scrollTabIntoView(selectedIndex);
         }
 
         tabLayout.post(this::bindFolderLongPressActions);
+        tabLayout.post(this::updateFolderTriggerVisuals);
+    }
+
+    private void addCellSystemTab(String tag, String title) {
+        TabLayout.Tab tab = tabLayout.newTab().setText(title);
+        tab.setTag(tag);
+        tabLayout.addTab(tab);
+    }
+
+    private void scrollTabIntoView(int position) {
+        tabLayout.post(() -> {
+            if (position < 0 || tabLayout.getChildCount() == 0
+                    || !(tabLayout.getChildAt(0) instanceof ViewGroup)) return;
+            ViewGroup tabStrip = (ViewGroup) tabLayout.getChildAt(0);
+            if (position >= tabStrip.getChildCount()) return;
+            View tabView = tabStrip.getChildAt(position);
+            int visibleLeft = tabLayout.getScrollX();
+            int visibleRight = visibleLeft + tabLayout.getWidth();
+            if (tabView.getRight() > visibleRight) {
+                tabLayout.smoothScrollTo(tabView.getRight() - tabLayout.getWidth(), 0);
+            } else if (tabView.getLeft() < visibleLeft) {
+                tabLayout.smoothScrollTo(tabView.getLeft(), 0);
+            }
+        });
     }
 
     private List<String> applySavedFolderOrder(List<String> databaseTables) {
@@ -600,6 +779,10 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             if (tab == null || tab.getTag() == null) continue;
             String folderName = (String) tab.getTag();
             tabView.setOnTouchListener(null);
+            if (isCellSystemFolder(folderName)) {
+                tabView.setOnLongClickListener(null);
+                continue;
+            }
             tabView.setOnLongClickListener(v -> {
                 showFolderActionsDialog(folderName);
                 return true;
@@ -618,11 +801,26 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
 
         content.findViewById(R.id.folder_action_move_button).setOnClickListener(v -> {
             dialog.dismiss();
-            tabLayout.post(this::enableFolderMove);
+            tabLayout.post(() -> enableFolderMove(folderName));
         });
         content.findViewById(R.id.folder_action_rename_button).setOnClickListener(v -> {
             dialog.dismiss();
             showRenameFolderDialog(folderName);
+        });
+        content.findViewById(R.id.folder_action_gray_search_button).setOnClickListener(v -> {
+            dialog.dismiss();
+            showGrayDeviceSearchDialog(folderName);
+        });
+        MaterialButton triggerButton = content.findViewById(R.id.folder_action_trigger_button);
+        boolean triggerArmed = isFolderTriggerArmed(folderName);
+        styleFolderTriggerActionButton(triggerButton, triggerArmed);
+        triggerButton.setOnClickListener(v -> {
+            dialog.dismiss();
+            if (triggerArmed) {
+                disarmFolderTrigger(folderName);
+            } else {
+                armFolderTrigger(folderName);
+            }
         });
         content.findViewById(R.id.folder_action_delete_button).setOnClickListener(v -> {
             dialog.dismiss();
@@ -639,33 +837,452 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
         dialog.show();
     }
 
-    private void enableFolderMove() {
+    private void armFolderTrigger(String folderName) {
+        Location origin = null;
+        try {
+            origin = com.example.santiway.gsm_protocol.LocationManager
+                    .getInstance(this)
+                    .getBestEffortLocation();
+        } catch (Exception e) {
+            Log.e(TAG, "Could not get trigger origin: " + e.getMessage(), e);
+        }
+
+        if (origin == null) {
+            Toast.makeText(this, R.string.toast_folder_trigger_location_missing, Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        SharedPreferences.Editor editor = getSharedPreferences(PREFS_APP, MODE_PRIVATE).edit();
+        editor.putString(KEY_LAST_SNAPSHOT_TRIGGER_FOLDER, folderName);
+        editor.putFloat(KEY_LAST_SNAPSHOT_TRIGGER_LAT, (float) origin.getLatitude());
+        editor.putFloat(KEY_LAST_SNAPSHOT_TRIGGER_LON, (float) origin.getLongitude());
+        editor.putBoolean(KEY_LAST_SNAPSHOT_TRIGGER_HAS_ORIGIN, true);
+        editor.putBoolean(KEY_LAST_SNAPSHOT_TRIGGER_ARMED, true);
+        editor.putBoolean(KEY_LAST_SNAPSHOT_TRIGGER_APPLIED, false);
+        editor.apply();
+
+        Toast.makeText(
+                this,
+                getString(R.string.toast_folder_trigger_armed, getDisplayTableName(folderName)),
+                Toast.LENGTH_LONG
+        ).show();
+        updateFolderTriggerVisuals();
+    }
+
+    private void disarmFolderTrigger(String folderName) {
+        if (!isFolderTriggerArmed(folderName)) return;
+        clearFolderTriggerState();
+        updateFolderTriggerVisuals();
+        Toast.makeText(
+                this,
+                getString(R.string.toast_folder_trigger_disarmed, getDisplayTableName(folderName)),
+                Toast.LENGTH_SHORT
+        ).show();
+    }
+
+    private boolean isFolderTriggerArmed(String folderName) {
+        if (folderName == null) return false;
+        SharedPreferences prefs = getSharedPreferences(PREFS_APP, MODE_PRIVATE);
+        return prefs.getBoolean(KEY_LAST_SNAPSHOT_TRIGGER_ARMED, false)
+                && folderName.equals(prefs.getString(KEY_LAST_SNAPSHOT_TRIGGER_FOLDER, ""));
+    }
+
+    private void clearFolderTriggerState() {
+        getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                .edit()
+                .remove(KEY_LAST_SNAPSHOT_TRIGGER_FOLDER)
+                .remove(KEY_LAST_SNAPSHOT_TRIGGER_LAT)
+                .remove(KEY_LAST_SNAPSHOT_TRIGGER_LON)
+                .putBoolean(KEY_LAST_SNAPSHOT_TRIGGER_HAS_ORIGIN, false)
+                .putBoolean(KEY_LAST_SNAPSHOT_TRIGGER_ARMED, false)
+                .putBoolean(KEY_LAST_SNAPSHOT_TRIGGER_APPLIED, false)
+                .apply();
+    }
+
+    private void updateArmedFolderNameOnRename(String oldName, String newName) {
+        if (!isFolderTriggerArmed(oldName)) return;
+        getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                .edit()
+                .putString(KEY_LAST_SNAPSHOT_TRIGGER_FOLDER, newName)
+                .apply();
+    }
+
+    private void styleFolderTriggerActionButton(MaterialButton button, boolean armed) {
+        button.setText(armed ? R.string.folder_action_trigger_disable : R.string.folder_action_trigger);
+        button.setIconTint(ColorStateList.valueOf(Color.parseColor(armed ? "#FF8A95" : "#F5C542")));
+        button.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor(armed ? "#4A2030" : "#172A46")));
+        button.setStrokeColor(ColorStateList.valueOf(Color.parseColor(armed ? "#7A3348" : "#2D4566")));
+    }
+
+    private void checkArmedFolderTrigger() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_APP, MODE_PRIVATE);
+        if (!prefs.getBoolean(KEY_LAST_SNAPSHOT_TRIGGER_ARMED, false)) return;
+        if (!prefs.getBoolean(KEY_LAST_SNAPSHOT_TRIGGER_HAS_ORIGIN, false)) return;
+
+        String folderName = prefs.getString(KEY_LAST_SNAPSHOT_TRIGGER_FOLDER, "");
+        if (folderName == null || folderName.trim().isEmpty()) return;
+
+        Location current = null;
+        try {
+            current = com.example.santiway.gsm_protocol.LocationManager
+                    .getInstance(this)
+                    .getBestEffortLocation();
+        } catch (Exception e) {
+            Log.e(TAG, "Could not check folder trigger distance: " + e.getMessage(), e);
+        }
+        if (current == null) return;
+
+        float[] distance = new float[1];
+        Location.distanceBetween(
+                prefs.getFloat(KEY_LAST_SNAPSHOT_TRIGGER_LAT, 0f),
+                prefs.getFloat(KEY_LAST_SNAPSHOT_TRIGGER_LON, 0f),
+                current.getLatitude(),
+                current.getLongitude(),
+                distance
+        );
+
+        if (distance[0] >= FOLDER_TRIGGER_DISTANCE_METERS) {
+            applyFolderTrigger(folderName);
+        }
+    }
+
+    private void applyFolderTrigger(String folderName) {
+        getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_LAST_SNAPSHOT_TRIGGER_ARMED, false)
+                .apply();
+        updateFolderTriggerVisuals();
+
+        new Thread(() -> {
+            int count = databaseHelper.updateAllDeviceStatusForTable(folderName, "TARGET");
+            getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(KEY_LAST_SNAPSHOT_TRIGGER_APPLIED, true)
+                    .apply();
+            runOnUiThread(() -> {
+                Toast.makeText(
+                        this,
+                        getString(R.string.toast_folder_trigger_applied, getDisplayTableName(folderName), count),
+                        Toast.LENGTH_LONG
+                ).show();
+                if (currentTable != null && currentTable.equals(folderName) && !isLoading) {
+                    loadDevicesForTable(currentTable, true);
+                }
+            });
+        }).start();
+    }
+
+    private void showGrayDeviceSearchDialog(String sourceFolder) {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        int padding = dpToPx(18);
+        root.setPadding(padding, dpToPx(8), padding, 0);
+
+        TextView description = createDialogText(R.string.gray_search_dialog_description, 14, false);
+        root.addView(description);
+
+        CheckBox firstUsePeriod = createDialogCheckBox(R.string.gray_search_first_period_title);
+        root.addView(firstUsePeriod);
+        LinearLayout firstPeriodRow = createPeriodRow(
+                R.string.gray_search_period_start_hint,
+                R.string.gray_search_period_end_hint);
+        EditText firstStartInput = (EditText) firstPeriodRow.getChildAt(0);
+        EditText firstEndInput = (EditText) firstPeriodRow.getChildAt(1);
+        setPeriodInputsEnabled(firstPeriodRow, false);
+        root.addView(firstPeriodRow);
+
+        CheckBox secondUsePeriod = createDialogCheckBox(R.string.gray_search_second_period_title);
+        root.addView(secondUsePeriod);
+        LinearLayout secondPeriodRow = createPeriodRow(
+                R.string.gray_search_period_start_hint,
+                R.string.gray_search_period_end_hint);
+        EditText secondStartInput = (EditText) secondPeriodRow.getChildAt(0);
+        EditText secondEndInput = (EditText) secondPeriodRow.getChildAt(1);
+        setPeriodInputsEnabled(secondPeriodRow, false);
+        root.addView(secondPeriodRow);
+
+        TextView formatHint = createDialogText(R.string.gray_search_date_format_hint, 12, false);
+        formatHint.setTextColor(Color.WHITE);
+        root.addView(formatHint);
+
+        TextView foldersTitle = createDialogText(R.string.gray_search_second_folders_title, 14, true);
+        foldersTitle.setPadding(0, dpToPx(14), 0, dpToPx(6));
+        root.addView(foldersTitle);
+
+        LinearLayout foldersContainer = new LinearLayout(this);
+        foldersContainer.setOrientation(LinearLayout.VERTICAL);
+        List<CheckBox> folderChecks = new ArrayList<>();
+        for (String folder : databaseHelper.getAllTables()) {
+            CheckBox checkBox = createDialogCheckBox(0);
+            checkBox.setText(getDisplayTableName(folder));
+            checkBox.setTag(folder);
+            foldersContainer.addView(checkBox);
+            folderChecks.add(checkBox);
+        }
+
+        ScrollView foldersScroll = new ScrollView(this);
+        foldersScroll.addView(foldersContainer);
+        root.addView(foldersScroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dpToPx(150)
+        ));
+
+        TextView foldersHint = createDialogText(R.string.gray_search_second_folders_hint, 12, false);
+        foldersHint.setTextColor(Color.WHITE);
+        root.addView(foldersHint);
+
+        firstUsePeriod.setOnCheckedChangeListener((buttonView, isChecked) ->
+                setPeriodInputsEnabled(firstPeriodRow, isChecked));
+        secondUsePeriod.setOnCheckedChangeListener((buttonView, isChecked) ->
+                setPeriodInputsEnabled(secondPeriodRow, isChecked));
+
+        AlertDialog dialog = new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
+                .setTitle(getString(R.string.gray_search_dialog_title, getDisplayTableName(sourceFolder)))
+                .setView(root)
+                .setPositiveButton(R.string.gray_search_start_action, null)
+                .setNegativeButton(R.string.dialog_cancel, null)
+                .create();
+
+        dialog.setOnShowListener(ignored -> {
+            DialogStyleUtils.tintButtons(dialog);
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                Period firstPeriod = readPeriod(firstUsePeriod.isChecked(), firstStartInput, firstEndInput);
+                if (!firstPeriod.valid) return;
+                Period secondPeriod = readPeriod(secondUsePeriod.isChecked(), secondStartInput, secondEndInput);
+                if (!secondPeriod.valid) return;
+
+                ArrayList<String> selectedFolders = new ArrayList<>();
+                for (CheckBox checkBox : folderChecks) {
+                    if (checkBox.isChecked() && checkBox.getTag() instanceof String) {
+                        selectedFolders.add((String) checkBox.getTag());
+                    }
+                }
+
+                Intent intent = new Intent(this, GrayDeviceSearchActivity.class);
+                intent.putExtra(GrayDeviceSearchActivity.EXTRA_SOURCE_FOLDER, sourceFolder);
+                intent.putExtra(GrayDeviceSearchActivity.EXTRA_FIRST_HAS_PERIOD, firstUsePeriod.isChecked());
+                intent.putExtra(GrayDeviceSearchActivity.EXTRA_FIRST_START, firstPeriod.start);
+                intent.putExtra(GrayDeviceSearchActivity.EXTRA_FIRST_END, firstPeriod.end);
+                intent.putExtra(GrayDeviceSearchActivity.EXTRA_SECOND_HAS_PERIOD, secondUsePeriod.isChecked());
+                intent.putExtra(GrayDeviceSearchActivity.EXTRA_SECOND_START, secondPeriod.start);
+                intent.putExtra(GrayDeviceSearchActivity.EXTRA_SECOND_END, secondPeriod.end);
+                intent.putStringArrayListExtra(GrayDeviceSearchActivity.EXTRA_SECOND_FOLDERS, selectedFolders);
+                startActivity(intent);
+                dialog.dismiss();
+            });
+        });
+        dialog.show();
+    }
+
+    private TextView createDialogText(int stringRes, int textSizeSp, boolean bold) {
+        TextView view = new TextView(this);
+        if (stringRes != 0) {
+            view.setText(stringRes);
+        }
+        view.setTextColor(Color.WHITE);
+        view.setTextSize(textSizeSp);
+        if (bold) {
+            view.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        }
+        return view;
+    }
+
+    private CheckBox createDialogCheckBox(int stringRes) {
+        CheckBox checkBox = new CheckBox(this);
+        if (stringRes != 0) {
+            checkBox.setText(stringRes);
+        }
+        checkBox.setTextColor(Color.WHITE);
+        checkBox.setButtonTintList(ColorStateList.valueOf(Color.parseColor("#3DDC84")));
+        return checkBox;
+    }
+
+    private LinearLayout createPeriodRow(int startHint, int endHint) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, 0, 0, dpToPx(8));
+
+        EditText start = createPeriodInput(startHint);
+        EditText end = createPeriodInput(endHint);
+        row.addView(start, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout.LayoutParams endParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        endParams.setMargins(dpToPx(8), 0, 0, 0);
+        row.addView(end, endParams);
+        return row;
+    }
+
+    private EditText createPeriodInput(int hintRes) {
+        EditText input = new EditText(this);
+        input.setHint(hintRes);
+        input.setSingleLine(true);
+        input.setInputType(InputType.TYPE_NULL);
+        input.setFocusable(false);
+        input.setCursorVisible(false);
+        input.setTextColor(Color.WHITE);
+        input.setHintTextColor(Color.WHITE);
+        input.setTextSize(13);
+        input.setOnClickListener(v -> showDateTimePicker(input));
+        return input;
+    }
+
+    private void showDateTimePicker(EditText target) {
+        Calendar initial = Calendar.getInstance();
+        String currentText = target.getText() == null ? "" : target.getText().toString().trim();
+        if (!currentText.isEmpty()) {
+            try {
+                SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+                format.setLenient(false);
+                Date parsed = format.parse(currentText);
+                if (parsed != null) {
+                    initial.setTime(parsed);
+                }
+            } catch (Exception ignored) {}
+        }
+
+        DatePickerDialog dateDialog = new DatePickerDialog(
+                this,
+                (view, year, month, dayOfMonth) -> {
+                    Calendar selected = Calendar.getInstance();
+                    selected.set(Calendar.YEAR, year);
+                    selected.set(Calendar.MONTH, month);
+                    selected.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+                    selected.set(Calendar.HOUR_OF_DAY, initial.get(Calendar.HOUR_OF_DAY));
+                    selected.set(Calendar.MINUTE, initial.get(Calendar.MINUTE));
+                    selected.set(Calendar.SECOND, 0);
+                    selected.set(Calendar.MILLISECOND, 0);
+
+                    TimePickerDialog timeDialog = new TimePickerDialog(
+                            this,
+                            (timeView, hourOfDay, minute) -> {
+                                selected.set(Calendar.HOUR_OF_DAY, hourOfDay);
+                                selected.set(Calendar.MINUTE, minute);
+                                SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+                                target.setText(format.format(selected.getTime()));
+                            },
+                            selected.get(Calendar.HOUR_OF_DAY),
+                            selected.get(Calendar.MINUTE),
+                            true
+                    );
+                    timeDialog.show();
+                },
+                initial.get(Calendar.YEAR),
+                initial.get(Calendar.MONTH),
+                initial.get(Calendar.DAY_OF_MONTH)
+        );
+        dateDialog.show();
+    }
+
+    private void setPeriodInputsEnabled(LinearLayout row, boolean enabled) {
+        for (int i = 0; i < row.getChildCount(); i++) {
+            row.getChildAt(i).setEnabled(enabled);
+            row.getChildAt(i).setAlpha(enabled ? 1f : 0.45f);
+        }
+    }
+
+    private Period readPeriod(boolean enabled, EditText startInput, EditText endInput) {
+        Period period = new Period();
+        period.valid = true;
+        if (!enabled) {
+            return period;
+        }
+
+        String startText = startInput.getText() == null ? "" : startInput.getText().toString().trim();
+        String endText = endInput.getText() == null ? "" : endInput.getText().toString().trim();
+        if (startText.isEmpty() && endText.isEmpty()) {
+            Toast.makeText(this, R.string.gray_search_period_required, Toast.LENGTH_SHORT).show();
+            period.valid = false;
+            return period;
+        }
+
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault());
+        format.setLenient(false);
+        try {
+            if (!startText.isEmpty()) {
+                Date parsed = format.parse(startText);
+                period.start = parsed != null ? parsed.getTime() : -1L;
+            }
+            if (!endText.isEmpty()) {
+                Date parsed = format.parse(endText);
+                period.end = parsed != null ? parsed.getTime() : -1L;
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, R.string.gray_search_period_invalid, Toast.LENGTH_SHORT).show();
+            period.valid = false;
+            return period;
+        }
+
+        if (period.start > 0 && period.end > 0 && period.start > period.end) {
+            Toast.makeText(this, R.string.gray_search_period_order_invalid, Toast.LENGTH_SHORT).show();
+            period.valid = false;
+        }
+        return period;
+    }
+
+    private void enableFolderMove(String anchorFolderName) {
         if (tabLayout.getChildCount() == 0 || !(tabLayout.getChildAt(0) instanceof ViewGroup)) return;
         folderMoveMode = true;
         Toast.makeText(this, R.string.folder_move_instruction, Toast.LENGTH_LONG).show();
+        setFolderDeleteControlsVisible(true);
 
         ViewGroup tabStrip = (ViewGroup) tabLayout.getChildAt(0);
         int count = Math.min(tabStrip.getChildCount(), tabLayout.getTabCount());
         for (int i = 0; i < count; i++) {
             TabLayout.Tab tab = tabLayout.getTabAt(i);
             if (tab == null || tab.getTag() == null) continue;
+            if (isCellSystemFolder((String) tab.getTag())) continue;
             View tabView = tabStrip.getChildAt(i);
-            startFolderWiggle(tabView);
+            startFolderTremble(tabView);
             bindFolderDrag(tabStrip, tabView, (String) tab.getTag());
         }
+        focusFolderInMoveRibbon(anchorFolderName);
     }
 
-    private void startFolderWiggle(View tabView) {
+    private void startFolderTremble(View tabView) {
         tabView.setPivotX(tabView.getWidth() / 2f);
         tabView.setPivotY(tabView.getHeight() / 2f);
-        ObjectAnimator animator = ObjectAnimator.ofFloat(tabView, View.ROTATION,
-                0f, -20f, 20f, 0f);
-        animator.setDuration(1500L);
+        ObjectAnimator animator = ObjectAnimator.ofPropertyValuesHolder(
+                tabView,
+                PropertyValuesHolder.ofFloat(View.ROTATION, 0f, -0.35f, 0.35f, -0.22f, 0.22f, 0f),
+                PropertyValuesHolder.ofFloat(View.TRANSLATION_X, 0f, -0.35f, 0.35f, -0.2f, 0.2f, 0f)
+        );
+        animator.setDuration(780L);
         animator.setInterpolator(new LinearInterpolator());
         animator.setRepeatCount(ObjectAnimator.INFINITE);
         animator.setRepeatMode(ObjectAnimator.RESTART);
         animator.start();
         folderWiggleAnimations.put(tabView, animator);
+    }
+
+    private void focusFolderInMoveRibbon(String folderName) {
+        int index = findFolderTabIndex(folderName);
+        if (index < 0) return;
+
+        TabLayout.Tab tab = tabLayout.getTabAt(index);
+        if (tab != null && !tab.isSelected()) {
+            tab.select();
+        }
+
+        tabLayout.post(() -> {
+            tabLayout.setScrollPosition(index, 0f, true);
+            if (tabLayout.getChildCount() == 0 || !(tabLayout.getChildAt(0) instanceof ViewGroup)) return;
+            ViewGroup tabStrip = (ViewGroup) tabLayout.getChildAt(0);
+            if (index >= tabStrip.getChildCount()) return;
+
+            View tabView = tabStrip.getChildAt(index);
+            int targetScroll = tabView.getLeft() - (tabLayout.getWidth() - tabView.getWidth()) / 2;
+            tabLayout.smoothScrollTo(Math.max(0, targetScroll), 0);
+            tabView.requestFocus();
+        });
+    }
+
+    private int findFolderTabIndex(String folderName) {
+        for (int i = 0; i < tabLayout.getTabCount(); i++) {
+            TabLayout.Tab tab = tabLayout.getTabAt(i);
+            if (tab != null && folderName.equals(tab.getTag())) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private void bindFolderDrag(ViewGroup tabStrip, View tabView, String folderName) {
@@ -677,10 +1294,10 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
                     ObjectAnimator wiggle = folderWiggleAnimations.remove(view);
                     if (wiggle != null) wiggle.cancel();
                     view.setRotation(0f);
-                    view.setScaleX(1.06f);
-                    view.setScaleY(1.06f);
-                    view.setAlpha(0.9f);
-                    ViewCompat.setElevation(view, dpToPx(12));
+                    view.setScaleX(1.03f);
+                    view.setScaleY(1.03f);
+                    view.setAlpha(0.96f);
+                    ViewCompat.setElevation(view, dpToPx(8));
                     tabStrip.requestDisallowInterceptTouchEvent(true);
                     return true;
                 case MotionEvent.ACTION_MOVE:
@@ -739,7 +1356,110 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
                 child.setOnTouchListener(null);
             }
         }
+        setFolderDeleteControlsVisible(false);
         bindFolderLongPressActions();
+        updateFolderTriggerVisuals();
+    }
+
+    private void setFolderDeleteControlsVisible(boolean visible) {
+        for (int i = 0; i < tabLayout.getTabCount(); i++) {
+            TabLayout.Tab tab = tabLayout.getTabAt(i);
+            if (tab == null || tab.getTag() == null) continue;
+            String folderName = (String) tab.getTag();
+            if (visible) {
+                tab.setCustomView(createFolderTabEditView(folderName));
+            } else {
+                tab.setCustomView((View) null);
+                tab.setText(getDisplayTableName(folderName));
+            }
+        }
+    }
+
+    private View createFolderTabEditView(String folderName) {
+        boolean canDelete = !FolderNameHelper.isMainFolder(folderName) && !isCellSystemFolder(folderName);
+        LinearLayout container = new LinearLayout(this);
+        container.setOrientation(LinearLayout.HORIZONTAL);
+        container.setGravity(Gravity.CENTER);
+        container.setClipChildren(false);
+        container.setClipToPadding(false);
+        container.setMinimumWidth(dpToPx(82));
+        container.setPadding(dpToPx(10), dpToPx(2), dpToPx(10), dpToPx(2));
+        if (isFolderTriggerArmed(folderName)) {
+            container.setBackground(createFolderTabBackground());
+        }
+
+        if (canDelete) {
+            TextView deleteButton = new TextView(this);
+            deleteButton.setText("\u00D7");
+            deleteButton.setTextColor(Color.WHITE);
+            deleteButton.setTextSize(11);
+            deleteButton.setGravity(Gravity.CENTER);
+            deleteButton.setIncludeFontPadding(false);
+            deleteButton.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            deleteButton.setContentDescription(getString(R.string.content_desc_delete_icon));
+
+            GradientDrawable deleteBackground = new GradientDrawable();
+            deleteBackground.setShape(GradientDrawable.OVAL);
+            deleteBackground.setColor(Color.parseColor("#F0445E"));
+            deleteBackground.setStroke(dpToPx(1), Color.parseColor("#FFE1E6"));
+            deleteButton.setBackground(deleteBackground);
+            deleteButton.setOnClickListener(v -> {
+                stopFolderMoveMode();
+                showDeleteFolderDialog(folderName);
+            });
+
+            LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
+                    dpToPx(18),
+                    dpToPx(18)
+            );
+            deleteParams.setMargins(0, 0, dpToPx(8), 0);
+            container.addView(deleteButton, deleteParams);
+        }
+
+        TextView label = new TextView(this);
+        label.setText(getDisplayTableName(folderName));
+        label.setGravity(Gravity.CENTER);
+        label.setSingleLine(true);
+        label.setEllipsize(TextUtils.TruncateAt.END);
+        label.setTextSize(14);
+        label.setIncludeFontPadding(false);
+        label.setMaxWidth(dpToPx(150));
+        label.setTextColor(new ColorStateList(
+                new int[][]{new int[]{android.R.attr.state_selected}, new int[]{}},
+                new int[]{Color.WHITE, Color.WHITE}
+        ));
+        container.addView(label, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
+
+        return container;
+    }
+
+    private void updateFolderTriggerVisuals() {
+        tabLayout.post(() -> {
+            if (tabLayout.getChildCount() == 0 || !(tabLayout.getChildAt(0) instanceof ViewGroup)) return;
+            ViewGroup tabStrip = (ViewGroup) tabLayout.getChildAt(0);
+            int count = Math.min(tabStrip.getChildCount(), tabLayout.getTabCount());
+            for (int i = 0; i < count; i++) {
+                TabLayout.Tab tab = tabLayout.getTabAt(i);
+                View tabView = tabStrip.getChildAt(i);
+                if (tab == null || tab.getTag() == null) {
+                    tabView.setBackground(null);
+                    continue;
+                }
+                String folderName = (String) tab.getTag();
+                tabView.setBackground(isFolderTriggerArmed(folderName) ? createFolderTabBackground() : null);
+            }
+        });
+    }
+
+    private GradientDrawable createFolderTabBackground() {
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(Color.parseColor("#B8FF3B30"));
+        background.setCornerRadius(dpToPx(10));
+        background.setStroke(dpToPx(1), Color.parseColor("#FFFF8A95"));
+        return background;
     }
 
     private void cancelFolderWiggleAnimations() {
@@ -801,8 +1521,11 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
                 .setPositiveButton(R.string.dialog_change, null)
                 .setNegativeButton(R.string.dialog_cancel, null)
                 .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(v -> renameFolder(oldName, input, dialog)));
+        dialog.setOnShowListener(ignored -> {
+            DialogStyleUtils.tintButtons(dialog);
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                    .setOnClickListener(v -> renameFolder(oldName, input, dialog));
+        });
         dialog.show();
     }
 
@@ -821,6 +1544,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
 
         databaseHelper.renameTable(oldName, newName);
         new UserDeviceFolderSyncManager(this).syncFolderRenamed(oldName, newName);
+        updateArmedFolderNameOnRename(oldName, newName);
         int index = orderedTables.indexOf(oldName);
         if (index >= 0) orderedTables.set(index, newName);
         saveFolderOrder();
@@ -840,19 +1564,24 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             Toast.makeText(this, R.string.error_main_folder_cannot_be_deleted, Toast.LENGTH_SHORT).show();
             return;
         }
-        new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
+        AlertDialog dialog = new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
                 .setTitle(R.string.dialog_confirm_delete_title)
                 .setMessage(getString(R.string.dialog_confirm_delete_folder_message,
                         getDisplayTableName(folderName)))
-                .setPositiveButton(R.string.dialog_yes, (dialog, which) -> deleteFolder(folderName))
+                .setPositiveButton(R.string.dialog_yes, (d, which) -> deleteFolder(folderName))
                 .setNegativeButton(R.string.dialog_no, null)
-                .show();
+                .create();
+        dialog.setOnShowListener(ignored -> DialogStyleUtils.tintButtons(dialog));
+        dialog.show();
     }
 
     private void deleteFolder(String folderName) {
         if (!databaseHelper.deleteTable(folderName)) {
             Toast.makeText(this, R.string.error_folder_delete, Toast.LENGTH_SHORT).show();
             return;
+        }
+        if (isFolderTriggerArmed(folderName)) {
+            clearFolderTriggerState();
         }
         new UserDeviceFolderSyncManager(this).syncFolderDeleted(folderName);
         orderedTables.remove(folderName);
@@ -878,7 +1607,6 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
         hasMoreData = true;
         isLoading = false;
         allLoadedDevices.clear();
-        currentStatusFilter = "ALL";
         adapter.clearData();
         updateFilterButtonsUI();
     }
@@ -896,19 +1624,23 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
 
         adapter.setCurrentTableName(tableName);
         isLoading = true;
+        int loadOffset = isFirstLoad ? 0 : currentOffset;
 
         new Thread(() -> {
             List<Device> deviceList = new ArrayList<>();
 
             try {
+                if (isCellSystemFolder(tableName)) {
+                    deviceList = loadCellSystemFolderDevices(tableName, loadOffset, PAGE_SIZE);
+                } else {
                 String uniqueTableName = getUniqueTableName(tableName);
                 UniqueDevicesHelper uniqueHelper =
                         new UniqueDevicesHelper(DeviceListActivity.this, uniqueTableName);
 
                 if (currentSearchQuery == null || currentSearchQuery.isEmpty()) {
-                    deviceList = uniqueHelper.getAllDevices();
+                    deviceList = uniqueHelper.getDevicesPage(loadOffset, PAGE_SIZE);
                 } else {
-                    deviceList = uniqueHelper.getAllDevicesWithSearch(currentSearchQuery);
+                    deviceList = uniqueHelper.getDevicesPageWithSearch(currentSearchQuery, loadOffset, PAGE_SIZE);
                 }
 
                 // Fallback: если unique-представление пустое, читаем из raw-таблицы
@@ -916,40 +1648,129 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
                     Log.w("LOAD_DEVICES", "Unique table is empty for " + tableName + ", fallback to raw table");
 
                     if (currentSearchQuery == null || currentSearchQuery.isEmpty()) {
-                        deviceList = databaseHelper.getAllDataFromTableWithPagination(tableName, 0, PAGE_SIZE);
+                        deviceList = databaseHelper.getAllDataFromTableWithPagination(tableName, loadOffset, PAGE_SIZE);
                     } else {
                         deviceList = databaseHelper.getAllDataFromTableWithPaginationAndSearch(
                                 tableName,
                                 currentSearchQuery,
-                                0,
+                                loadOffset,
                                 PAGE_SIZE
                         );
                     }
                 }
-
-                for (Device device : deviceList) {
-                    String deviceKey = device.getMac();
-                    String actualStatus = databaseHelper.getStatusFromServiceTables(deviceKey);
-                    device.setStatus(actualStatus);
                 }
 
-                hasMoreData = false;
+                if (!isCellSystemFolder(tableName)) {
+                    Set<String> deviceKeys = new LinkedHashSet<>();
+                    for (Device device : deviceList) {
+                        if (device.getMac() != null) {
+                            deviceKeys.add(device.getMac());
+                        }
+                    }
+                    Map<String, String> actualStatuses = databaseHelper.getStatusesFromServiceTables(deviceKeys);
+                    for (Device device : deviceList) {
+                        String deviceKey = device.getMac();
+                        if (deviceKey == null) continue;
+                        String normalizedKey = deviceKey.trim().toUpperCase(Locale.US);
+                        String actualStatus = actualStatuses.get(normalizedKey);
+                        if (actualStatus != null) {
+                            device.setStatus(actualStatus);
+                        }
+                    }
+                }
+
             } catch (Exception e) {
                 Log.e("LOAD_DEVICES", "Ошибка загрузки устройств: " + e.getMessage(), e);
             }
 
             List<Device> finalDeviceList = deviceList;
+            boolean finalHasMore = finalDeviceList.size() >= PAGE_SIZE;
             Log.d("LOAD_DEVICES", "table=" + tableName + ", loaded=" + deviceList.size());
             runOnUiThread(() -> {
                 adapter.hideLoading();
-                allLoadedDevices.clear();
+                if (isFirstLoad) {
+                    allLoadedDevices.clear();
+                }
                 allLoadedDevices.addAll(finalDeviceList);
-
+                currentOffset = allLoadedDevices.size();
+                hasMoreData = finalHasMore;
                 applyCurrentFilter();
                 isLoading = false;
                 Log.d("LOAD_DEVICES", "apply to adapter: table=" + tableName + ", count=" + finalDeviceList.size());
             });
         }).start();
+    }
+
+    private List<Device> loadCellSystemFolderDevices(String systemFolder, int offset, int limit) {
+        List<Device> result = new ArrayList<>();
+        String requiredStatus = statusForCellSystemFolder(systemFolder);
+        String query = currentSearchQuery == null ? "" : currentSearchQuery.trim().toUpperCase(Locale.US);
+        databaseHelper.rebuildStatusTables(null);
+        Set<String> persistentKeys = databaseHelper.getPersistentStatusKeys(requiredStatus);
+        Set<String> seenKeys = new LinkedHashSet<>();
+
+        for (String folder : orderedTables) {
+            if (isCellSystemFolder(folder)) continue;
+            UniqueDevicesHelper helper = new UniqueDevicesHelper(this, getUniqueTableName(folder));
+            List<Device> devices = helper.getAllDevices();
+            Set<String> cellKeys = new LinkedHashSet<>();
+            for (Device device : devices) {
+                if (isCellDevice(device) && !TextUtils.isEmpty(device.getMac())) {
+                    cellKeys.add(device.getMac());
+                }
+            }
+            Map<String, String> serviceStatuses = databaseHelper.getStatusesFromServiceTables(cellKeys);
+            for (Device device : devices) {
+                if (!isCellDevice(device)) continue;
+                String normalizedKey = device.getMac() == null
+                        ? ""
+                        : device.getMac().trim().toUpperCase(Locale.US);
+                String serviceStatus = serviceStatuses.get(normalizedKey);
+                if (serviceStatus != null) {
+                    device.setStatus(serviceStatus);
+                }
+                String status = device.getStatus() == null ? "GREY" : device.getStatus().trim().toUpperCase(Locale.US);
+                if (!requiredStatus.equals(status)) continue;
+                if (!query.isEmpty() && !matchesDeviceQuery(device, query)) continue;
+                device.setSourceFolder(folder);
+                if (!normalizedKey.isEmpty()) {
+                    seenKeys.add(normalizedKey);
+                }
+                result.add(device);
+            }
+        }
+
+        for (String key : persistentKeys) {
+            if (seenKeys.contains(key)) continue;
+            Device persisted = new Device(
+                    "Cell Tower [" + key + "]",
+                    "Cell",
+                    "",
+                    "",
+                    key,
+                    requiredStatus,
+                    0L
+            );
+            if (!query.isEmpty() && !matchesDeviceQuery(persisted, query)) continue;
+            result.add(persisted);
+        }
+
+        result.sort((a, b) -> Long.compare(b.getTimestamp(), a.getTimestamp()));
+        int start = Math.max(0, offset);
+        if (start >= result.size()) return new ArrayList<>();
+        int end = Math.min(result.size(), start + Math.max(1, limit));
+        return new ArrayList<>(result.subList(start, end));
+    }
+
+    private boolean matchesDeviceQuery(Device device, String query) {
+        return containsIgnoreCase(device.getName(), query)
+                || containsIgnoreCase(device.getMac(), query)
+                || containsIgnoreCase(device.getType(), query)
+                || containsIgnoreCase(device.getStatus(), query);
+    }
+
+    private boolean containsIgnoreCase(String value, String upperQuery) {
+        return value != null && value.toUpperCase(Locale.US).contains(upperQuery);
     }
 
     private void updateAllDevicesStatus(String status) {
@@ -961,10 +1782,68 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
 
         if (tabLayout.getTabAt(pos) == null) return;
         String folder = (String) tabLayout.getTabAt(pos).getTag();
+        if (isCellSystemFolder(folder)) {
+            Toast.makeText(this, R.string.cell_system_folder_readonly, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if ("TARGET".equalsIgnoreCase(status)) {
+            showBulkTargetOptionsDialog(folder);
+            return;
+        }
+
+        updateAllDevicesStatus(folder, status, true, true);
+    }
+
+    private void showBulkTargetOptionsDialog(String folder) {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        int padding = dpToPx(20);
+        content.setPadding(padding, dpToPx(8), padding, 0);
+
+        TextView message = new TextView(this);
+        message.setText(R.string.dialog_bulk_target_message);
+        message.setTextColor(Color.WHITE);
+        message.setTextSize(15);
+        content.addView(message);
+
+        CheckBox includeCellsCheckBox = new CheckBox(this);
+        includeCellsCheckBox.setText(R.string.dialog_bulk_target_include_cells);
+        includeCellsCheckBox.setTextColor(Color.WHITE);
+        includeCellsCheckBox.setPadding(0, dpToPx(12), 0, 0);
+        content.addView(includeCellsCheckBox);
+
+        CheckBox includeSafeCheckBox = new CheckBox(this);
+        includeSafeCheckBox.setText(R.string.dialog_bulk_target_include_safe);
+        includeSafeCheckBox.setTextColor(Color.WHITE);
+        includeSafeCheckBox.setPadding(0, dpToPx(8), 0, 0);
+        content.addView(includeSafeCheckBox);
+
+        AlertDialog dialog = new AlertDialog.Builder(this, R.style.CustomAlertDialogTheme)
+                .setTitle(R.string.dialog_bulk_target_title)
+                .setView(content)
+                .setPositiveButton(R.string.dialog_bulk_target_apply, (d, which) ->
+                        updateAllDevicesStatus(
+                                folder,
+                                "TARGET",
+                                includeCellsCheckBox.isChecked(),
+                                includeSafeCheckBox.isChecked()
+                        ))
+                .setNegativeButton(R.string.dialog_cancel, null)
+                .create();
+
+        dialog.setOnShowListener(d -> {
+            DialogStyleUtils.tintButtons(dialog);
+        });
+        dialog.show();
+    }
+
+    private void updateAllDevicesStatus(String folder, String status,
+                                        boolean includeCellTowers,
+                                        boolean includeSafeDevices) {
 
         new Thread(() -> {
             int count = new MainDatabaseHelper(DeviceListActivity.this)
-                    .updateAllDeviceStatusForTable(folder, status);
+                    .updateAllDeviceStatusForTable(folder, status, includeCellTowers, includeSafeDevices);
 
             runOnUiThread(() -> {
                 Toast.makeText(
@@ -992,31 +1871,84 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     }
 
     private void setupFilterButtons() {
-        if (btnFilterTarget != null) {
-            btnFilterTarget.setOnClickListener(v -> {
-                currentStatusFilter = "TARGET";
+        if (deviceTypeFilterGroup != null) {
+            deviceTypeFilterGroup.check(typeFilterButtonId(currentTypeFilter));
+            deviceTypeFilterGroup.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+                if (!isChecked) return;
+                if (checkedId == R.id.btn_filter_type_all) {
+                    currentTypeFilter = "ALL";
+                } else if (checkedId == R.id.btn_filter_type_wifi) {
+                    currentTypeFilter = "WIFI";
+                } else if (checkedId == R.id.btn_filter_type_bluetooth) {
+                    currentTypeFilter = "BLUETOOTH";
+                } else if (checkedId == R.id.btn_filter_type_cell) {
+                    currentTypeFilter = "CELL";
+                }
+                saveFilters();
                 applyCurrentFilter();
                 updateFilterButtonsUI();
             });
         }
 
-        if (btnFilterSafe != null) {
-            btnFilterSafe.setOnClickListener(v -> {
-                currentStatusFilter = "SAFE";
-                applyCurrentFilter();
-                updateFilterButtonsUI();
-            });
-        }
-
-        if (btnFilterAll != null) {
-            btnFilterAll.setOnClickListener(v -> {
-                currentStatusFilter = "ALL";
+        if (statusFilterGroup != null) {
+            statusFilterGroup.check(statusFilterButtonId(currentStatusFilter));
+            statusFilterGroup.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+                if (!isChecked) return;
+                if (checkedId == R.id.btn_filter_target) {
+                    currentStatusFilter = "TARGET";
+                } else if (checkedId == R.id.btn_filter_safe) {
+                    currentStatusFilter = "SAFE";
+                } else if (checkedId == R.id.btn_filter_all) {
+                    currentStatusFilter = "ALL";
+                }
+                saveFilters();
                 applyCurrentFilter();
                 updateFilterButtonsUI();
             });
         }
 
         updateFilterButtonsUI();
+    }
+
+    private void loadSavedFilters() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_APP, MODE_PRIVATE);
+        currentTypeFilter = sanitizeTypeFilter(
+                prefs.getString(KEY_DEVICE_LIST_TYPE_FILTER, currentTypeFilter)
+        );
+        currentStatusFilter = sanitizeStatusFilter(
+                prefs.getString(KEY_DEVICE_LIST_STATUS_FILTER, currentStatusFilter)
+        );
+    }
+
+    private void saveFilters() {
+        getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                .edit()
+                .putString(KEY_DEVICE_LIST_TYPE_FILTER, currentTypeFilter)
+                .putString(KEY_DEVICE_LIST_STATUS_FILTER, currentStatusFilter)
+                .apply();
+    }
+
+    private String sanitizeTypeFilter(String value) {
+        if ("WIFI".equals(value) || "BLUETOOTH".equals(value) || "CELL".equals(value)) return value;
+        return "ALL";
+    }
+
+    private String sanitizeStatusFilter(String value) {
+        if ("TARGET".equals(value) || "SAFE".equals(value)) return value;
+        return "ALL";
+    }
+
+    private int typeFilterButtonId(String typeFilter) {
+        if ("WIFI".equals(typeFilter)) return R.id.btn_filter_type_wifi;
+        if ("BLUETOOTH".equals(typeFilter)) return R.id.btn_filter_type_bluetooth;
+        if ("CELL".equals(typeFilter)) return R.id.btn_filter_type_cell;
+        return R.id.btn_filter_type_all;
+    }
+
+    private int statusFilterButtonId(String statusFilter) {
+        if ("TARGET".equals(statusFilter)) return R.id.btn_filter_target;
+        if ("SAFE".equals(statusFilter)) return R.id.btn_filter_safe;
+        return R.id.btn_filter_all;
     }
 
     private void setupSearch() {
@@ -1031,37 +1963,123 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
 
             @Override
             public void afterTextChanged(Editable s) {
-                handler.removeCallbacksAndMessages(null);
+                if (searchDebounceRunnable != null) {
+                    handler.removeCallbacks(searchDebounceRunnable);
+                }
 
-                handler.postDelayed(() -> {
-                    currentSearchQuery = s.toString().trim();
+                String query = s == null ? "" : s.toString().trim();
+                searchDebounceRunnable = () -> {
+                    currentSearchQuery = query;
                     resetPagination();
                     if (currentTable != null && !currentTable.isEmpty()) {
                         loadDevicesForTable(currentTable, true);
                     }
-                }, 300);
+                };
+                handler.postDelayed(searchDebounceRunnable, 300);
             }
         });
     }
 
     private void applyCurrentFilter() {
+        if (isCellSystemFolder(currentTable)) {
+            adapter.updateData(new ArrayList<>(allLoadedDevices));
+            return;
+        }
+
         List<Device> filteredList = new ArrayList<>();
 
-        if ("ALL".equalsIgnoreCase(currentStatusFilter)) {
-            filteredList.addAll(allLoadedDevices);
-        } else {
-            for (Device device : allLoadedDevices) {
+        for (Device device : allLoadedDevices) {
+            if (!matchesCurrentTypeFilter(device)) {
+                continue;
+            }
+
+            if (!"ALL".equalsIgnoreCase(currentStatusFilter)) {
                 String status = device.getStatus() != null
                         ? device.getStatus().trim().toUpperCase(Locale.ROOT)
                         : "GREY";
-
-                if (status.equals(currentStatusFilter)) {
-                    filteredList.add(device);
+                if (!status.equals(currentStatusFilter)) {
+                    continue;
                 }
             }
+
+            filteredList.add(device);
         }
 
         adapter.updateData(filteredList);
+    }
+
+    private boolean matchesCurrentTypeFilter(Device device) {
+        if (device == null || device.getType() == null) return false;
+        if ("ALL".equals(currentTypeFilter)) {
+            return true;
+        }
+        String type = device.getType().trim();
+        if ("WIFI".equals(currentTypeFilter)) {
+            return "Wi-Fi".equalsIgnoreCase(type) || "WiFi".equalsIgnoreCase(type);
+        }
+        if ("BLUETOOTH".equals(currentTypeFilter)) {
+            return "Bluetooth".equalsIgnoreCase(type);
+        }
+        if ("CELL".equals(currentTypeFilter)) {
+            return isCellType(type);
+        }
+        return true;
+    }
+
+    private boolean isCellDevice(Device device) {
+        return device != null && isCellType(device.getType());
+    }
+
+    private boolean isCellType(String type) {
+        return "Cell".equalsIgnoreCase(type) || "Cellular".equalsIgnoreCase(type);
+    }
+
+    public void removeDeviceFromCurrentCellSystemFolder(Device device) {
+        if (!isCurrentCellSystemFolder() || device == null || TextUtils.isEmpty(device.getMac())) return;
+        String statusToRemove = statusForCellSystemFolder(currentTable);
+        String sourceFolder = device.getSourceFolder();
+
+        new Thread(() -> {
+            int affected = databaseHelper.removeDeviceFromPersistentStatus(device.getMac(), statusToRemove);
+            if (!TextUtils.isEmpty(sourceFolder)) {
+                int updated = databaseHelper.updateDeviceStatus(sourceFolder, device.getMac(), "GREY");
+                if (affected <= 0) affected = updated;
+            }
+            int finalAffected = affected;
+            runOnUiThread(() -> {
+                Toast.makeText(
+                        this,
+                        finalAffected > 0 ? R.string.toast_removed_from_list : R.string.error_status_update,
+                        Toast.LENGTH_SHORT
+                ).show();
+                resetPagination();
+                loadDevicesForTable(currentTable, true);
+            });
+        }).start();
+    }
+
+    public void addCellDeviceToBlacklist(Device device) {
+        if (device == null || !isCellDevice(device) || TextUtils.isEmpty(device.getMac())) return;
+        String sourceFolder = isCellSystemFolder(currentTable) && !TextUtils.isEmpty(device.getSourceFolder())
+                ? device.getSourceFolder()
+                : currentTable;
+        if (TextUtils.isEmpty(sourceFolder) || isCellSystemFolder(sourceFolder)) {
+            Toast.makeText(this, R.string.error_table_name_missing, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        new Thread(() -> {
+            int affected = databaseHelper.updateDeviceStatus(sourceFolder, device.getMac(), "BLACKLIST");
+            runOnUiThread(() -> {
+                Toast.makeText(
+                        this,
+                        affected > 0 ? R.string.toast_added_to_blacklist : R.string.error_status_update,
+                        Toast.LENGTH_SHORT
+                ).show();
+                resetPagination();
+                loadDevicesForTable(currentTable, true);
+            });
+        }).start();
     }
     private void setupRecyclerSwipe() {
         devicesRecyclerView.setOnTouchListener((v, event) -> {
@@ -1114,16 +2132,34 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
 
         TabLayout.Tab tab = tabLayout.getTabAt(newIndex);
         if (tab != null) {
-            tab.select();
+            selectingTabBySwipe = true;
+            try {
+                tab.select();
+            } finally {
+                selectingTabBySwipe = false;
+            }
         }
     }
 
     private void updateFilterButtonsUI() {
-        if (btnFilterTarget == null || btnFilterSafe == null || btnFilterAll == null) return;
+        styleToggleButton(btnTypeAll, "ALL".equals(currentTypeFilter), "#3A4A63");
+        styleToggleButton(btnTypeWifi, "WIFI".equals(currentTypeFilter), "#2D8CFF");
+        styleToggleButton(btnTypeBluetooth, "BLUETOOTH".equals(currentTypeFilter), "#6C63FF");
+        styleToggleButton(btnTypeCell, "CELL".equals(currentTypeFilter), "#FF9800");
+        styleToggleButton(btnFilterTarget, "TARGET".equals(currentStatusFilter), "#FF3B30");
+        styleToggleButton(btnFilterAll, "ALL".equals(currentStatusFilter), "#3A4A63");
+        styleToggleButton(btnFilterSafe, "SAFE".equals(currentStatusFilter), "#34C759");
+    }
 
-        btnFilterTarget.setAlpha("TARGET".equals(currentStatusFilter) ? 1.0f : 0.5f);
-        btnFilterSafe.setAlpha("SAFE".equals(currentStatusFilter) ? 1.0f : 0.5f);
-        btnFilterAll.setAlpha("ALL".equals(currentStatusFilter) ? 1.0f : 0.5f);
+    private void styleToggleButton(MaterialButton button, boolean selected, String selectedColor) {
+        if (button == null) return;
+        int color = selected ? Color.parseColor(selectedColor) : Color.TRANSPARENT;
+        int strokeColor = selected ? Color.parseColor(selectedColor) : Color.parseColor("#5D708E");
+        button.setAlpha(selected ? 1.0f : 0.72f);
+        button.setTextColor(Color.WHITE);
+        button.setBackgroundTintList(ColorStateList.valueOf(color));
+        button.setStrokeColor(ColorStateList.valueOf(strokeColor));
+        button.setStrokeWidth(dpToPx(1));
     }
 
     @Override
@@ -1142,6 +2178,12 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
     }
 
     // Вспомогательный класс Device (расширенный с добавлением полей из dev)
+    private static class Period {
+        boolean valid;
+        long start = -1L;
+        long end = -1L;
+    }
+
     public static class Device implements Parcelable {
         String name;
         String type;
@@ -1150,6 +2192,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
         String mac;
         String status;
         long timestamp;
+        String sourceFolder;
 
         public Device(String name, String type, String location, String time) {
             this.name = name;
@@ -1187,6 +2230,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             mac = in.readString();
             status = in.readString();
             timestamp = in.readLong();
+            sourceFolder = in.readString();
         }
 
         public static final Creator<Device> CREATOR = new Creator<Device>() {
@@ -1215,6 +2259,7 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
             dest.writeString(mac);
             dest.writeString(status);
             dest.writeLong(timestamp);
+            dest.writeString(sourceFolder);
         }
 
         public String getName() { return name; }
@@ -1224,8 +2269,10 @@ public class DeviceListActivity extends BaseLocalizedActivity implements DeviceL
         public String getMac() { return mac; }
         public String getStatus() { return status; }
         public long getTimestamp() { return timestamp; }
+        public String getSourceFolder() { return sourceFolder; }
 
         public void setStatus(String status) { this.status = status; }
         public void setMac(String mac) { this.mac = mac; }
+        public void setSourceFolder(String sourceFolder) { this.sourceFolder = sourceFolder; }
     }
 }

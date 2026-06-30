@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
 import android.content.pm.PackageManager;
 import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Color;
@@ -56,9 +57,12 @@ import com.example.santiway.bluetooth_scanner.BluetoothForegroundService;
 import com.example.santiway.cell_scanner.CellForegroundService;
 import com.example.santiway.esp32.Esp32Activity;
 import com.example.santiway.esp32.Esp32ConnectionService;
+import com.example.santiway.esp32.Esp32DatabaseHelper;
+import com.example.santiway.opencellid.OpenCellIdSyncScheduler;
 import com.example.santiway.upload_data.ApiConfig;
 import com.example.santiway.upload_data.DeviceUploadManager;
 import com.example.santiway.upload_data.DeviceUploadService;
+import com.example.santiway.upload_data.ServerUploadConfig;
 import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.example.santiway.upload_data.UniqueDevicesHelper;
 import com.example.santiway.upload_name_device.UserDeviceSyncManager;
@@ -115,12 +119,26 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
     private static final String PREFS_APP = "app_prefs";
     private static final String KEY_CURRENT_FOLDER = "current_folder";
     private static final String KEY_OWNER_DEVICE_SYNCED_ONCE = "owner_device_synced_once";
-    private GestureDetector folderGestureDetector;
+    private GestureDetector mainNavigationGestureDetector;
     private ImageButton snapshotButton;
     private boolean isSnapshotRunning = false;
     private String folderBeforeSnapshot = null;
     private final Handler snapshotHandler = new Handler();
+    private View snapshotTriggerContainer;
+    private ImageButton snapshotTriggerButton;
     private ImageButton targetDetectionButton;
+    private String activeSnapshotFolder = null;
+    private double activeSnapshotLat = 0.0;
+    private double activeSnapshotLon = 0.0;
+    private boolean activeSnapshotHasOrigin = false;
+
+    private static final String KEY_LAST_SNAPSHOT_TRIGGER_FOLDER = "last_snapshot_trigger_folder";
+    private static final String KEY_LAST_SNAPSHOT_TRIGGER_LAT = "last_snapshot_trigger_lat";
+    private static final String KEY_LAST_SNAPSHOT_TRIGGER_LON = "last_snapshot_trigger_lon";
+    private static final String KEY_LAST_SNAPSHOT_TRIGGER_HAS_ORIGIN = "last_snapshot_trigger_has_origin";
+    private static final String KEY_LAST_SNAPSHOT_TRIGGER_ARMED = "last_snapshot_trigger_armed";
+    private static final String KEY_LAST_SNAPSHOT_TRIGGER_APPLIED = "last_snapshot_trigger_applied";
+    private static final float SNAPSHOT_TRIGGER_DISTANCE_METERS = 500f;
 
     private Runnable timerRunnable = new Runnable() {
         @Override
@@ -230,11 +248,11 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
         cellularStatusTextView = findViewById(R.id.cellular_status);
         coordinatesTextView = findViewById(R.id.coordinates_text);
         timeLabelTextView = findViewById(R.id.time_label);
-        lastUploadDateTextView = findViewById(R.id.last_upload_date);
+        lastUploadDateTextView = null;
         toolbarFolderTitleTextView.setOnClickListener(v -> showFolderSelectionDialog());
 
         setSupportActionBar(toolbar);
-        setupFolderSwipe();
+        setupMainNavigationSwipe();
 
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(false);
@@ -242,6 +260,8 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
         }
 
         databaseHelper = new MainDatabaseHelper(this);
+        OpenCellIdSyncScheduler.scheduleDaily(this);
+        OpenCellIdSyncScheduler.enqueueIfDue(this);
 
         SharedPreferences appPrefs = getSharedPreferences(PREFS_APP, MODE_PRIVATE);
         currentScanFolder = appPrefs.getString(KEY_CURRENT_FOLDER, DEFAULT_FOLDER_INTERNAL);
@@ -286,23 +306,30 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
                 showInitialPermissionsExplanation();
             }
         });
+        if (snapshotTriggerButton != null) {
+            snapshotTriggerButton.setOnClickListener(v -> armOrApplySnapshotTrigger());
+        }
+        updateSnapshotTriggerButton();
 
         targetDetectionButton.setOnClickListener(v -> {
-            SharedPreferences prefs = getSharedPreferences("AppSettings", MODE_PRIVATE);
-            boolean enabled = prefs.getBoolean("target_detection_enabled", true);
-
-            prefs.edit()
-                    .putBoolean("target_detection_enabled", !enabled)
-                    .apply();
+            int currentMode = AlarmModeConfig.getMode(this);
+            int nextMode = currentMode == AlarmModeConfig.MODE_OFF
+                    ? AlarmModeConfig.MODE_ALL
+                    : AlarmModeConfig.MODE_OFF;
+            AlarmModeConfig.saveMode(this, nextMode);
+            if (nextMode == AlarmModeConfig.MODE_OFF) {
+                AlarmModeConfig.saveQuietModeEnabled(this, false);
+            }
 
             Toast.makeText(this,
-                    !enabled
-                            ? getString(R.string.toast_target_detection_enabled)
-                            : getString(R.string.toast_target_detection_disabled),
+                    nextMode == AlarmModeConfig.MODE_OFF
+                            ? getString(R.string.toast_alarm_mode_off)
+                            : getString(R.string.toast_alarm_mode_all),
                     Toast.LENGTH_SHORT).show();
 
             updateTargetDetectionButton();
         });
+        updateTargetDetectionButton();
 
         findViewById(R.id.footer_device).setOnClickListener(v -> openDeviceListActivity());
         findViewById(R.id.footer_create).setOnClickListener(v -> showCreateFolderDialog());
@@ -382,10 +409,14 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
     }
 
     private void applyNavigationBarColor() {
+        getWindow().setStatusBarColor(Color.parseColor("#071427"));
         getWindow().setNavigationBarColor(Color.parseColor("#172A46"));
-        new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView())
-                .setAppearanceLightNavigationBars(false);
+        WindowInsetsControllerCompat controller =
+                new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
+        controller.setAppearanceLightStatusBars(false);
+        controller.setAppearanceLightNavigationBars(false);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            getWindow().setStatusBarContrastEnforced(false);
             getWindow().setNavigationBarContrastEnforced(false);
         }
     }
@@ -399,6 +430,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
     @Override
     protected void onResume() {
         super.onResume();
+        updateTargetDetectionButton();
 
         String savedFolder = getSharedPreferences(PREFS_APP, MODE_PRIVATE)
                 .getString(KEY_CURRENT_FOLDER, DEFAULT_FOLDER_INTERNAL);
@@ -473,6 +505,12 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
         return "snapshot-" + sdf.format(new Date());
     }
 
+    private int snapshotDurationSeconds() {
+        int seconds = getSharedPreferences("AppSettings", MODE_PRIVATE)
+                .getInt("snapshot_duration_seconds", 60);
+        return seconds > 0 ? seconds : 60;
+    }
+
     private void startSnapshotScan() {
         if (isSnapshotRunning) {
             Toast.makeText(this, getString(R.string.toast_snapshot_already_running), Toast.LENGTH_SHORT).show();
@@ -510,9 +548,17 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
                     .start();
         }
 
-        Toast.makeText(this, getString(R.string.toast_snapshot_started), Toast.LENGTH_SHORT).show();
+        int snapshotDurationSeconds = snapshotDurationSeconds();
+        Toast.makeText(
+                this,
+                getString(R.string.toast_snapshot_started, snapshotDurationSeconds),
+                Toast.LENGTH_SHORT
+        ).show();
 
-        snapshotHandler.postDelayed(() -> finishSnapshotScan(wasScanning), 60_000);
+        snapshotHandler.postDelayed(
+                () -> finishSnapshotScan(wasScanning),
+                snapshotDurationSeconds * 1000L
+        );
     }
 
     private void animateSnapshotButton() {
@@ -554,11 +600,154 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
         Toast.makeText(this, getString(R.string.toast_snapshot_finished), Toast.LENGTH_SHORT).show();
     }
 
-    private void updateTargetDetectionButton() {
-        boolean enabled = getSharedPreferences("AppSettings", MODE_PRIVATE)
-                .getBoolean("target_detection_enabled", true);
+    private void saveSnapshotTriggerOrigin(String snapshotFolder) {
+        Location origin = getCurrentSnapshotOrigin();
+        SharedPreferences.Editor editor = getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                .edit()
+                .putString(KEY_LAST_SNAPSHOT_TRIGGER_FOLDER, snapshotFolder)
+                .putBoolean(KEY_LAST_SNAPSHOT_TRIGGER_ARMED, false)
+                .putBoolean(KEY_LAST_SNAPSHOT_TRIGGER_APPLIED, false);
 
-        targetDetectionButton.setAlpha(enabled ? 1.0f : 0.45f);
+        activeSnapshotFolder = snapshotFolder;
+        if (origin != null) {
+            activeSnapshotLat = origin.getLatitude();
+            activeSnapshotLon = origin.getLongitude();
+            activeSnapshotHasOrigin = true;
+            editor.putFloat(KEY_LAST_SNAPSHOT_TRIGGER_LAT, (float) activeSnapshotLat)
+                    .putFloat(KEY_LAST_SNAPSHOT_TRIGGER_LON, (float) activeSnapshotLon)
+                    .putBoolean(KEY_LAST_SNAPSHOT_TRIGGER_HAS_ORIGIN, true);
+        } else {
+            activeSnapshotLat = 0.0;
+            activeSnapshotLon = 0.0;
+            activeSnapshotHasOrigin = false;
+            editor.putBoolean(KEY_LAST_SNAPSHOT_TRIGGER_HAS_ORIGIN, false);
+        }
+        editor.apply();
+        updateSnapshotTriggerButton();
+    }
+
+    private Location getCurrentSnapshotOrigin() {
+        if (locationManager != null && locationManager.hasValidLocation()) {
+            Location currentLocation = locationManager.getCurrentLocation();
+            if (currentLocation != null) return currentLocation;
+        }
+
+        SharedPreferences prefs = getSharedPreferences("AppSettings", MODE_PRIVATE);
+        if (prefs.getBoolean("static_location_enabled", false)) {
+            float lat = prefs.getFloat("static_latitude", 0f);
+            float lon = prefs.getFloat("static_longitude", 0f);
+            if (lat != 0f || lon != 0f) {
+                Location staticLocation = new Location("static");
+                staticLocation.setLatitude(lat);
+                staticLocation.setLongitude(lon);
+                return staticLocation;
+            }
+        }
+        return null;
+    }
+
+    private void markSnapshotTriggerReady() {
+        getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_LAST_SNAPSHOT_TRIGGER_APPLIED, false)
+                .apply();
+    }
+
+    private void updateSnapshotTriggerButton() {
+        if (snapshotTriggerContainer == null || snapshotTriggerButton == null) return;
+        SharedPreferences prefs = getSharedPreferences(PREFS_APP, MODE_PRIVATE);
+        String folder = prefs.getString(KEY_LAST_SNAPSHOT_TRIGGER_FOLDER, "");
+        boolean applied = prefs.getBoolean(KEY_LAST_SNAPSHOT_TRIGGER_APPLIED, false);
+        boolean visible = !isSnapshotRunning && folder != null && !folder.trim().isEmpty() && !applied;
+        snapshotTriggerContainer.setVisibility(visible ? View.VISIBLE : View.GONE);
+
+        boolean armed = prefs.getBoolean(KEY_LAST_SNAPSHOT_TRIGGER_ARMED, false);
+        int color = armed ? Color.parseColor("#F5C542") : Color.parseColor("#FF3B30");
+        snapshotTriggerButton.setImageTintList(ColorStateList.valueOf(color));
+        snapshotTriggerButton.setColorFilter(color);
+        snapshotTriggerButton.setAlpha(visible ? 1.0f : 0.38f);
+    }
+
+    private void armOrApplySnapshotTrigger() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_APP, MODE_PRIVATE);
+        String folder = prefs.getString(KEY_LAST_SNAPSHOT_TRIGGER_FOLDER, "");
+        if (folder == null || folder.trim().isEmpty()) {
+            Toast.makeText(this, R.string.toast_snapshot_trigger_no_snapshot, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (!prefs.getBoolean(KEY_LAST_SNAPSHOT_TRIGGER_HAS_ORIGIN, false)) {
+            Toast.makeText(this, R.string.toast_snapshot_trigger_no_origin, Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        Location current = getCurrentSnapshotOrigin();
+        if (current == null) {
+            prefs.edit().putBoolean(KEY_LAST_SNAPSHOT_TRIGGER_ARMED, true).apply();
+            updateSnapshotTriggerButton();
+            Toast.makeText(this, R.string.toast_snapshot_trigger_wait_location, Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        float distance = distanceFromSnapshot(current, prefs);
+        if (distance >= SNAPSHOT_TRIGGER_DISTANCE_METERS) {
+            applySnapshotTrigger(folder);
+        } else {
+            prefs.edit().putBoolean(KEY_LAST_SNAPSHOT_TRIGGER_ARMED, true).apply();
+            updateSnapshotTriggerButton();
+            Toast.makeText(this,
+                    getString(R.string.toast_snapshot_trigger_armed, distance),
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private float distanceFromSnapshot(Location current, SharedPreferences prefs) {
+        float originLat = prefs.getFloat(KEY_LAST_SNAPSHOT_TRIGGER_LAT, 0f);
+        float originLon = prefs.getFloat(KEY_LAST_SNAPSHOT_TRIGGER_LON, 0f);
+        float[] result = new float[1];
+        Location.distanceBetween(originLat, originLon,
+                current.getLatitude(), current.getLongitude(), result);
+        return result[0];
+    }
+
+    private void checkArmedSnapshotTrigger(Location current) {
+        if (current == null) return;
+        SharedPreferences prefs = getSharedPreferences(PREFS_APP, MODE_PRIVATE);
+        if (!prefs.getBoolean(KEY_LAST_SNAPSHOT_TRIGGER_ARMED, false)) return;
+        if (!prefs.getBoolean(KEY_LAST_SNAPSHOT_TRIGGER_HAS_ORIGIN, false)) return;
+
+        String folder = prefs.getString(KEY_LAST_SNAPSHOT_TRIGGER_FOLDER, "");
+        if (folder == null || folder.trim().isEmpty()) return;
+
+        if (distanceFromSnapshot(current, prefs) >= SNAPSHOT_TRIGGER_DISTANCE_METERS) {
+            applySnapshotTrigger(folder);
+        }
+    }
+
+    private void applySnapshotTrigger(String folder) {
+        new Thread(() -> {
+            int count = databaseHelper.updateAllDeviceStatusForTable(folder, "TARGET");
+            getSharedPreferences(PREFS_APP, MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(KEY_LAST_SNAPSHOT_TRIGGER_ARMED, false)
+                    .putBoolean(KEY_LAST_SNAPSHOT_TRIGGER_APPLIED, true)
+                    .apply();
+            runOnUiThread(() -> {
+                updateSnapshotTriggerButton();
+                Toast.makeText(this,
+                        getString(R.string.toast_folder_trigger_applied, getDisplayFolderName(folder), count),
+                        Toast.LENGTH_LONG).show();
+            });
+        }).start();
+    }
+
+    private void updateTargetDetectionButton() {
+        int alarmMode = AlarmModeConfig.getMode(this);
+        boolean enabled = alarmMode != AlarmModeConfig.MODE_OFF;
+        int color = AlarmModeConfig.bellColorForMode(alarmMode);
+        targetDetectionButton.setSelected(enabled);
+        targetDetectionButton.setAlpha(enabled ? 1.0f : 0.38f);
+        targetDetectionButton.setImageTintList(ColorStateList.valueOf(color));
+        targetDetectionButton.setColorFilter(color);
     }
 
     private void initializeLocationManager() {
@@ -593,6 +782,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
                     location.getLongitude()
             );
             coordinatesTextView.setText(coords);
+            checkArmedSnapshotTrigger(location);
         } else {
             coordinatesTextView.setText(getString(R.string.coordinates_unavailable));
         }
@@ -602,8 +792,33 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
         if (isScanning) {
             stopScanning();
         } else {
-            startScanning();
+            startScanningFromUserAction();
         }
+    }
+
+    private void startScanningFromUserAction() {
+        if (!AlarmModeConfig.isQuietModeEnabled(this)) {
+            startScanning();
+            return;
+        }
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.alarm_quiet_mode_dialog_title)
+                .setMessage(R.string.alarm_quiet_mode_dialog_message)
+                .setPositiveButton(R.string.alarm_quiet_mode_include_cells,
+                        (d, which) -> {
+                            AlarmModeConfig.saveQuietModeIncludeCellTowers(this, true);
+                            startScanning();
+                        })
+                .setNegativeButton(R.string.alarm_quiet_mode_exclude_cells,
+                        (d, which) -> {
+                            AlarmModeConfig.saveQuietModeIncludeCellTowers(this, false);
+                            startScanning();
+                        })
+                .setNeutralButton(R.string.dialog_cancel, null)
+                .create();
+        dialog.setOnShowListener(ignored -> DialogStyleUtils.tintButtons(dialog));
+        dialog.show();
     }
 
     private void startScanning() {
@@ -724,7 +939,10 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
     protected void onDestroy() {
         super.onDestroy();
         if (locationManager != null) {
-            locationManager.cleanup();
+            locationManager.clearOnLocationUpdateListener();
+            if (!isScanning) {
+                locationManager.cleanup();
+            }
         }
         //stopScanning();
         if (folderSwitchedReceiver != null) {
@@ -758,12 +976,14 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
     }
 
     private void showMissingPermissionsWarning() {
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(getString(R.string.dialog_permissions_missing_title))
                 .setMessage(getString(R.string.dialog_permissions_missing_message))
-                .setPositiveButton(getString(R.string.dialog_request_again), (dialog, which) -> requestNecessaryPermissions())
+                .setPositiveButton(getString(R.string.dialog_request_again), (d, which) -> requestNecessaryPermissions())
                 .setNegativeButton(getString(R.string.dialog_cancel), null)
-                .show();
+                .create();
+        dialog.setOnShowListener(ignored -> DialogStyleUtils.tintButtons(dialog));
+        dialog.show();
     }
 
     private void showMissingFunctionalityWarning() {
@@ -785,12 +1005,14 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
 
         warningMessage.append(getString(R.string.limited_functionality_outro));
 
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(getString(R.string.dialog_limited_functionality_title))
                 .setMessage(warningMessage.toString())
-                .setPositiveButton(getString(R.string.dialog_open_settings), (dialog, which) -> openSettings())
+                .setPositiveButton(getString(R.string.dialog_open_settings), (d, which) -> openSettings())
                 .setNegativeButton(getString(R.string.dialog_continue), null)
-                .show();
+                .create();
+        dialog.setOnShowListener(ignored -> DialogStyleUtils.tintButtons(dialog));
+        dialog.show();
     }
 
     private void checkNetworkAvailability() {
@@ -850,15 +1072,17 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
     }
 
     private void showInitialPermissionsExplanation() {
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(getString(R.string.dialog_required_permissions_title))
                 .setMessage(getString(R.string.dialog_required_permissions_message))
-                .setPositiveButton(getString(R.string.dialog_request), (dialog, which) -> requestEssentialPermissions())
-                .setNegativeButton(getString(R.string.dialog_later), (dialog, which) -> {
+                .setPositiveButton(getString(R.string.dialog_request), (d, which) -> requestEssentialPermissions())
+                .setNegativeButton(getString(R.string.dialog_later), (d, which) -> {
                     showMissingPermissionsWarning();
                 })
                 .setCancelable(false)
-                .show();
+                .create();
+        dialog.setOnShowListener(ignored -> DialogStyleUtils.tintButtons(dialog));
+        dialog.show();
     }
 
     private void requestNecessaryPermissions() {
@@ -878,8 +1102,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
             permissionsToRequest.add(android.Manifest.permission.POST_NOTIFICATIONS);
         }
 
-        // READ_PHONE_STATE запрашивайте отдельно, только если действительно нужно
-        // permissionsToRequest.add(android.Manifest.permission.READ_PHONE_STATE);
+        permissionsToRequest.add(android.Manifest.permission.READ_PHONE_STATE);
 
         if (!permissionsToRequest.isEmpty()) {
             requestPermissionLauncher.launch(permissionsToRequest.toArray(new String[0]));
@@ -916,6 +1139,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
     private void requestEssentialPermissions() {
         List<String> permissions = new ArrayList<>();
         permissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        permissions.add(Manifest.permission.READ_PHONE_STATE);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             permissions.add(Manifest.permission.BLUETOOTH_SCAN);
@@ -935,7 +1159,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
                 // Запрашиваем при первом запуске или когда пользователь начинает сканирование
                 SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
                 if (!prefs.getBoolean("notifications_asked", false)) {
-                    new AlertDialog.Builder(this)
+                    AlertDialog dialog = new AlertDialog.Builder(this)
                             .setTitle(getString(R.string.dialog_notifications_title))
                             .setMessage(getString(R.string.dialog_notifications_permission_message))
                             .setPositiveButton(getString(R.string.dialog_allow), (d, w) -> {
@@ -945,7 +1169,9 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
                                 prefs.edit().putBoolean("notifications_asked", true).apply();
                             })
                             .setNegativeButton(getString(R.string.dialog_later), null)
-                            .show();
+                            .create();
+                    dialog.setOnShowListener(ignored -> DialogStyleUtils.tintButtons(dialog));
+                    dialog.show();
                 }
             }
         }
@@ -1095,6 +1321,10 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
     }
 
     private void startUploadService() {
+        if (!ServerUploadConfig.isEnabled(this)) {
+            Log.d(TAG, "Server upload disabled - upload service not started");
+            return;
+        }
         Intent serviceIntent = new Intent(this, DeviceUploadService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent);
@@ -1146,15 +1376,25 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
         uploadUpdateReceiver = null;
     }
 
-    //Очистка данных старее 7 дней
+    // Очистка данных старше выбранного срока хранения.
     private void cleanupOldDataOnStart() {
         new Thread(() -> {
             try {
-                MainDatabaseHelper helper = new MainDatabaseHelper(this);
-                long maxAge = 7 * 24 * 60 * 60 * 1000L; // 7 дней в миллисекундах
-                helper.deleteOldRecordsFromAllTables(maxAge);
+                int retentionDays = getSharedPreferences("AppSettings", MODE_PRIVATE)
+                        .getInt("data_retention_days", 7);
+                if (retentionDays <= 0) retentionDays = 7;
+                long retentionMaxAge = retentionDays * 24L * 60L * 60L * 1000L;
 
-                Log.d(TAG, "✅ Old data cleaned up on app start");
+                try (MainDatabaseHelper helper = new MainDatabaseHelper(this)) {
+                    helper.deleteOldRecordsFromAllTables(retentionMaxAge);
+                }
+                try (Esp32DatabaseHelper esp32Helper = new Esp32DatabaseHelper(this)) {
+                    esp32Helper.deleteOldRuntimeData(retentionMaxAge);
+                }
+                try (NotificationDatabaseHelper notificationHelper = new NotificationDatabaseHelper(this)) {
+                    notificationHelper.deleteOldNotifications(retentionMaxAge);
+                }
+                Log.d(TAG, "Old data cleaned up on app start. Retention days: " + retentionDays);
             } catch (Exception e) {
                 Log.e(TAG, "Error cleaning old data: " + e.getMessage());
             }
@@ -1262,10 +1502,10 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
     }
 
     //Методы для свайпа папок
-    private void setupFolderSwipe() {
+    private void setupMainNavigationSwipe() {
         View swipeArea = findViewById(R.id.main_swipe_area);
 
-        folderGestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+        mainNavigationGestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
             private static final int SWIPE_THRESHOLD = 120;
             private static final int SWIPE_VELOCITY_THRESHOLD = 120;
 
@@ -1286,9 +1526,9 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
                         && Math.abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
 
                     if (diffX > 0) {
-                        switchFolderBySwipe(-1); // вправо
+                        viewAppConfig();
                     } else {
-                        switchFolderBySwipe(1);  // влево
+                        openDeviceListActivity();
                     }
 
                     return true;
@@ -1298,30 +1538,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
             }
         });
 
-        swipeArea.setOnTouchListener((v, event) -> folderGestureDetector.onTouchEvent(event));
-    }
-
-    private void switchFolderBySwipe(int direction) {
-        if (isSnapshotRunning) {
-            Toast.makeText(this, getString(R.string.toast_snapshot_blocks_scan), Toast.LENGTH_SHORT).show();
-            return;
-        }
-        List<String> folders = getAllFolders();
-        if (folders == null || folders.isEmpty()) return;
-
-        int currentIndex = folders.indexOf(currentScanFolder);
-        if (currentIndex == -1) currentIndex = 0;
-
-        int newIndex = currentIndex + direction;
-
-        if (newIndex < 0) {
-            newIndex = folders.size() - 1;
-        } else if (newIndex >= folders.size()) {
-            newIndex = 0;
-        }
-
-        String selectedFolder = folders.get(newIndex);
-        switchToFolder(selectedFolder);
+        swipeArea.setOnTouchListener((v, event) -> mainNavigationGestureDetector.onTouchEvent(event));
     }
 
     private void switchToFolder(String selectedFolder) {

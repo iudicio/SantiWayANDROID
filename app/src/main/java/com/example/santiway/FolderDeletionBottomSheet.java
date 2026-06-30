@@ -95,14 +95,16 @@ public class FolderDeletionBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void showConfirmDeleteDialog(String folderName) {
-        new AlertDialog.Builder(requireContext(), R.style.MyAlertDialogStyle)
+        AlertDialog dialog = new AlertDialog.Builder(requireContext(), R.style.MyAlertDialogStyle)
                 .setTitle(getString(R.string.dialog_confirm_delete_title))
                 .setMessage(getString(R.string.dialog_confirm_delete_folder_message, folderName))
-                .setPositiveButton(getString(R.string.dialog_delete), (dialog, which) -> {
+                .setPositiveButton(getString(R.string.dialog_delete), (d, which) -> {
                     listener.onDeleteRequested(folderName);
                     dismiss();
                 })
                 .setNegativeButton(getString(R.string.dialog_cancel), null)
-                .show();
+                .create();
+        dialog.setOnShowListener(ignored -> DialogStyleUtils.tintButtons(dialog));
+        dialog.show();
     }
 }

@@ -1,8 +1,17 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <style name="Base.Theme.SantiWay" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#172A46</item>
+        <item name="colorPrimaryDark">#071427</item>
+        <item name="colorAccent">#3DDC84</item>
+        <item name="android:statusBarColor">#071427</item>
         <item name="android:navigationBarColor">#172A46</item>
+        <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:enforceStatusBarContrast">false</item>
         <item name="android:enforceNavigationBarContrast">false</item>
+        <item name="alertDialogTheme">@style/CustomAlertDialogTheme</item>
+        <item name="android:alertDialogTheme">@style/CustomAlertDialogTheme</item>
+        <item name="homeAsUpIndicator">@drawable/ic_arrow_back</item>
     </style>
 
     <style name="Theme.SantiWay" parent="Base.Theme.SantiWay" />
@@ -48,12 +57,17 @@
 
         <item name="colorPrimary">#3DDC84</item>
 
-        <item name="colorOnSurface">#757575</item> <item name="buttonBarPositiveButtonStyle">@style/MyDialogButton</item>
+        <item name="colorOnSurface">@android:color/white</item> <item name="buttonBarPositiveButtonStyle">@style/MyDialogButton</item>
         <item name="buttonBarNegativeButtonStyle">@style/MyDialogButton</item>
     </style>
 
     <style name="MyDialogButton" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
-        <item name="android:textColor">#3DDC84</item> </style>
+        <item name="android:textColor">@android:color/white</item>
+    </style>
+
+    <style name="SantiWayDialogButton" parent="Widget.AppCompat.Button.ButtonBar.AlertDialog">
+        <item name="android:textColor">@android:color/white</item>
+    </style>
 
     <style name="NavigationViewTextStyle" parent="TextAppearance.AppCompat.Body1">
         <item name="android:textSize">16sp</item>
@@ -65,5 +79,10 @@
         <item name="android:textColor">#FFFFFF</item>
         <item name="android:colorBackground">#0B1A2C</item>
         <item name="android:colorAccent">#3DDC84</item>
+        <item name="buttonBarButtonStyle">@style/SantiWayDialogButton</item>
+        <item name="buttonBarPositiveButtonStyle">@style/SantiWayDialogButton</item>
+        <item name="buttonBarNegativeButtonStyle">@style/SantiWayDialogButton</item>
+        <item name="buttonBarNeutralButtonStyle">@style/SantiWayDialogButton</item>
+        <item name="android:buttonBarButtonStyle">@style/SantiWayDialogButton</item>
     </style>
 </resources>

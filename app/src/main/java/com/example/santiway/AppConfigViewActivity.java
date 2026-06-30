@@ -1,6 +1,11 @@
 package com.example.santiway;
 
 import com.example.santiway.host_database.*;
+import com.example.santiway.esp32.Esp32DatabaseHelper;
+import com.example.santiway.activity_map.MapLayerManager;
+import com.example.santiway.upload_data.MainDatabaseHelper;
+import com.example.santiway.upload_data.DeviceUploadService;
+import com.example.santiway.upload_data.ServerUploadConfig;
 import com.example.santiway.upload_name_device.UserDeviceSyncManager;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
@@ -22,6 +27,8 @@ import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.activity.OnBackPressedCallback;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.Toolbar;
 
 import androidx.activity.ComponentActivity;
@@ -37,18 +44,33 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
     private Spinner protocolSpinner;
     private Spinner scannerSpinner;
     private Spinner languageSpinner;
+    private Spinner mapLayerSpinner;
     private EditText intervalInput;
     private Switch enabledSwitch;
     private EditText signalStrengthInput;
     private TextView serverIpInput;
     private TextView apiKeyDisplay;
+    private Switch serverUploadSwitch;
     private EditText deviceNameInput;
     private EditText mapPointLimitInput;
-    private Switch targetDetectionSwitch;
+    private EditText snapshotDurationSecondsInput;
+    private EditText dataRetentionDaysInput;
+    private EditText mapMarkerSizeInput;
+    private EditText yandexTilesApiKeyInput;
+    private Switch alarmOffSwitch;
+    private Switch alarmTargetsSwitch;
+    private Switch alarmCellsSwitch;
+    private Switch alarmMarkedTargetsSwitch;
+    private Switch alarmAllSwitch;
+    private Switch alarmQuietModeSwitch;
     private Switch staticLocationSwitch;
     private EditText staticLatitudeInput;
     private EditText staticLongitudeInput;
     private Button selectStaticLocationBtn;
+    private int selectedAlarmMode = AlarmModeConfig.MODE_OFF;
+    private boolean selectedQuietMode;
+    private boolean updatingAlarmSwitches;
+    private boolean suppressExitPrompt;
 
     // Допустимые значения для протокола
     private final String[] allowedProtocols = {"GSM", "GPS"};
@@ -68,14 +90,21 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
         scannerSpinner = findViewById(R.id.scanner_spinner);
         protocolSpinner = findViewById(R.id.protocol_spinner);
         languageSpinner = findViewById(R.id.language_spinner);
+        mapLayerSpinner = findViewById(R.id.map_layer_spinner);
         intervalInput = findViewById(R.id.interval_input);
         enabledSwitch = findViewById(R.id.enabled_switch);
         signalStrengthInput = findViewById(R.id.signal_strength_input);
         serverIpInput = findViewById(R.id.server_ip_input);
         apiKeyDisplay = findViewById(R.id.api_key_display);
+        serverUploadSwitch = findViewById(R.id.server_upload_switch);
         deviceNameInput = findViewById(R.id.device_scanner);
 
-        targetDetectionSwitch = findViewById(R.id.target_detection_switch);
+        alarmOffSwitch = findViewById(R.id.alarm_mode_off_switch);
+        alarmTargetsSwitch = findViewById(R.id.alarm_mode_targets_switch);
+        alarmCellsSwitch = findViewById(R.id.alarm_mode_cells_switch);
+        alarmMarkedTargetsSwitch = findViewById(R.id.alarm_mode_marked_targets_switch);
+        alarmAllSwitch = findViewById(R.id.alarm_mode_all_switch);
+        alarmQuietModeSwitch = findViewById(R.id.alarm_quiet_mode_switch);
         staticLocationSwitch = findViewById(R.id.static_location_switch);
         staticLatitudeInput = findViewById(R.id.static_latitude_input);
         staticLongitudeInput = findViewById(R.id.static_longitude_input);
@@ -83,6 +112,7 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
 
         SharedPreferences prefs = getSharedPreferences("AppSettings", MODE_PRIVATE);
 
+        serverUploadSwitch.setChecked(ServerUploadConfig.isEnabled(this));
         staticLocationSwitch.setChecked(prefs.getBoolean("static_location_enabled", false));
         staticLatitudeInput.setText(String.valueOf(prefs.getFloat("static_latitude", 0f)));
         staticLongitudeInput.setText(String.valueOf(prefs.getFloat("static_longitude", 0f)));
@@ -91,13 +121,17 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
             Intent intent = new Intent(this, StaticLocationMapActivity.class);
             startActivity(intent);
         });
+        findViewById(R.id.open_manual_btn).setOnClickListener(v ->
+                startActivity(new Intent(this, AppManualActivity.class)));
+        findViewById(R.id.open_opencellid_status_btn).setOnClickListener(v ->
+                startActivity(new Intent(this, OpenCellIdStatusActivity.class)));
 
-        boolean targetDetectionEnabled = getSharedPreferences("AppSettings", MODE_PRIVATE)
-                .getBoolean("target_detection_enabled", true);
-
-        targetDetectionSwitch.setChecked(targetDetectionEnabled);
+        selectedAlarmMode = AlarmModeConfig.getMode(this);
+        selectedQuietMode = AlarmModeConfig.isQuietModeEnabled(this);
+        setupAlarmModeSwitches();
 
         setupSpinners();
+        setupMapLayerSpinner();
         setupAppSettingsUI();
         setupScannerSettingsUI();
 
@@ -110,13 +144,19 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
 
         styleAllTextInputs(root);
 
-        toolbar.setNavigationIcon(androidx.appcompat.R.drawable.abc_ic_ab_back_material);
+        toolbar.setNavigationIcon(R.drawable.ic_arrow_back);
 
         if (toolbar.getNavigationIcon() != null) {
             toolbar.getNavigationIcon().setTint(Color.WHITE);
         }
 
-        toolbar.setNavigationOnClickListener(v -> finish());
+        toolbar.setNavigationOnClickListener(v -> confirmExitOrFinish());
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                confirmExitOrFinish();
+            }
+        });
 
         ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -150,11 +190,23 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
         });
 
         mapPointLimitInput = findViewById(R.id.map_point_limit_input);
+        snapshotDurationSecondsInput = findViewById(R.id.snapshot_duration_seconds_input);
+        dataRetentionDaysInput = findViewById(R.id.data_retention_days_input);
+        mapMarkerSizeInput = findViewById(R.id.map_marker_size_input);
+        yandexTilesApiKeyInput = findViewById(R.id.yandex_tiles_api_key_input);
 
         int pointLimit = getSharedPreferences("AppSettings", MODE_PRIVATE)
                 .getInt("map_point_limit", 100);
+        int snapshotDurationSeconds = getSharedPreferences("AppSettings", MODE_PRIVATE)
+                .getInt("snapshot_duration_seconds", 60);
+        int retentionDays = getSharedPreferences("AppSettings", MODE_PRIVATE)
+                .getInt("data_retention_days", 7);
 
         mapPointLimitInput.setText(String.valueOf(pointLimit));
+        snapshotDurationSecondsInput.setText(String.valueOf(snapshotDurationSeconds <= 0 ? 60 : snapshotDurationSeconds));
+        dataRetentionDaysInput.setText(String.valueOf(retentionDays <= 0 ? 7 : retentionDays));
+        mapMarkerSizeInput.setText(String.valueOf(MapLayerManager.markerSizeDp(this)));
+        yandexTilesApiKeyInput.setText(MapLayerManager.yandexApiKey(this));
     }
 
     @Override
@@ -194,6 +246,92 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
 
     private int dpToPx(int dp) {
         return Math.round(dp * getResources().getDisplayMetrics().density);
+    }
+
+    private void setupAlarmModeSwitches() {
+        bindAlarmOffSwitch();
+        bindAlarmChannelSwitch(alarmTargetsSwitch, AlarmModeConfig.CHANNEL_TRACKING_DEVICES);
+        bindAlarmChannelSwitch(alarmCellsSwitch, AlarmModeConfig.CHANNEL_CELL_TOWERS);
+        bindAlarmChannelSwitch(alarmMarkedTargetsSwitch, AlarmModeConfig.CHANNEL_MARKED_TARGETS);
+        bindAlarmAllSwitch();
+        bindQuietModeSwitch();
+        applyAlarmModeToSwitches();
+    }
+
+    private void bindAlarmOffSwitch() {
+        if (alarmOffSwitch == null) return;
+        alarmOffSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (updatingAlarmSwitches) return;
+            if (isChecked) {
+                selectedAlarmMode = AlarmModeConfig.MODE_OFF;
+                selectedQuietMode = false;
+            }
+            applyAlarmModeToSwitches();
+        });
+    }
+
+    private void bindAlarmChannelSwitch(Switch alarmSwitch, int channel) {
+        if (alarmSwitch == null) return;
+        alarmSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (updatingAlarmSwitches) return;
+            if (isChecked) {
+                selectedAlarmMode |= channel;
+            } else {
+                selectedAlarmMode &= ~channel;
+            }
+            selectedAlarmMode = AlarmModeConfig.sanitizeMask(selectedAlarmMode);
+            applyAlarmModeToSwitches();
+        });
+    }
+
+    private void bindAlarmAllSwitch() {
+        if (alarmAllSwitch == null) return;
+        alarmAllSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (updatingAlarmSwitches) return;
+            selectedAlarmMode = isChecked ? AlarmModeConfig.MODE_ALL : AlarmModeConfig.MODE_OFF;
+            if (!isChecked) selectedQuietMode = false;
+            applyAlarmModeToSwitches();
+        });
+    }
+
+    private void bindQuietModeSwitch() {
+        if (alarmQuietModeSwitch == null) return;
+        alarmQuietModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (updatingAlarmSwitches) return;
+            selectedQuietMode = isChecked;
+            if (isChecked) {
+                selectedAlarmMode |= AlarmModeConfig.CHANNEL_MARKED_TARGETS;
+            }
+            selectedAlarmMode = AlarmModeConfig.sanitizeMask(selectedAlarmMode);
+            applyAlarmModeToSwitches();
+        });
+    }
+
+    private void applyAlarmModeToSwitches() {
+        updatingAlarmSwitches = true;
+        if (selectedQuietMode) {
+            selectedAlarmMode |= AlarmModeConfig.CHANNEL_MARKED_TARGETS;
+        }
+        selectedAlarmMode = AlarmModeConfig.sanitizeMask(selectedAlarmMode);
+        if (alarmOffSwitch != null) {
+            alarmOffSwitch.setChecked(selectedAlarmMode == AlarmModeConfig.MODE_OFF);
+        }
+        if (alarmTargetsSwitch != null) {
+            alarmTargetsSwitch.setChecked((selectedAlarmMode & AlarmModeConfig.CHANNEL_TRACKING_DEVICES) != 0);
+        }
+        if (alarmCellsSwitch != null) {
+            alarmCellsSwitch.setChecked((selectedAlarmMode & AlarmModeConfig.CHANNEL_CELL_TOWERS) != 0);
+        }
+        if (alarmMarkedTargetsSwitch != null) {
+            alarmMarkedTargetsSwitch.setChecked((selectedAlarmMode & AlarmModeConfig.CHANNEL_MARKED_TARGETS) != 0);
+        }
+        if (alarmAllSwitch != null) {
+            alarmAllSwitch.setChecked(selectedAlarmMode == AlarmModeConfig.MODE_ALL);
+        }
+        if (alarmQuietModeSwitch != null) {
+            alarmQuietModeSwitch.setChecked(selectedQuietMode);
+        }
+        updatingAlarmSwitches = false;
     }
 
     private void setupSpinners() {
@@ -266,6 +404,57 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
         });
     }
 
+    private void setupMapLayerSpinner() {
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(
+                this,
+                android.R.layout.simple_spinner_item,
+                MapLayerManager.layerLabels(this)
+        ) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                TextView text = view.findViewById(android.R.id.text1);
+                if (text != null) {
+                    text.setTextColor(Color.WHITE);
+                    text.setTextSize(16);
+                }
+                return view;
+            }
+
+            @Override
+            public View getDropDownView(int position, View convertView, ViewGroup parent) {
+                View view = super.getDropDownView(position, convertView, parent);
+                TextView text = view.findViewById(android.R.id.text1);
+                if (text != null) {
+                    text.setTextColor(Color.WHITE);
+                    text.setBackgroundColor(Color.parseColor("#0B1A2C"));
+                }
+                return view;
+            }
+        };
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        mapLayerSpinner.setAdapter(adapter);
+        mapLayerSpinner.setSelection(MapLayerManager.savedLayerIndex(this));
+        mapLayerSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            private boolean firstCall = true;
+
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (firstCall) {
+                    firstCall = false;
+                    return;
+                }
+
+                MapLayerManager.saveLayerIndex(AppConfigViewActivity.this, position);
+                Toast.makeText(AppConfigViewActivity.this, "Слой карты сохранён", Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+    }
+
     private void setupAppSettingsUI() {
         Button saveGeneralBtn = findViewById(R.id.save_general_btn);
 
@@ -289,77 +478,122 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
         String currentDeviceName = repository.getDeviceName();
         deviceNameInput.setText(currentDeviceName);
 
-        saveGeneralBtn.setOnClickListener(v -> {
-            // ПРОВЕРКА: Выбран ли допустимый протокол
-            String selectedProtocol = (String) protocolSpinner.getSelectedItem();
-            if (!isAllowedProtocol(selectedProtocol)) {
-                showToast(getString(R.string.error_select_gsm_or_gps));
-                return;
+        saveGeneralBtn.setOnClickListener(v -> saveGeneralSettingsFromUi(true));
+    }
+
+    private boolean saveGeneralSettingsFromUi(boolean showSuccessToast) {
+        // ПРОВЕРКА: Выбран ли допустимый протокол
+        String selectedProtocol = (String) protocolSpinner.getSelectedItem();
+        if (!isAllowedProtocol(selectedProtocol)) {
+            showToast(getString(R.string.error_select_gsm_or_gps));
+            return false;
+        }
+
+        // Получаем и проверяем имя устройства
+        String deviceName = safeText(deviceNameInput);
+        if (deviceName.isEmpty()) {
+            deviceName = getString(R.string.default_device_name);
+            deviceNameInput.setText(deviceName);
+        }
+
+        // Сохраняем протокол и имя устройства
+        String oldDeviceName = repository.getDeviceName();
+        if (oldDeviceName == null || oldDeviceName.trim().isEmpty()) {
+            oldDeviceName = getString(R.string.default_device_name);
+        }
+
+        int mapPointLimit = 100;
+        int snapshotDurationSeconds = 60;
+        int dataRetentionDays = 7;
+        int mapMarkerSize = MapLayerManager.markerSizeDp(this);
+
+        try {
+            mapPointLimit = Integer.parseInt(safeText(mapPointLimitInput));
+            if (mapPointLimit <= 0) mapPointLimit = 100;
+        } catch (Exception e) {
+            mapPointLimit = 100;
+        }
+
+        try {
+            snapshotDurationSeconds = Integer.parseInt(safeText(snapshotDurationSecondsInput));
+            if (snapshotDurationSeconds <= 0) snapshotDurationSeconds = 60;
+        } catch (Exception e) {
+            snapshotDurationSeconds = 60;
+        }
+
+        try {
+            dataRetentionDays = Integer.parseInt(safeText(dataRetentionDaysInput));
+            if (dataRetentionDays <= 0) dataRetentionDays = 7;
+        } catch (Exception e) {
+            dataRetentionDays = 7;
+        }
+        try {
+            mapMarkerSize = Integer.parseInt(safeText(mapMarkerSizeInput));
+        } catch (Exception ignored) {}
+        MapLayerManager.saveLayerIndex(this, mapLayerSpinner.getSelectedItemPosition());
+        MapLayerManager.saveMarkerSizeDp(this, mapMarkerSize);
+        MapLayerManager.saveYandexApiKey(this, safeText(yandexTilesApiKeyInput));
+        if (selectedQuietMode) {
+            selectedAlarmMode |= AlarmModeConfig.CHANNEL_MARKED_TARGETS;
+        }
+        AlarmModeConfig.saveMode(this, selectedAlarmMode);
+        AlarmModeConfig.saveQuietModeEnabled(this, selectedQuietMode);
+        ServerUploadConfig.setEnabled(this, serverUploadSwitch.isChecked());
+        if (!serverUploadSwitch.isChecked()) {
+            stopService(new Intent(this, DeviceUploadService.class));
+        }
+
+        repository.setGeoProtocol(selectedProtocol);
+
+        getSharedPreferences("AppSettings", MODE_PRIVATE)
+                .edit()
+                .putInt("map_point_limit", mapPointLimit)
+                .putInt("snapshot_duration_seconds", snapshotDurationSeconds)
+                .putInt("data_retention_days", dataRetentionDays)
+                .apply();
+
+        if (!deviceName.equals(oldDeviceName)) {
+            repository.setDeviceName(deviceName);
+            new UserDeviceSyncManager(this).syncOwnerDevice();
+            if (showSuccessToast) showToast(getString(R.string.toast_device_name_saved));
+        } else {
+            repository.setDeviceName(deviceName);
+            if (showSuccessToast) showToast(getString(R.string.toast_settings_saved_device_name_not_changed));
+        }
+
+        float staticLat = 0f;
+        float staticLon = 0f;
+
+        try {
+            staticLat = Float.parseFloat(safeText(staticLatitudeInput));
+            staticLon = Float.parseFloat(safeText(staticLongitudeInput));
+        } catch (Exception ignored) {}
+
+        getSharedPreferences("AppSettings", MODE_PRIVATE)
+                .edit()
+                .putInt("map_point_limit", mapPointLimit)
+                .putInt("snapshot_duration_seconds", snapshotDurationSeconds)
+                .putInt("data_retention_days", dataRetentionDays)
+                .putBoolean("static_location_enabled", staticLocationSwitch.isChecked())
+                .putFloat("static_latitude", staticLat)
+                .putFloat("static_longitude", staticLon)
+                .apply();
+        cleanupStoredData(dataRetentionDays);
+        return true;
+    }
+
+    private void cleanupStoredData(int retentionDays) {
+        int days = retentionDays <= 0 ? 7 : retentionDays;
+        long maxAge = days * 24L * 60L * 60L * 1000L;
+        new Thread(() -> {
+            try (MainDatabaseHelper mainHelper = new MainDatabaseHelper(this);
+                 Esp32DatabaseHelper esp32Helper = new Esp32DatabaseHelper(this);
+                 NotificationDatabaseHelper notificationHelper = new NotificationDatabaseHelper(this)) {
+                mainHelper.deleteOldRecordsFromAllTables(maxAge);
+                esp32Helper.deleteOldRuntimeData(maxAge);
+                notificationHelper.deleteOldNotifications(maxAge);
             }
-
-            // Получаем и проверяем имя устройства
-            String deviceName = deviceNameInput.getText().toString().trim();
-            if (deviceName.isEmpty()) {
-                deviceName = getString(R.string.default_device_name); // Если пустое, устанавливаем по умолчанию
-                deviceNameInput.setText(deviceName);
-            }
-
-            // Сохраняем протокол и имя устройства
-            String oldDeviceName = repository.getDeviceName();
-            if (oldDeviceName == null || oldDeviceName.trim().isEmpty()) {
-                oldDeviceName = getString(R.string.default_device_name);
-            }
-
-            int mapPointLimit = 100;
-
-            try {
-                mapPointLimit = Integer.parseInt(mapPointLimitInput.getText().toString().trim());
-                if (mapPointLimit <= 0) mapPointLimit = 100;
-            } catch (Exception e) {
-                mapPointLimit = 100;
-            }
-
-            getSharedPreferences("AppSettings", MODE_PRIVATE)
-                    .edit()
-                    .putInt("map_point_limit", mapPointLimit)
-                    .apply();
-
-            repository.setGeoProtocol(selectedProtocol);
-
-            getSharedPreferences("AppSettings", MODE_PRIVATE)
-                    .edit()
-                    .putInt("map_point_limit", mapPointLimit)
-                    .putBoolean("target_detection_enabled", targetDetectionSwitch.isChecked())
-                    .apply();
-
-            if (!deviceName.equals(oldDeviceName)) {
-                repository.setDeviceName(deviceName);
-                new UserDeviceSyncManager(this).syncOwnerDevice();
-                showToast(getString(R.string.toast_device_name_saved));
-            } else {
-                repository.setDeviceName(deviceName);
-                showToast(getString(R.string.toast_settings_saved_device_name_not_changed));
-            }
-
-            float staticLat = 0f;
-            float staticLon = 0f;
-
-            try {
-                staticLat = Float.parseFloat(staticLatitudeInput.getText().toString().trim());
-                staticLon = Float.parseFloat(staticLongitudeInput.getText().toString().trim());
-            } catch (Exception ignored) {}
-
-            getSharedPreferences("AppSettings", MODE_PRIVATE)
-                    .edit()
-                    .putInt("map_point_limit", mapPointLimit)
-                    .putBoolean("target_detection_enabled", targetDetectionSwitch.isChecked())
-                    .putBoolean("static_location_enabled", staticLocationSwitch.isChecked())
-                    .putFloat("static_latitude", staticLat)
-                    .putFloat("static_longitude", staticLon)
-                    .apply();
-
-            //showCurrentValues();
-        });
+        }).start();
     }
 
     private void styleAllTextInputs(View view) {
@@ -417,40 +651,44 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
     private void setupScannerSettingsUI() {
         Button saveScannerBtn = findViewById(R.id.save_scanner_btn);
 
-        saveScannerBtn.setOnClickListener(v -> {
-            String selectedScanner = (String) scannerSpinner.getSelectedItem();
-            String intervalText = intervalInput.getText().toString();
-            String signalStrength = signalStrengthInput.getText().toString();
+        saveScannerBtn.setOnClickListener(v -> saveScannerSettingsFromUi(true));
+    }
 
-            // ПРОВЕРКА: Корректный ли интервал
-            Float interval = parseFloat(intervalText);
-            if (interval == null || interval < 0) {
-                showToast(getString(R.string.error_enter_correct_interval));
-                return;
-            }
+    private boolean saveScannerSettingsFromUi(boolean showSuccessToast) {
+        String selectedScanner = (String) scannerSpinner.getSelectedItem();
+        String intervalText = safeText(intervalInput);
+        String signalStrength = safeText(signalStrengthInput);
 
-            // ПРОВЕРКА: корректность силы сигнала
-            Float strength = parseFloat(signalStrength);
-            if (strength == null || strength > 0 || strength < -120) {
-                showToast(getString(R.string.error_signal_strength_range));;
-                return;
-            }
+        // ПРОВЕРКА: Корректный ли интервал
+        Float interval = parseFloat(intervalText);
+        if (interval == null || interval < 0) {
+            showToast(getString(R.string.error_enter_correct_interval));
+            return false;
+        }
 
-            ScannerSettings newSettings = new ScannerSettings(
-                    selectedScanner,
-                    enabledSwitch.isChecked(),
-                    interval,
-                    strength
-            );
+        // ПРОВЕРКА: корректность силы сигнала
+        Float strength = parseFloat(signalStrength);
+        if (strength == null || strength > 0 || strength < -120) {
+            showToast(getString(R.string.error_signal_strength_range));
+            return false;
+        }
 
-            if (repository.updateScannerSettings(newSettings)) {
+        ScannerSettings newSettings = new ScannerSettings(
+                selectedScanner,
+                enabledSwitch.isChecked(),
+                interval,
+                strength
+        );
+
+        if (repository.updateScannerSettings(newSettings)) {
+            if (showSuccessToast) {
                 showToast(getString(R.string.toast_scanner_settings_saved, selectedScanner));
-                updateScanningStatus();
-                //showCurrentValues();
-            } else {
-                showToast(getString(R.string.error_saving_settings));
             }
-        });
+            updateScanningStatus();
+            return true;
+        }
+        showToast(getString(R.string.error_saving_settings));
+        return false;
     }
 
     private void loadScannerSettings(String scannerName) {
@@ -471,6 +709,116 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
             }
         }
         repository.setScanning(isScanning);
+    }
+
+    private void confirmExitOrFinish() {
+        if (suppressExitPrompt || !hasUnsavedChanges()) {
+            finish();
+            return;
+        }
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.dialog_unsaved_settings_title)
+                .setMessage(R.string.dialog_unsaved_settings_message)
+                .setPositiveButton(R.string.dialog_unsaved_settings_save, (d, which) -> saveAllSettingsAndFinish())
+                .setNegativeButton(R.string.dialog_unsaved_settings_discard, (d, which) -> {
+                    suppressExitPrompt = true;
+                    finish();
+                })
+                .setNeutralButton(R.string.dialog_cancel, null)
+                .create();
+        dialog.setOnShowListener(ignored -> DialogStyleUtils.tintButtons(dialog));
+        dialog.show();
+    }
+
+    private void saveAllSettingsAndFinish() {
+        boolean generalSaved = saveGeneralSettingsFromUi(false);
+        if (!generalSaved) return;
+        boolean scannerSaved = saveScannerSettingsFromUi(false);
+        if (!scannerSaved) return;
+        showToast(getString(R.string.toast_settings_saved_device_name_not_changed));
+        suppressExitPrompt = true;
+        finish();
+    }
+
+    private boolean hasUnsavedChanges() {
+        return isGeneralSettingsDirty() || isCurrentScannerSettingsDirty();
+    }
+
+    private boolean isGeneralSettingsDirty() {
+        SharedPreferences prefs = getSharedPreferences("AppSettings", MODE_PRIVATE);
+
+        String selectedProtocol = (String) protocolSpinner.getSelectedItem();
+        if (!sameText(selectedProtocol, repository.getGeoProtocol())) return true;
+
+        String currentDeviceName = safeText(deviceNameInput);
+        if (currentDeviceName.isEmpty()) currentDeviceName = getString(R.string.default_device_name);
+        String savedDeviceName = repository.getDeviceName();
+        if (savedDeviceName == null || savedDeviceName.trim().isEmpty()) {
+            savedDeviceName = getString(R.string.default_device_name);
+        }
+        if (!sameText(currentDeviceName, savedDeviceName)) return true;
+
+        if (positiveIntChanged(mapPointLimitInput, prefs.getInt("map_point_limit", 100), 100)) return true;
+        if (positiveIntChanged(snapshotDurationSecondsInput, prefs.getInt("snapshot_duration_seconds", 60), 60)) return true;
+        if (positiveIntChanged(dataRetentionDaysInput, prefs.getInt("data_retention_days", 7), 7)) return true;
+        Integer markerSize = parseInteger(safeText(mapMarkerSizeInput));
+        if (markerSize == null || markerSize != MapLayerManager.markerSizeDp(this)) return true;
+        if (!sameText(safeText(yandexTilesApiKeyInput), MapLayerManager.yandexApiKey(this))) return true;
+        if (mapLayerSpinner.getSelectedItemPosition() != MapLayerManager.savedLayerIndex(this)) return true;
+
+        if (AlarmModeConfig.sanitizeMask(selectedAlarmMode) != AlarmModeConfig.getMode(this)) return true;
+        if (selectedQuietMode != AlarmModeConfig.isQuietModeEnabled(this)) return true;
+        if (serverUploadSwitch.isChecked() != ServerUploadConfig.isEnabled(this)) return true;
+
+        if (staticLocationSwitch.isChecked() != prefs.getBoolean("static_location_enabled", false)) return true;
+        if (floatInputChanged(staticLatitudeInput, prefs.getFloat("static_latitude", 0f))) return true;
+        return floatInputChanged(staticLongitudeInput, prefs.getFloat("static_longitude", 0f));
+    }
+
+    private boolean isCurrentScannerSettingsDirty() {
+        Object selected = scannerSpinner.getSelectedItem();
+        if (!(selected instanceof String)) return false;
+        ScannerSettings settings = repository.getScannerSettings((String) selected);
+        if (settings == null) return false;
+
+        Float interval = parseFloat(safeText(intervalInput));
+        Float signal = parseFloat(safeText(signalStrengthInput));
+        if (interval == null || signal == null) return true;
+        if (Math.abs(interval - settings.getScanInterval()) > 0.0001f) return true;
+        if (Math.abs(signal - settings.getSignalStrength()) > 0.0001f) return true;
+        return enabledSwitch.isChecked() != settings.isEnabled();
+    }
+
+    private boolean positiveIntChanged(EditText input, int savedValue, int fallbackValue) {
+        Integer parsed = parseInteger(safeText(input));
+        if (parsed == null) return true;
+        int normalized = parsed <= 0 ? fallbackValue : parsed;
+        return normalized != savedValue;
+    }
+
+    private boolean floatInputChanged(EditText input, float savedValue) {
+        Float parsed = parseFloat(safeText(input));
+        if (parsed == null) return true;
+        return Math.abs(parsed - savedValue) > 0.000001f;
+    }
+
+    private boolean sameText(String a, String b) {
+        String left = a == null ? "" : a.trim();
+        String right = b == null ? "" : b.trim();
+        return left.equals(right);
+    }
+
+    private String safeText(TextView view) {
+        return view == null || view.getText() == null ? "" : view.getText().toString().trim();
+    }
+
+    private Integer parseInteger(String value) {
+        try {
+            return Integer.parseInt(value);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
 //    private void showCurrentValues() {

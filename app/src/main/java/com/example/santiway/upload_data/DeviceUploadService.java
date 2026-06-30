@@ -3,6 +3,7 @@ package com.example.santiway.upload_data;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
@@ -20,6 +21,7 @@ import androidx.core.app.NotificationCompat;
 import com.example.santiway.R;
 import com.example.santiway.LocaleHelper;
 
+import com.example.santiway.MainActivity;
 import java.util.List;
 
 public class DeviceUploadService extends Service {
@@ -37,6 +39,11 @@ public class DeviceUploadService extends Service {
     public void onCreate() {
         super.onCreate();
         Log.d(TAG, "DeviceUploadService created");
+        if (!ServerUploadConfig.isEnabled(this)) {
+            Log.d(TAG, "Server upload disabled - stopping service");
+            stopSelf();
+            return;
+        }
 
         uploadManager = new DeviceUploadManager(this);
         phoneLocationUploadManager = new PhoneLocationUploadManager(this);
@@ -69,6 +76,11 @@ public class DeviceUploadService extends Service {
     }
 
     private void performUpload() {
+        if (!ServerUploadConfig.isEnabled(this)) {
+            Log.d(TAG, "Server upload disabled - skip upload tick");
+            stopSelf();
+            return;
+        }
         if (!isNetworkConnected()) {
             Log.d(TAG, "No network connection - skip upload tick");
             return;
@@ -113,12 +125,30 @@ public class DeviceUploadService extends Service {
     }
 
     private Notification createNotification() {
+        Intent notificationIntent = new Intent(this, MainActivity.class);
+        notificationIntent.setFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK |
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP |
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP
+        );
+
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                this,
+                1004,
+                notificationIntent,
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                        ? PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                        : PendingIntent.FLAG_UPDATE_CURRENT
+        );
+
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle(getString(R.string.app_name))
+                .setContentTitle(LocaleHelper.getString(this, R.string.app_name))
                 .setContentText(LocaleHelper.getString(this, R.string.upload_notification_text))
-                .setSmallIcon(R.drawable.ic_pause)
+                .setSmallIcon(android.R.drawable.stat_sys_upload)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setContentIntent(pendingIntent)
                 .build();
     }
 

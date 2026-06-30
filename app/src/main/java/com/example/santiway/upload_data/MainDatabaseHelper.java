@@ -16,7 +16,6 @@ import android.os.Build;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.util.Log;
-import android.graphics.Color;
 
 import androidx.core.app.NotificationCompat;
 
@@ -24,13 +23,22 @@ import com.example.santiway.NotificationData;
 import com.example.santiway.NotificationDatabaseHelper;
 import com.example.santiway.NotificationsActivity;
 import com.example.santiway.R;
+import com.example.santiway.AlarmModeConfig;
 import com.example.santiway.LocaleHelper;
 import com.example.santiway.cell_scanner.CellTower;
+import com.example.santiway.opencellid.OpenCellIdUnknownTowerNotifier;
 import com.example.santiway.wifi_scanner.WifiDevice;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.text.SimpleDateFormat;
 
@@ -42,12 +50,22 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     private static final long SOUND_INTERVAL = 3600000;
     private static final int TARGET_NOTIFICATION_ID = 1001;
     private static final String TARGET_NOTIFICATION_CHANNEL_ID = "target_alerts_channel";
+    private static final long DUPLICATE_WINDOW_MS = 30000L;
+    private static final long RETENTION_CLEANUP_INTERVAL_MS = 60L * 60L * 1000L;
+    private static final long DEVICES_CHANGED_BROADCAST_INTERVAL_MS = 2000L;
+    private static final double GPS_SPOOF_DISTANCE_METERS = 10000.0;
+    private static final double GPS_SPOOF_SPEED_KMH = 400.0;
+    private static volatile long lastRetentionCleanupAt = 0L;
+    private static final Map<String, Long> LAST_DEVICES_CHANGED_BROADCAST = new HashMap<>();
+    private static final Map<String, Boolean> INDEX_READY = new HashMap<>();
+    private static final Set<String> RAW_TABLE_READY = Collections.synchronizedSet(new HashSet<>());
+    private static final Set<String> UNIQUE_TABLE_READY = Collections.synchronizedSet(new HashSet<>());
     public static final String ACTION_DEVICES_CHANGED = "com.example.santiway.ACTION_DEVICES_CHANGED";
     public static final String EXTRA_TABLE_NAME = "table_name";
 
     private static final String TAG = "MainDatabaseHelper";
     private static final String DATABASE_NAME = "UnifiedScanner.db";
-    private static final int DATABASE_VERSION = 8; // УВЕЛИЧЕНО
+    private static final int DATABASE_VERSION = 9;
     private final Context mContext;
 
     public MainDatabaseHelper(Context context) {
@@ -105,11 +123,138 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         db.execSQL(createUnifiedTable);
         db.execSQL(createTargetTable);
         db.execSQL(createSafeTable);
+        createPersistentStatusTables(db);
+        createGpsSpoofedDevicesTable(db);
+        createCoreIndexes(db);
+    }
+
+    private void createCoreIndexes(SQLiteDatabase db) {
+        try {
+            createPersistentStatusTables(db);
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_target_devices_key ON target_devices(device_key)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_safe_devices_key ON safe_devices(device_key)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_blacklist_devices_key ON blacklist_devices(device_key)");
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_gps_spoofed_devices_key ON gps_spoofed_devices(device_key)");
+        } catch (Exception e) {
+            Log.e(TAG, "Error creating status indexes: " + e.getMessage());
+        }
+        createIndexesForExistingScannerTables(db);
+    }
+
+    private void createPersistentStatusTables(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS target_devices (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "device_key TEXT NOT NULL UNIQUE" +
+                ");");
+        db.execSQL("CREATE TABLE IF NOT EXISTS safe_devices (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "device_key TEXT NOT NULL UNIQUE" +
+                ");");
+        db.execSQL("CREATE TABLE IF NOT EXISTS blacklist_devices (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "device_key TEXT NOT NULL UNIQUE" +
+                ");");
+    }
+
+    private void createGpsSpoofedDevicesTable(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS gps_spoofed_devices (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "device_key TEXT NOT NULL UNIQUE," +
+                "distance_meters REAL," +
+                "speed_kmh REAL," +
+                "timestamp INTEGER" +
+                ");");
+    }
+
+    private void createIndexesForExistingScannerTables(SQLiteDatabase db) {
+        Cursor cursor = null;
+        try {
+            cursor = db.rawQuery(
+                    "SELECT name FROM sqlite_master WHERE type='table' " +
+                            "AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%'",
+                    null
+            );
+            while (cursor != null && cursor.moveToNext()) {
+                String table = cursor.getString(0);
+                if (table == null
+                        || "target_devices".equals(table)
+                        || "safe_devices".equals(table)
+                        || "blacklist_devices".equals(table)
+                        || "gps_spoofed_devices".equals(table)
+                        || "unique_devices".equals(table)) {
+                    continue;
+                }
+                if (table.endsWith("_unique")) {
+                    createUniqueTableIndexes(db, table);
+                } else {
+                    createRawTableIndexes(db, table);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error creating scanner indexes: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+    }
+
+    private void createRawTableIndexes(SQLiteDatabase db, String tableName) {
+        if (!markIndexSetupNeeded("raw:" + tableName)) {
+            return;
+        }
+        String safeName = "\"" + tableName + "\"";
+        createIndex(db, safeIndexName(tableName, "timestamp"), safeName + "(timestamp)");
+        createIndex(db, safeIndexName(tableName, "bssid_timestamp"), safeName + "(bssid,timestamp)");
+        createIndex(db, safeIndexName(tableName, "type_timestamp"), safeName + "(type,timestamp)");
+        createIndex(db, safeIndexName(tableName, "cell_timestamp"),
+                safeName + "(cell_id,mcc,mnc,timestamp)");
+        createIndex(db, safeIndexName(tableName, "uploaded_timestamp"),
+                safeName + "(is_uploaded,timestamp)");
+    }
+
+    private void createUniqueTableIndexes(SQLiteDatabase db, String tableName) {
+        if (!markIndexSetupNeeded("unique:" + tableName)) {
+            return;
+        }
+        String safeName = "\"" + tableName + "\"";
+        createIndex(db, safeIndexName(tableName, "uid"), safeName + "(unique_identifier)");
+        createIndex(db, safeIndexName(tableName, "last_seen"), safeName + "(last_seen)");
+        createIndex(db, safeIndexName(tableName, "status_last_seen"), safeName + "(status,last_seen)");
+    }
+
+    private boolean markIndexSetupNeeded(String key) {
+        synchronized (INDEX_READY) {
+            if (INDEX_READY.containsKey(key)) {
+                return false;
+            }
+            INDEX_READY.put(key, true);
+            return true;
+        }
+    }
+
+    private void createIndex(SQLiteDatabase db, String indexName, String target) {
+        try {
+            db.execSQL("CREATE INDEX IF NOT EXISTS \"" + indexName + "\" ON " + target);
+        } catch (Exception e) {
+            Log.e(TAG, "Error creating index " + indexName + ": " + e.getMessage());
+        }
+    }
+
+    private String safeIndexName(String tableName, String suffix) {
+        String base = tableName == null ? "table" : tableName.replaceAll("[^A-Za-z0-9_]", "_");
+        if (base.isEmpty()) {
+            base = "table";
+        }
+        String hash = Integer.toHexString((tableName == null ? "" : tableName).hashCode());
+        return "idx_" + base + "_" + hash + "_" + suffix;
     }
 
 
     public void deleteOldRecordsFromAllTables(long maxAgeMillis) {
         SQLiteDatabase db = this.getWritableDatabase();
+        deleteOldRecordsFromAllTables(db, maxAgeMillis);
+    }
+
+    private void deleteOldRecordsFromAllTables(SQLiteDatabase db, long maxAgeMillis) {
         Cursor cursor = null;
 
         try {
@@ -128,6 +273,8 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
                 if ("target_devices".equals(table)
                         || "safe_devices".equals(table)
+                        || "blacklist_devices".equals(table)
+                        || "gps_spoofed_devices".equals(table)
                         || "unique_devices".equals(table)) {
                     continue;
                 }
@@ -156,12 +303,40 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                     Log.e(TAG, "Error deleting old records from table " + table + ": " + e.getMessage());
                 }
             }
-
         } catch (Exception e) {
             Log.e(TAG, "Error deleting old records: " + e.getMessage());
         } finally {
             if (cursor != null) cursor.close();
         }
+    }
+
+    private void scheduleRetentionCleanupIfDue() {
+        long now = System.currentTimeMillis();
+        synchronized (MainDatabaseHelper.class) {
+            if (now - lastRetentionCleanupAt < RETENTION_CLEANUP_INTERVAL_MS) {
+                return;
+            }
+            lastRetentionCleanupAt = now;
+        }
+
+        Context appContext = mContext.getApplicationContext();
+        int retentionDays = appContext.getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
+                .getInt("data_retention_days", 7);
+        if (retentionDays <= 0) {
+            retentionDays = 7;
+        }
+        long maxAge = retentionDays * 24L * 60L * 60L * 1000L;
+
+        new Thread(() -> {
+            try (MainDatabaseHelper helper = new MainDatabaseHelper(appContext)) {
+                helper.deleteOldRecordsFromAllTables(maxAge);
+                try (NotificationDatabaseHelper notificationHelper = new NotificationDatabaseHelper(appContext)) {
+                    notificationHelper.deleteOldNotifications(maxAge);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Retention cleanup failed: " + e.getMessage());
+            }
+        }).start();
     }
 
     private boolean hasColumn(SQLiteDatabase db, String tableName, String columnName) {
@@ -185,8 +360,48 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         return false;
     }
 
+    private boolean isGpsSpoofIgnored(SQLiteDatabase db, String uniqueId) {
+        String key = normalizeDeviceKey(uniqueId);
+        if (key == null || key.isEmpty()) return false;
+
+        Cursor cursor = null;
+        try {
+            createGpsSpoofedDevicesTable(db);
+            cursor = db.rawQuery(
+                    "SELECT 1 FROM gps_spoofed_devices WHERE UPPER(device_key) = ? LIMIT 1",
+                    new String[]{key}
+            );
+            return cursor != null && cursor.moveToFirst();
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking GPS spoof ignore for " + uniqueId + ": " + e.getMessage());
+            return false;
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+    }
+
+    private void markGpsSpoofIgnored(SQLiteDatabase db, String uniqueId,
+                                     double distanceMeters, double speedKmh, long timestamp) {
+        String key = normalizeDeviceKey(uniqueId);
+        if (key == null || key.isEmpty()) return;
+
+        try {
+            createGpsSpoofedDevicesTable(db);
+            ContentValues values = new ContentValues();
+            values.put("device_key", key);
+            values.put("distance_meters", distanceMeters);
+            values.put("speed_kmh", speedKmh);
+            values.put("timestamp", timestamp);
+            db.insertWithOnConflict("gps_spoofed_devices", null, values, SQLiteDatabase.CONFLICT_REPLACE);
+        } catch (Exception e) {
+            Log.e(TAG, "Error marking GPS spoof ignore for " + uniqueId + ": " + e.getMessage());
+        }
+    }
+
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        createGpsSpoofedDevicesTable(db);
+        createCoreIndexes(db);
 //        if (oldVersion < 8) {
 //            try {
 //                Cursor cursor = db.rawQuery(
@@ -297,6 +512,99 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         return addOrUpdateUnifiedDevice(tableName, values, selection, selectionArgs, device.getTimestamp());
     }
 
+    public long addTriangulatedWifiDevice(WifiDevice device, String tableName) {
+        long inserted = addWifiDevice(device, tableName);
+        if (inserted != -1) return inserted;
+
+        ContentValues values = new ContentValues();
+        values.put("type", "Wi-Fi");
+        values.put("name", device.getSsid());
+        String bssid = device.getBssid() == null ? null : device.getBssid().toUpperCase(Locale.US);
+        values.put("bssid", bssid);
+        values.put("signal_strength", device.getSignalStrength());
+        values.put("frequency", device.getFrequency());
+        values.put("capabilities", device.getCapabilities());
+        values.put("vendor", device.getVendor());
+        values.put("latitude", device.getLatitude());
+        values.put("longitude", device.getLongitude());
+        values.put("altitude", device.getAltitude());
+        values.put("location_accuracy", device.getLocationAccuracy());
+        values.put("timestamp", device.getTimestamp());
+        values.put("folder_name", tableName);
+        return updateRecentTriangulatedDevice(tableName, values, bssid, device.getTimestamp());
+    }
+
+    public long addTriangulatedBluetoothDevice(BluetoothDevice device, String tableName) {
+        long inserted = addBluetoothDevice(device, tableName);
+        if (inserted != -1) return inserted;
+
+        ContentValues values = new ContentValues();
+        values.put("type", "Bluetooth");
+        values.put("name", device.getDeviceName());
+        String mac = device.getMacAddress() == null ? null : device.getMacAddress().toUpperCase(Locale.US);
+        values.put("bssid", mac);
+        values.put("signal_strength", device.getSignalStrength());
+        values.put("vendor", device.getVendor());
+        values.put("latitude", device.getLatitude());
+        values.put("longitude", device.getLongitude());
+        values.put("altitude", device.getAltitude());
+        values.put("location_accuracy", device.getLocationAccuracy());
+        values.put("timestamp", device.getTimestamp());
+        values.put("folder_name", tableName);
+        return updateRecentTriangulatedDevice(tableName, values, mac, device.getTimestamp());
+    }
+
+    private long updateRecentTriangulatedDevice(String tableName, ContentValues values,
+                                                String mac, long timestamp) {
+        if (mac == null || mac.trim().isEmpty()) return -1;
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor cursor = null;
+        try {
+            scheduleRetentionCleanupIfDue();
+            createFolderRawTableIfNotExists(db, tableName);
+            createFolderUniqueTableIfNotExists(db, getUniqueTableName(tableName));
+
+            long duplicateStart = timestamp - DUPLICATE_WINDOW_MS;
+            long duplicateEnd = timestamp + DUPLICATE_WINDOW_MS;
+            cursor = db.rawQuery(
+                    "SELECT id,status FROM \"" + tableName + "\" " +
+                            "WHERE UPPER(COALESCE(bssid,''))=? AND timestamp BETWEEN ? AND ? " +
+                            "ORDER BY ABS(timestamp - ?) ASC LIMIT 1",
+                    new String[]{
+                            mac.toUpperCase(Locale.US),
+                            String.valueOf(duplicateStart),
+                            String.valueOf(duplicateEnd),
+                            String.valueOf(timestamp)
+                    }
+            );
+            if (cursor == null || !cursor.moveToFirst()) return -1;
+
+            long id = cursor.getLong(cursor.getColumnIndexOrThrow("id"));
+            String status = cursor.isNull(cursor.getColumnIndexOrThrow("status"))
+                    ? "GREY"
+                    : cursor.getString(cursor.getColumnIndexOrThrow("status"));
+            values.put("status", status == null || status.trim().isEmpty() ? "GREY" : status);
+            values.put("is_uploaded", 0);
+
+            db.beginTransaction();
+            int updated = db.update("\"" + tableName + "\"", values, "id=?",
+                    new String[]{String.valueOf(id)});
+            if (updated > 0) {
+                addToFolderUniqueDevices(db, tableName, values);
+                syncStatusTables(db, mac, values.getAsString("status"));
+                notifyDevicesChangedThrottled(tableName);
+            }
+            db.setTransactionSuccessful();
+            return updated > 0 ? id : -1;
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating triangulated duplicate: " + e.getMessage(), e);
+            return -1;
+        } finally {
+            if (cursor != null) cursor.close();
+            if (db.inTransaction()) db.endTransaction();
+        }
+    }
+
     public long addCellTower(CellTower tower, String tableName) {
         ContentValues values = new ContentValues();
         values.put("type", "Cell");
@@ -331,18 +639,33 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         values.put("status", "GREY");
         values.put("folder_name", tableName);
 
-        String selection = "cell_id = ? AND network_type = ?";
-        String[] selectionArgs = {String.valueOf(tower.getCellId()), tower.getNetworkType()};
-        return addOrUpdateUnifiedDevice(tableName, values, selection, selectionArgs, tower.getTimestamp());
+        String networkType = tower.getNetworkType() == null ? "" : tower.getNetworkType();
+        boolean lteLike = "LTE".equalsIgnoreCase(networkType) || "5G".equalsIgnoreCase(networkType);
+        String selection = "cell_id = ? AND network_type = ? AND " + (lteLike ? "tac" : "lac") + " = ?";
+        String[] selectionArgs = {
+                String.valueOf(tower.getCellId()),
+                networkType,
+                String.valueOf(lteLike ? tower.getTac() : tower.getLac())
+        };
+        long result = addOrUpdateUnifiedDevice(tableName, values, selection, selectionArgs, tower.getTimestamp());
+        if (result != -1) {
+            OpenCellIdUnknownTowerNotifier.checkAndNotify(mContext, tower);
+        }
+        return result;
     }
 
     private long addOrUpdateUnifiedDevice(String tableName, ContentValues values, String selection, String[] selectionArgs, long newTimestamp) {
         SQLiteDatabase db = null;
         Cursor cursor = null;
         long result = -1;
+        boolean ownsTransaction = false;
 
         try {
+            scheduleRetentionCleanupIfDue();
             db = this.getWritableDatabase();
+            ownsTransaction = !db.inTransaction();
+            createFolderRawTableIfNotExists(db, tableName);
+            createFolderUniqueTableIfNotExists(db, getUniqueTableName(tableName));
 
             // Определяем уникальный ID устройства
             String uniqueId = null;
@@ -362,14 +685,16 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 if (cellId != null && cellId > 0 && cellId != 2147483647) {
                     if ("LTE".equals(networkType) || "5G".equals(networkType)) {
                         // Для LTE/5G: MCC_MNC_TAC_CI
-                        uniqueId = String.format(Locale.US, "%d_%d_%d_%d",
+                        uniqueId = String.format(Locale.US, "%s_%d_%d_%d_%d",
+                                networkType,
                                 mcc != null ? mcc : 0,
                                 mnc != null ? mnc : 0,
                                 tac != null ? tac : 0,
                                 cellId);
                     } else {
                         // Для GSM/UMTS: MCC_MNC_LAC_CI
-                        uniqueId = String.format(Locale.US, "%d_%d_%d_%d",
+                        uniqueId = String.format(Locale.US, "%s_%d_%d_%d_%d",
+                                networkType != null ? networkType : "CELL",
                                 mcc != null ? mcc : 0,
                                 mnc != null ? mnc : 0,
                                 lac != null ? lac : 0,
@@ -386,27 +711,41 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             // 2. ЖЕСТКАЯ ДЕДУПЛИКАЦИЯ: проверяем точное совпадение за последние 2 секунды
             String checkQuery;
             String[] checkArgs;
+            long duplicateStart = newTimestamp - DUPLICATE_WINDOW_MS;
+            long duplicateEnd = newTimestamp + DUPLICATE_WINDOW_MS;
 
             if (bssid != null) {
                 checkQuery = "SELECT COUNT(*) FROM \"" + tableName + "\" " +
-                        "WHERE bssid = ? AND ABS(timestamp - ?) <= 2000";
-                checkArgs = new String[]{uniqueId, String.valueOf(newTimestamp)};
+                        "WHERE UPPER(COALESCE(bssid, '')) = ? AND timestamp BETWEEN ? AND ?";
+                checkArgs = new String[]{
+                        uniqueId,
+                        String.valueOf(duplicateStart),
+                        String.valueOf(duplicateEnd)
+                };
             } else {
                 // Для сотовых вышек ищем по составному ключу
-                checkQuery = "SELECT COUNT(*) FROM \"" + tableName + "\" " +
-                        "WHERE type = 'Cell' AND " +
-                        "cell_id = ? AND mcc = ? AND mnc = ? AND " +
-                        "ABS(timestamp - ?) <= 2000";
-
                 Long cellId = values.getAsLong("cell_id");
                 Integer mcc = values.getAsInteger("mcc");
                 Integer mnc = values.getAsInteger("mnc");
+                Long tac = values.getAsLong("tac");
+                Integer lac = values.getAsInteger("lac");
+                String networkType = values.getAsString("network_type");
+                boolean lteLike = "LTE".equalsIgnoreCase(networkType) || "5G".equalsIgnoreCase(networkType);
+
+                checkQuery = "SELECT COUNT(*) FROM \"" + tableName + "\" " +
+                        "WHERE type = 'Cell' AND " +
+                        "cell_id = ? AND mcc = ? AND mnc = ? AND network_type = ? AND " +
+                        (lteLike ? "tac" : "lac") + " = ? AND " +
+                        "timestamp BETWEEN ? AND ?";
 
                 checkArgs = new String[]{
                         String.valueOf(cellId),
                         String.valueOf(mcc),
                         String.valueOf(mnc),
-                        String.valueOf(newTimestamp)
+                        String.valueOf(networkType),
+                        String.valueOf(lteLike ? tac : lac),
+                        String.valueOf(duplicateStart),
+                        String.valueOf(duplicateEnd)
                 };
             }
 
@@ -434,46 +773,57 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
 
             // 5. Проверяем Target только для GREY-устройств
             String lastStatus = "GREY";
-            ContentValues latestDevice = getLatestDeviceData(uniqueId, tableName);
+            String dbStatus = getLatestDeviceStatus(db, uniqueId, tableName, values);
+            if (dbStatus != null && !dbStatus.isEmpty()) lastStatus = dbStatus;
 
-            if (latestDevice != null) {
-                String dbStatus = latestDevice.getAsString("status");
-                if (dbStatus != null && !dbStatus.isEmpty()) {
-                    lastStatus = dbStatus;
-                }
-            }
+            boolean trackingAlarmEnabled = AlarmModeConfig.isTrackingDeviceAlarmEnabled(mContext);
+            boolean markedTargetAlarmEnabled = AlarmModeConfig.isMarkedTargetAlarmEnabled(mContext);
+            boolean quietModeEnabled = AlarmModeConfig.isQuietModeEnabled(mContext);
+            boolean quietIncludesCells = AlarmModeConfig.isQuietModeIncludeCellTowers(mContext);
+            boolean isCellRecord = "Cell".equalsIgnoreCase(values.getAsString("type"));
+            boolean notifyTarget = false;
+            boolean persistentAlert = "TARGET".equalsIgnoreCase(getStatusFromServiceTables(uniqueId));
 
-            boolean targetDetectionEnabled = mContext
-                    .getSharedPreferences("AppSettings", Context.MODE_PRIVATE)
-                    .getBoolean("target_detection_enabled", true);
-
-            if (targetDetectionEnabled && curLat != null && curLon != null && "GREY".equals(lastStatus)) {
+            if ("SAFE".equalsIgnoreCase(getStatusFromServiceTables(uniqueId)) || "SAFE".equalsIgnoreCase(lastStatus)) {
+                values.put("status", "SAFE");
+            } else if (persistentAlert) {
+                values.put("status", "TARGET");
+                notifyTarget = markedTargetAlarmEnabled;
+            } else if (quietModeEnabled && (!isCellRecord || quietIncludesCells)) {
+                values.put("status", "TARGET");
+                notifyTarget = true;
+            } else if ("TARGET".equalsIgnoreCase(lastStatus)) {
+                values.put("status", "TARGET");
+                notifyTarget = markedTargetAlarmEnabled;
+            } else if (trackingAlarmEnabled && curLat != null && curLon != null && "GREY".equals(lastStatus)) {
                 try {
-                    String calculatedStatus = evaluateTargetStatus(uniqueId, curLat, curLon, newTimestamp, tableName);
+                    String calculatedStatus = evaluateTargetStatus(db, uniqueId, curLat, curLon, newTimestamp, tableName);
                     values.put("status", calculatedStatus);
                     Log.d(TAG, "Status for " + uniqueId + ": " + calculatedStatus);
-
-                    if ("TARGET".equals(calculatedStatus)) {
-                        createTargetNotification(values, uniqueId, curLat, curLon);
-                    }
+                    notifyTarget = "TARGET".equals(calculatedStatus);
                 } catch (Exception e) {
                     Log.e(TAG, "Error calculating status: " + e.getMessage());
+                    values.put("status", lastStatus);
                 }
             } else {
                 values.put("status", lastStatus);
             }
 
+            if (notifyTarget && curLat != null && curLon != null) {
+                createTargetNotification(values, uniqueId, curLat, curLon, persistentAlert);
+            }
+
             // 7. Добавляем запись в основную таблицу
-            db.beginTransaction();
+            if (ownsTransaction) db.beginTransaction();
             result = db.insert("\"" + tableName + "\"", null, values);
 
             if (result != -1) {
                 addToFolderUniqueDevices(db, tableName, values);
                 syncStatusTables(db, uniqueId, values.getAsString("status"));
-                notifyDevicesChanged(tableName);
+                notifyDevicesChangedThrottled(tableName);
             }
 
-            db.setTransactionSuccessful();
+            if (ownsTransaction) db.setTransactionSuccessful();
 
         } catch (Exception e) {
             Log.e(TAG, "Error: " + e.getMessage());
@@ -481,7 +831,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             if (cursor != null) cursor.close();
             if (db != null && db.isOpen()) {
                 try {
-                    if (db.inTransaction()) {
+                    if (ownsTransaction && db.inTransaction()) {
                         db.endTransaction();
                     }
                 } catch (Exception e) {
@@ -496,6 +846,11 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
      * Создает уведомление для Target устройств
      */
     private void createTargetNotification(ContentValues values, String uniqueId, double lat, double lon) {
+        createTargetNotification(values, uniqueId, lat, lon, false);
+    }
+
+    private void createTargetNotification(ContentValues values, String uniqueId, double lat, double lon, boolean forceSound) {
+        NotificationDatabaseHelper notifDb = null;
         try {
             String type = values.getAsString("type");
             String name = values.getAsString("name");
@@ -504,7 +859,11 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             }
 
             // 1. Сохраняем уведомление в БД
-            NotificationDatabaseHelper notifDb = new NotificationDatabaseHelper(mContext);
+            notifDb = new NotificationDatabaseHelper(mContext);
+            if (!forceSound && !notifDb.isUniqueAlert(uniqueId)) {
+                return;
+            }
+
             String title = LocaleHelper.getString(mContext, R.string.target_notification_title, type);
             String message = LocaleHelper.getString(mContext, R.string.target_device_moving_message,
                     name, uniqueId, lat, lon);
@@ -553,18 +912,12 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             );
 
             // 4. Счетчик уведомлений
-            List<NotificationData> allNotifs = notifDb.getAllNotifications();
-            int alertCount = 0;
-            for (NotificationData n : allNotifs) {
-                if (n.getType() == NotificationData.NotificationType.ALARM) {
-                    alertCount++;
-                }
-            }
+            int alertCount = notifDb.countNotificationsByType(NotificationData.NotificationType.ALARM);
             String contentText = LocaleHelper.getString(mContext, R.string.targets_detected_count, alertCount);
 
             // 5. Получаем флаг "первое ли уведомление" из SharedPreferences
             SharedPreferences prefs = mContext.getSharedPreferences("notif_prefs", Context.MODE_PRIVATE);
-            boolean isFirstAlert = prefs.getBoolean("is_first_alert", true);
+            boolean isFirstAlert = forceSound || prefs.getBoolean("is_first_alert", true);
 
             // 6. Строим базовое уведомление
             NotificationCompat.Builder builder = new NotificationCompat.Builder(mContext, TARGET_NOTIFICATION_CHANNEL_ID)
@@ -582,7 +935,9 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                         .setVibrate(new long[]{0, 500, 200, 500});
 
                 // Сохраняем, что первый alert уже был
-                prefs.edit().putBoolean("is_first_alert", false).apply();
+                if (!forceSound) {
+                    prefs.edit().putBoolean("is_first_alert", false).apply();
+                }
                 Log.d(TAG, "🔊 FIRST ALERT: with sound and vibration");
             } else {
                 builder.setPriority(NotificationCompat.PRIORITY_LOW)
@@ -595,9 +950,12 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 notificationManager.notify(TARGET_NOTIFICATION_ID, builder.build());
                 Log.d(TAG, "✅ Notification sent/updated. Total alerts: " + alertCount);
             }
-
         } catch (Exception e) {
             Log.e(TAG, "Error creating notification: " + e.getMessage(), e);
+        } finally {
+            if (notifDb != null) {
+                notifDb.close();
+            }
         }
     }
     public void clearTableData(String folderName) {
@@ -610,8 +968,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             db.delete("\"" + folderName + "_unique\"", null, null);
 
             // После очистки текущей папки служебные таблицы тоже должны очиститься
-            db.delete("target_devices", null, null);
-            db.delete("safe_devices", null, null);
+            db.delete("gps_spoofed_devices", null, null);
 
             db.setTransactionSuccessful();
             notifyDevicesChanged(folderName);
@@ -626,6 +983,10 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         try {
             db.execSQL("ALTER TABLE \"" + oldName + "\" RENAME TO \"" + newName + "\"");
             db.execSQL("ALTER TABLE \"" + oldName + "_unique\" RENAME TO \"" + newName + "_unique\"");
+            RAW_TABLE_READY.remove(oldName);
+            UNIQUE_TABLE_READY.remove(oldName + "_unique");
+            RAW_TABLE_READY.add(newName);
+            UNIQUE_TABLE_READY.add(newName + "_unique");
         } catch (Exception e) {
             Log.e("DB_RENAME", "Error: " + e.getMessage());
         }
@@ -873,11 +1234,16 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             );
 
             // 3. Полностью пересобираем служебные таблицы
-            rebuildStatusTables(tableName);
+            if ("GREY".equalsIgnoreCase(newStatus) || "IGNORE".equalsIgnoreCase(newStatus)) {
+                removeDeviceFromAllPersistentStatuses(db, deviceKey);
+            } else {
+                syncStatusTables(db, deviceKey, newStatus);
+            }
 
             db.setTransactionSuccessful();
 
-            if ("TARGET".equalsIgnoreCase(newStatus)) {
+            if ("TARGET".equalsIgnoreCase(newStatus)
+                    && AlarmModeConfig.isMarkedTargetAlarmEnabled(mContext)) {
                 notifyTargetDeviceNow(tableName, deviceKey);
             }
 
@@ -941,6 +1307,34 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         db.delete("safe_devices", "device_key = ?", new String[]{deviceKey});
     }
 
+    private void addDeviceToBlacklist(SQLiteDatabase db, String deviceKey) {
+        deviceKey = normalizeDeviceKey(deviceKey);
+        if (deviceKey == null || deviceKey.isEmpty()) return;
+
+        ContentValues values = new ContentValues();
+        values.put("device_key", deviceKey);
+
+        db.insertWithOnConflict(
+                "blacklist_devices",
+                null,
+                values,
+                SQLiteDatabase.CONFLICT_IGNORE
+        );
+    }
+
+    private void removeDeviceFromBlacklist(SQLiteDatabase db, String deviceKey) {
+        deviceKey = normalizeDeviceKey(deviceKey);
+        if (deviceKey == null || deviceKey.isEmpty()) return;
+
+        db.delete("blacklist_devices", "device_key = ?", new String[]{deviceKey});
+    }
+
+    private void removeDeviceFromAllPersistentStatuses(SQLiteDatabase db, String deviceKey) {
+        removeDeviceFromTarget(db, deviceKey);
+        removeDeviceFromSafe(db, deviceKey);
+        removeDeviceFromBlacklist(db, deviceKey);
+    }
+
     private void syncStatusTables(SQLiteDatabase db, String deviceKey, String status) {
         deviceKey = normalizeDeviceKey(deviceKey);
         if (deviceKey == null || deviceKey.isEmpty()) return;
@@ -951,26 +1345,42 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             case "TARGET":
                 addDeviceToTarget(db, deviceKey);
                 removeDeviceFromSafe(db, deviceKey);
+                removeDeviceFromBlacklist(db, deviceKey);
                 break;
 
             case "SAFE":
                 addDeviceToSafe(db, deviceKey);
                 removeDeviceFromTarget(db, deviceKey);
+                removeDeviceFromBlacklist(db, deviceKey);
+                break;
+
+            case "BLACKLIST":
+                addDeviceToBlacklist(db, deviceKey);
+                removeDeviceFromTarget(db, deviceKey);
+                removeDeviceFromSafe(db, deviceKey);
+                break;
+
+            case "GREY":
+                removeDeviceFromTarget(db, deviceKey);
+                removeDeviceFromSafe(db, deviceKey);
+                removeDeviceFromBlacklist(db, deviceKey);
                 break;
 
             default:
-                removeDeviceFromTarget(db, deviceKey);
-                removeDeviceFromSafe(db, deviceKey);
                 break;
         }
     }
 
     public void rebuildStatusTables(String folderName) {
+        rebuildAllStatusTables();
+        if (folderName != null || folderName == null) return;
         SQLiteDatabase db = this.getWritableDatabase();
         Cursor cursor = null;
+        boolean ownsTransaction = false;
 
         try {
-            db.beginTransaction();
+            ownsTransaction = !db.inTransaction();
+            if (ownsTransaction) db.beginTransaction();
 
             // Полностью очищаем служебные таблицы
             db.delete("target_devices", null, null);
@@ -1002,17 +1412,115 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 syncStatusTables(db, deviceKey, status);
             }
 
-            db.setTransactionSuccessful();
+            if (ownsTransaction) db.setTransactionSuccessful();
         } catch (Exception e) {
             Log.e(TAG, "Error rebuilding status tables: " + e.getMessage());
         } finally {
             if (cursor != null) cursor.close();
-            if (db.inTransaction()) db.endTransaction();
+            if (ownsTransaction && db.inTransaction()) db.endTransaction();
         }
     }
 
     // Добавлен метод из dev для массового обновления статуса
+    private void rebuildAllStatusTables() {
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor cursor = null;
+        boolean ownsTransaction = false;
+
+        try {
+            ownsTransaction = !db.inTransaction();
+            if (ownsTransaction) db.beginTransaction();
+
+            createPersistentStatusTables(db);
+
+            for (String folder : getAllUserTables(db)) {
+                if (!tableExists(db, folder + "_unique")) continue;
+
+                if (cursor != null) {
+                    cursor.close();
+                    cursor = null;
+                }
+
+                cursor = db.rawQuery(
+                        "SELECT unique_identifier, bssid, cell_id, status " +
+                                "FROM \"" + folder + "_unique\"",
+                        null
+                );
+
+                while (cursor != null && cursor.moveToNext()) {
+                    String uniqueIdentifier = cursor.getString(0);
+                    String bssid = cursor.getString(1);
+                    int cellId = cursor.getInt(2);
+                    String status = cursor.getString(3);
+
+                    String deviceKey = null;
+                    if (uniqueIdentifier != null && !uniqueIdentifier.trim().isEmpty()) {
+                        deviceKey = uniqueIdentifier;
+                    } else if (bssid != null && !bssid.trim().isEmpty()) {
+                        deviceKey = bssid;
+                    } else if (cellId > 0) {
+                        deviceKey = String.valueOf(cellId);
+                    }
+
+                    syncStatusTables(db, deviceKey, status);
+                }
+            }
+
+            if (ownsTransaction) db.setTransactionSuccessful();
+        } catch (Exception e) {
+            Log.e(TAG, "Error rebuilding all status tables: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+            if (ownsTransaction && db.inTransaction()) db.endTransaction();
+        }
+    }
+
+    private List<String> getAllUserTables(SQLiteDatabase db) {
+        List<String> tables = new ArrayList<>();
+        Cursor cursor = null;
+        try {
+            cursor = db.rawQuery(
+                    "SELECT name FROM sqlite_master " +
+                            "WHERE type='table' " +
+                            "AND name NOT LIKE 'sqlite_%' " +
+                            "AND name NOT LIKE 'android_%' " +
+                            "AND name != 'unique_devices' " +
+                            "AND name != 'target_devices' " +
+                            "AND name != 'safe_devices' " +
+                            "AND name != 'blacklist_devices' " +
+                            "AND name != 'gps_spoofed_devices' " +
+                            "AND name NOT LIKE '%_unique'",
+                    null
+            );
+            while (cursor != null && cursor.moveToNext()) {
+                tables.add(cursor.getString(0));
+            }
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return tables;
+    }
+
+    private boolean tableExists(SQLiteDatabase db, String tableName) {
+        Cursor cursor = null;
+        try {
+            cursor = db.rawQuery(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+                    new String[]{tableName}
+            );
+            return cursor != null && cursor.moveToFirst();
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+    }
+
     public int updateAllDeviceStatusForTable(String folderName, String newStatus) {
+        return updateAllDeviceStatusForTable(folderName, newStatus, true, false);
+    }
+
+    public int updateAllDeviceStatusForTable(String folderName, String newStatus,
+                                             boolean includeCellTowers,
+                                             boolean includeSafeDevices) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
         values.put("status", newStatus);
@@ -1022,16 +1530,25 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         try {
             db.beginTransaction();
 
-            rowsAffected = db.update("\"" + folderName + "\"", values, null, null);
-            db.update("\"" + folderName + "_unique\"", values, null, null);
+            if ("TARGET".equalsIgnoreCase(newStatus)) {
+                String targetWhere = buildBulkTargetWhere(includeCellTowers, includeSafeDevices);
+                rowsAffected = db.update("\"" + folderName + "\"", values, targetWhere, null);
+                db.update("\"" + folderName + "_unique\"", values, targetWhere, null);
+            } else {
+                rowsAffected = db.update("\"" + folderName + "\"", values, null, null);
+                db.update("\"" + folderName + "_unique\"", values, null, null);
+            }
 
             // Полная пересборка target/safe по актуальному status из _unique
             rebuildStatusTables(folderName);
-            if ("TARGET".equalsIgnoreCase(newStatus)) {
+            if ("TARGET".equalsIgnoreCase(newStatus)
+                    && AlarmModeConfig.isMarkedTargetAlarmEnabled(mContext)) {
                 Cursor c = null;
                 try {
+                    String targetWhere = buildBulkTargetWhere(includeCellTowers, includeSafeDevices);
+                    String whereClause = targetWhere == null ? "" : " WHERE " + targetWhere;
                     c = db.rawQuery(
-                            "SELECT unique_identifier, bssid, cell_id FROM \"" + folderName + "_unique\"",
+                            "SELECT unique_identifier, bssid, cell_id FROM \"" + folderName + "_unique\"" + whereClause,
                             null
                     );
 
@@ -1070,11 +1587,34 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         return rowsAffected;
     }
 
+    private String buildBulkTargetWhere(boolean includeCellTowers, boolean includeSafeDevices) {
+        List<String> clauses = new ArrayList<>();
+        if (!includeSafeDevices) {
+            clauses.add("UPPER(COALESCE(status, 'GREY')) != 'SAFE'");
+        }
+        if (!includeCellTowers) {
+            clauses.add("UPPER(COALESCE(type, '')) != 'CELL'");
+        }
+        if (clauses.isEmpty()) {
+            return null;
+        }
+        StringBuilder where = new StringBuilder();
+        for (int i = 0; i < clauses.size(); i++) {
+            if (i > 0) {
+                where.append(" AND ");
+            }
+            where.append(clauses.get(i));
+        }
+        return where.toString();
+    }
+
     public boolean deleteTable(String folderName) {
         SQLiteDatabase db = this.getWritableDatabase();
         try {
             db.execSQL("DROP TABLE IF EXISTS \"" + folderName + "\"");
             db.execSQL("DROP TABLE IF EXISTS \"" + folderName + "_unique\"");
+            RAW_TABLE_READY.remove(folderName);
+            UNIQUE_TABLE_READY.remove(folderName + "_unique");
             return true;
         } catch (Exception e) {
             Log.e(TAG, "Error deleting folder tables: " + e.getMessage());
@@ -1095,6 +1635,8 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                             "AND name != 'unique_devices' " +
                             "AND name != 'target_devices' " +
                             "AND name != 'safe_devices' " +
+                            "AND name != 'blacklist_devices' " +
+                            "AND name != 'gps_spoofed_devices' " +
                             "AND name NOT LIKE '%_unique'",
                     null
             );
@@ -1108,10 +1650,216 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         }
         return tables;
     }
+
+    public GreySearchData searchGreyDevicesAcrossFolders(
+            String sourceFolder,
+            Long firstPeriodStart,
+            Long firstPeriodEnd,
+            Long secondPeriodStart,
+            Long secondPeriodEnd,
+            List<String> searchFolders
+    ) {
+        GreySearchData data = new GreySearchData();
+        if (sourceFolder == null || sourceFolder.trim().isEmpty()) {
+            return data;
+        }
+
+        Set<String> initialMacs = getGreyMacsFromFolder(sourceFolder, firstPeriodStart, firstPeriodEnd);
+        if (initialMacs.isEmpty()) {
+            return data;
+        }
+
+        List<String> folders = new ArrayList<>();
+        if (searchFolders == null || searchFolders.isEmpty()) {
+            folders.addAll(getAllTables());
+        } else {
+            folders.addAll(searchFolders);
+        }
+
+        Map<String, GreySearchDevice> devices = new LinkedHashMap<>();
+        for (String folder : folders) {
+            if (folder == null || folder.trim().isEmpty()) continue;
+            loadGreySearchPointsForFolder(folder, initialMacs, secondPeriodStart, secondPeriodEnd, devices, data.points);
+        }
+
+        data.devices.addAll(devices.values());
+        Collections.sort(data.devices, (left, right) -> {
+            int byCount = Integer.compare(right.detectionCount, left.detectionCount);
+            if (byCount != 0) return byCount;
+            return Long.compare(right.lastSeen, left.lastSeen);
+        });
+        Collections.sort(data.points, (left, right) -> Long.compare(right.timestamp, left.timestamp));
+        return data;
+    }
+
+    private Set<String> getGreyMacsFromFolder(String folderName, Long start, Long end) {
+        Set<String> macs = new LinkedHashSet<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            StringBuilder sql = new StringBuilder(
+                    "SELECT DISTINCT UPPER(bssid) AS mac FROM \"" + folderName + "\" " +
+                            "WHERE bssid IS NOT NULL AND TRIM(bssid) != '' " +
+                            "AND UPPER(COALESCE(status, 'GREY')) = 'GREY' " +
+                            "AND UPPER(COALESCE(type, '')) != 'CELL'"
+            );
+            List<String> args = new ArrayList<>();
+            appendTimestampWhere(sql, args, start, end);
+            cursor = db.rawQuery(sql.toString(), args.toArray(new String[0]));
+            while (cursor != null && cursor.moveToNext()) {
+                String mac = normalizeDeviceKey(cursor.getString(0));
+                if (mac != null && !mac.isEmpty()) {
+                    macs.add(mac);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading grey MACs from " + folderName + ": " + e.getMessage(), e);
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return macs;
+    }
+
+    private void loadGreySearchPointsForFolder(
+            String folderName,
+            Set<String> targetMacs,
+            Long start,
+            Long end,
+            Map<String, GreySearchDevice> devices,
+            List<GreySearchPoint> points
+    ) {
+        if (targetMacs == null || targetMacs.isEmpty()) return;
+        List<String> macList = new ArrayList<>(targetMacs);
+        for (int offset = 0; offset < macList.size(); offset += 400) {
+            int endIndex = Math.min(offset + 400, macList.size());
+            loadGreySearchPointsChunk(folderName, macList.subList(offset, endIndex), start, end, devices, points);
+        }
+    }
+
+    private void loadGreySearchPointsChunk(
+            String folderName,
+            List<String> macChunk,
+            Long start,
+            Long end,
+            Map<String, GreySearchDevice> devices,
+            List<GreySearchPoint> points
+    ) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        try {
+            StringBuilder placeholders = new StringBuilder();
+            List<String> args = new ArrayList<>();
+            for (int i = 0; i < macChunk.size(); i++) {
+                if (i > 0) placeholders.append(',');
+                placeholders.append('?');
+                args.add(macChunk.get(i));
+            }
+
+            StringBuilder sql = new StringBuilder(
+                    "SELECT type,name,UPPER(bssid) AS mac,latitude,longitude,timestamp,status " +
+                            "FROM \"" + folderName + "\" " +
+                            "WHERE UPPER(COALESCE(bssid, '')) IN (" + placeholders + ")"
+            );
+            appendTimestampWhere(sql, args, start, end);
+            sql.append(" ORDER BY timestamp DESC");
+
+            cursor = db.rawQuery(sql.toString(), args.toArray(new String[0]));
+            while (cursor != null && cursor.moveToNext()) {
+                String mac = normalizeDeviceKey(cursor.getString(cursor.getColumnIndexOrThrow("mac")));
+                if (mac == null || mac.isEmpty()) continue;
+
+                String type = cursor.getString(cursor.getColumnIndexOrThrow("type"));
+                String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
+                double latitude = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
+                double longitude = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
+                long timestamp = cursor.getLong(cursor.getColumnIndexOrThrow("timestamp"));
+                String status = cursor.getString(cursor.getColumnIndexOrThrow("status"));
+
+                GreySearchDevice device = devices.get(mac);
+                if (device == null) {
+                    device = new GreySearchDevice(mac, name, type);
+                    devices.put(mac, device);
+                }
+                device.detectionCount++;
+                device.lastSeen = Math.max(device.lastSeen, timestamp);
+                if ((device.name == null || device.name.trim().isEmpty()) && name != null && !name.trim().isEmpty()) {
+                    device.name = name;
+                }
+                if ((device.type == null || device.type.trim().isEmpty()) && type != null && !type.trim().isEmpty()) {
+                    device.type = type;
+                }
+
+                if (latitude != 0.0 && longitude != 0.0) {
+                    points.add(new GreySearchPoint(mac, name, type, folderName, latitude, longitude, timestamp, status));
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading grey search points from " + folderName + ": " + e.getMessage(), e);
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+    }
+
+    private void appendTimestampWhere(StringBuilder sql, List<String> args, Long start, Long end) {
+        if (start != null) {
+            sql.append(" AND timestamp >= ?");
+            args.add(String.valueOf(start));
+        }
+        if (end != null) {
+            sql.append(" AND timestamp <= ?");
+            args.add(String.valueOf(end));
+        }
+    }
+
+    public static class GreySearchData {
+        public final List<GreySearchDevice> devices = new ArrayList<>();
+        public final List<GreySearchPoint> points = new ArrayList<>();
+    }
+
+    public static class GreySearchDevice {
+        public final String mac;
+        public String name;
+        public String type;
+        public int detectionCount;
+        public long lastSeen;
+
+        public GreySearchDevice(String mac, String name, String type) {
+            this.mac = mac;
+            this.name = name;
+            this.type = type;
+        }
+    }
+
+    public static class GreySearchPoint {
+        public final String mac;
+        public final String name;
+        public final String type;
+        public final String folderName;
+        public final double latitude;
+        public final double longitude;
+        public final long timestamp;
+        public final String status;
+
+        public GreySearchPoint(String mac, String name, String type, String folderName,
+                               double latitude, double longitude, long timestamp, String status) {
+            this.mac = mac;
+            this.name = name;
+            this.type = type;
+            this.folderName = folderName;
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.timestamp = timestamp;
+            this.status = status;
+        }
+    }
+
     public void createTableIfNotExists(String tableName) {
         SQLiteDatabase db = this.getWritableDatabase();
         try {
-            if ("target_devices".equals(tableName) || "safe_devices".equals(tableName)) {
+            if ("target_devices".equals(tableName)
+                    || "safe_devices".equals(tableName)
+                    || "blacklist_devices".equals(tableName)
+                    || "gps_spoofed_devices".equals(tableName)) {
                 return;
             }
             createFolderRawTableIfNotExists(db, tableName);
@@ -1126,6 +1874,7 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     }
 
     private void createFolderRawTableIfNotExists(SQLiteDatabase db, String tableName) {
+        if (RAW_TABLE_READY.contains(tableName)) return;
         String safeName = "\"" + tableName + "\"";
         Cursor cursor = db.rawQuery(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
@@ -1169,9 +1918,12 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         } else {
             addMissingColumns(db, tableName);
         }
+        createRawTableIndexes(db, tableName);
+        RAW_TABLE_READY.add(tableName);
     }
 
     private void createFolderUniqueTableIfNotExists(SQLiteDatabase db, String uniqueTableName) {
+        if (UNIQUE_TABLE_READY.contains(uniqueTableName)) return;
         String safeName = "\"" + uniqueTableName + "\"";
 
         String createTableQuery = "CREATE TABLE IF NOT EXISTS " + safeName + " (" +
@@ -1212,8 +1964,8 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 ");";
 
         db.execSQL(createTableQuery);
-        db.execSQL("CREATE INDEX IF NOT EXISTS idx_" + uniqueTableName + "_uid ON \"" + uniqueTableName + "\"(unique_identifier)");
-        db.execSQL("CREATE INDEX IF NOT EXISTS idx_" + uniqueTableName + "_last_seen ON \"" + uniqueTableName + "\"(last_seen)");
+        createUniqueTableIndexes(db, uniqueTableName);
+        UNIQUE_TABLE_READY.add(uniqueTableName);
     }
 
     private void addMissingColumns(SQLiteDatabase db, String tableName) {
@@ -1244,6 +1996,122 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     }
 
     // Метод для получения всех записей устройства по MAC адресу (bssid) и cell_id
+    public static class DeviceHistorySummary {
+        public final List<DeviceLocation> points;
+        public final long firstTimestamp;
+        public final long lastTimestamp;
+        public final int detectionCount;
+
+        public DeviceHistorySummary(List<DeviceLocation> points, long firstTimestamp, long lastTimestamp, int detectionCount) {
+            this.points = points;
+            this.firstTimestamp = firstTimestamp;
+            this.lastTimestamp = lastTimestamp;
+            this.detectionCount = detectionCount;
+        }
+
+        public boolean isEmpty() {
+            return detectionCount <= 0 || points == null || points.isEmpty();
+        }
+    }
+
+    private static class DeviceHistoryQuery {
+        final String whereClause;
+        final String[] args;
+
+        DeviceHistoryQuery(String whereClause, String[] args) {
+            this.whereClause = whereClause;
+            this.args = args;
+        }
+    }
+
+    private DeviceHistoryQuery buildDeviceHistoryQuery(String deviceKey, String deviceType) {
+        boolean isCell = deviceType != null && deviceType.equalsIgnoreCase("Cell");
+        if (isCell) {
+            if (deviceKey != null && deviceKey.contains("_")) {
+                return new DeviceHistoryQuery(
+                        "type = 'Cell' AND " +
+                                "CAST(mcc AS TEXT) || '_' || CAST(mnc AS TEXT) || '_' || " +
+                                "CASE WHEN network_type IN ('LTE', '5G') " +
+                                "THEN CAST(tac AS TEXT) ELSE CAST(lac AS TEXT) END || '_' || " +
+                                "CAST(cell_id AS TEXT) = ?",
+                        new String[]{deviceKey}
+                );
+            }
+            return new DeviceHistoryQuery(
+                    "type = 'Cell' AND CAST(cell_id AS TEXT) = ?",
+                    new String[]{deviceKey}
+            );
+        }
+
+        return new DeviceHistoryQuery(
+                "bssid = ? AND type IN ('Wi-Fi', 'Bluetooth')",
+                new String[]{deviceKey}
+        );
+    }
+
+    private String[] appendArg(String[] args, String extra) {
+        String[] result = new String[args.length + 1];
+        System.arraycopy(args, 0, result, 0, args.length);
+        result[args.length] = extra;
+        return result;
+    }
+
+    public DeviceHistorySummary getDeviceHistorySummaryByKey(String tableName,
+                                                             String deviceKey,
+                                                             String deviceType,
+                                                             int pointLimit) {
+        List<DeviceLocation> points = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = null;
+        int count = 0;
+        long firstTimestamp = 0L;
+        long lastTimestamp = 0L;
+
+        try {
+            DeviceHistoryQuery spec = buildDeviceHistoryQuery(deviceKey, deviceType);
+            cursor = db.rawQuery(
+                    "SELECT COUNT(*), MIN(timestamp), MAX(timestamp) FROM \"" + tableName + "\" WHERE " + spec.whereClause,
+                    spec.args
+            );
+            if (cursor != null && cursor.moveToFirst()) {
+                count = cursor.getInt(0);
+                if (count > 0) {
+                    firstTimestamp = cursor.getLong(1);
+                    lastTimestamp = cursor.getLong(2);
+                }
+            }
+            if (cursor != null) {
+                cursor.close();
+                cursor = null;
+            }
+
+            if (count <= 0) {
+                return new DeviceHistorySummary(points, 0L, 0L, 0);
+            }
+
+            int safeLimit = Math.max(1, Math.min(pointLimit, 5000));
+            String pointQuery = "SELECT name, latitude, longitude, timestamp FROM (" +
+                    "SELECT name, latitude, longitude, timestamp FROM \"" + tableName + "\" " +
+                    "WHERE " + spec.whereClause + " ORDER BY timestamp DESC LIMIT ?" +
+                    ") ORDER BY timestamp ASC";
+            cursor = db.rawQuery(pointQuery, appendArg(spec.args, String.valueOf(safeLimit)));
+
+            while (cursor != null && cursor.moveToNext()) {
+                String name = cursor.getString(cursor.getColumnIndexOrThrow("name"));
+                double latitude = cursor.getDouble(cursor.getColumnIndexOrThrow("latitude"));
+                double longitude = cursor.getDouble(cursor.getColumnIndexOrThrow("longitude"));
+                String timestamp = cursor.getString(cursor.getColumnIndexOrThrow("timestamp"));
+                points.add(new DeviceLocation(name, latitude, longitude, timestamp, deviceKey));
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting device history summary: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+
+        return new DeviceHistorySummary(points, firstTimestamp, lastTimestamp, count);
+    }
+
     public List<DeviceLocation> getDeviceHistoryByKey(String tableName, String deviceKey, String deviceType) {
         List<DeviceLocation> history = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
@@ -1422,23 +2290,27 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     }
 
     // 3. Проверка условий Target
-    private String evaluateTargetStatus(String uniqueId, double curLat, double curLon, long curTime, String tableName) {
+    private String evaluateTargetStatus(SQLiteDatabase db, String uniqueId, double curLat, double curLon, long curTime, String tableName) {
         if (uniqueId == null || uniqueId.isEmpty()) return "GREY";
+        if (isGpsSpoofIgnored(db, uniqueId)) {
+            Log.d("MATH_CHECK", "ID: " + uniqueId + " - ignored as GPS spoofing");
+            return "GREY";
+        }
 
-        SQLiteDatabase db = this.getReadableDatabase();
         String column = uniqueId.contains(":") ? "bssid" : "cell_id";
 
         Cursor cursor = db.query("\"" + tableName + "\"",
                 new String[]{"latitude", "longitude", "timestamp"},
                 "CAST(" + column + " AS TEXT) = ?",
                 new String[]{uniqueId},
-                null, null, "timestamp DESC", "1");
+                null, null, "timestamp DESC", "2");
 
         double speedKmH = 0;
         double dist24h = 0;
 
         try {
             if (cursor != null && cursor.moveToFirst()) {
+                boolean isSecondPoint = cursor.getCount() == 1;
                 double prevLat = cursor.getDouble(0);
                 double prevLon = cursor.getDouble(1);
                 long prevTime = cursor.getLong(2);
@@ -1456,6 +2328,18 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
                 double timeHours = (double) (curTime - prevTime) / 3600000.0;
                 if (timeHours > 0) {
                     speedKmH = (currentJumpMeters / 1000.0) / timeHours;
+                }
+
+                if (isSecondPoint
+                        && currentJumpMeters > GPS_SPOOF_DISTANCE_METERS
+                        && speedKmH > GPS_SPOOF_SPEED_KMH) {
+                    markGpsSpoofIgnored(db, uniqueId, currentJumpMeters, speedKmH, curTime);
+                    Log.d("MATH_CHECK", String.format(
+                            Locale.US,
+                            "ID: %s - GPS spoofing ignored: second point jump %.2f m at %.2f km/h",
+                            uniqueId, currentJumpMeters, speedKmH
+                    ));
+                    return "GREY";
                 }
 
                 // 3. Фильтры перед дальнейшим расчетом
@@ -1642,6 +2526,65 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     /**
      * Получает последнюю запись устройства из Основная
      */
+    private String getLatestDeviceStatus(SQLiteDatabase db, String uniqueId, String tableName, ContentValues values) {
+        Cursor cursor = null;
+        try {
+            String bssid = values.getAsString("bssid");
+            String query;
+            String[] args;
+
+            if (bssid != null && !bssid.trim().isEmpty()) {
+                query = "SELECT status FROM \"" + tableName + "\" " +
+                        "WHERE UPPER(COALESCE(bssid, '')) = ? " +
+                        "ORDER BY timestamp DESC LIMIT 1";
+                args = new String[]{uniqueId};
+            } else {
+                Long cellId = values.getAsLong("cell_id");
+                Integer mcc = values.getAsInteger("mcc");
+                Integer mnc = values.getAsInteger("mnc");
+                String networkType = values.getAsString("network_type");
+                boolean lteLike = "LTE".equalsIgnoreCase(networkType) || "5G".equalsIgnoreCase(networkType);
+                Long areaValue = lteLike ? values.getAsLong("tac") : null;
+                if (!lteLike) {
+                    Integer lac = values.getAsInteger("lac");
+                    if (lac != null) areaValue = lac.longValue();
+                }
+
+                if (areaValue != null) {
+                    query = "SELECT status FROM \"" + tableName + "\" " +
+                            "WHERE type = 'Cell' AND cell_id = ? AND mcc = ? AND mnc = ? AND " +
+                            (lteLike ? "tac" : "lac") + " = ? " +
+                            "ORDER BY timestamp DESC LIMIT 1";
+                    args = new String[]{
+                            String.valueOf(cellId),
+                            String.valueOf(mcc),
+                            String.valueOf(mnc),
+                            String.valueOf(areaValue)
+                    };
+                } else {
+                    query = "SELECT status FROM \"" + tableName + "\" " +
+                            "WHERE type = 'Cell' AND cell_id = ? AND mcc = ? AND mnc = ? " +
+                            "ORDER BY timestamp DESC LIMIT 1";
+                    args = new String[]{
+                            String.valueOf(cellId),
+                            String.valueOf(mcc),
+                            String.valueOf(mnc)
+                    };
+                }
+            }
+
+            cursor = db.rawQuery(query, args);
+            if (cursor != null && cursor.moveToFirst()) {
+                return cursor.getString(0);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error getting latest device status: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return null;
+    }
+
     public ContentValues getLatestDeviceData(String uniqueId, String tableName) {
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = null;
@@ -1682,10 +2625,13 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     }
 
     public void notifyTargetDeviceNow(String tableName, String deviceKey) {
-        SQLiteDatabase db = this.getReadableDatabase();
+        if (!AlarmModeConfig.isMarkedTargetAlarmEnabled(mContext)) return;
+
+        SQLiteDatabase db = this.getWritableDatabase();
         Cursor cursor = null;
 
         try {
+            createPersistentStatusTables(db);
             deviceKey = normalizeDeviceKey(deviceKey);
             if (deviceKey == null || deviceKey.isEmpty()) return;
 
@@ -1736,6 +2682,18 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
             }
 
             cursor = db.rawQuery(
+                    "SELECT 1 FROM blacklist_devices WHERE UPPER(device_key) = ? LIMIT 1",
+                    new String[]{deviceKey}
+            );
+            if (cursor != null && cursor.moveToFirst()) {
+                return "BLACKLIST";
+            }
+            if (cursor != null) {
+                cursor.close();
+                cursor = null;
+            }
+
+            cursor = db.rawQuery(
                     "SELECT 1 FROM target_devices WHERE UPPER(device_key) = ? LIMIT 1",
                     new String[]{deviceKey}
             );
@@ -1765,6 +2723,127 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
     }
 
     // метод для получения deviceKey
+    public Map<String, String> getStatusesFromServiceTables(Set<String> deviceKeys) {
+        Map<String, String> statuses = new HashMap<>();
+        if (deviceKeys == null || deviceKeys.isEmpty()) return statuses;
+
+        List<String> normalizedKeys = new ArrayList<>();
+        for (String key : deviceKeys) {
+            String normalized = normalizeDeviceKey(key);
+            if (normalized != null && !normalized.isEmpty() && !normalizedKeys.contains(normalized)) {
+                normalizedKeys.add(normalized);
+            }
+        }
+        if (normalizedKeys.isEmpty()) return statuses;
+
+        SQLiteDatabase db = this.getWritableDatabase();
+        createPersistentStatusTables(db);
+        fillStatusesFromTable(db, "blacklist_devices", "BLACKLIST", normalizedKeys, statuses);
+        fillStatusesFromTable(db, "target_devices", "TARGET", normalizedKeys, statuses);
+        fillStatusesFromTable(db, "safe_devices", "SAFE", normalizedKeys, statuses);
+        return statuses;
+    }
+
+    public Set<String> getPersistentStatusKeys(String status) {
+        Set<String> keys = new LinkedHashSet<>();
+        String tableName = statusTableForStatus(status);
+        if (tableName == null) return keys;
+
+        SQLiteDatabase db = this.getWritableDatabase();
+        Cursor cursor = null;
+        try {
+            createPersistentStatusTables(db);
+            cursor = db.rawQuery(
+                    "SELECT UPPER(device_key) FROM " + tableName + " ORDER BY id DESC",
+                    null
+            );
+            while (cursor != null && cursor.moveToNext()) {
+                String key = cursor.getString(0);
+                if (key != null && !key.trim().isEmpty()) {
+                    keys.add(key);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading persistent status keys: " + e.getMessage());
+        } finally {
+            if (cursor != null) cursor.close();
+        }
+        return keys;
+    }
+
+    public int removeDeviceFromPersistentStatus(String deviceKey, String status) {
+        String tableName = statusTableForStatus(status);
+        String normalizedKey = normalizeDeviceKey(deviceKey);
+        if (tableName == null || normalizedKey == null || normalizedKey.isEmpty()) return 0;
+
+        SQLiteDatabase db = this.getWritableDatabase();
+        try {
+            createPersistentStatusTables(db);
+            return db.delete(tableName, "UPPER(device_key) = ?", new String[]{normalizedKey});
+        } catch (Exception e) {
+            Log.e(TAG, "Error removing persistent status key: " + e.getMessage());
+            return 0;
+        }
+    }
+
+    private String statusTableForStatus(String status) {
+        if ("TARGET".equalsIgnoreCase(status) || "ALERT".equalsIgnoreCase(status)) {
+            return "target_devices";
+        }
+        if ("SAFE".equalsIgnoreCase(status)) {
+            return "safe_devices";
+        }
+        if ("BLACKLIST".equalsIgnoreCase(status)) {
+            return "blacklist_devices";
+        }
+        return null;
+    }
+
+    private void fillStatusesFromTable(SQLiteDatabase db,
+                                       String tableName,
+                                       String status,
+                                       List<String> normalizedKeys,
+                                       Map<String, String> statuses) {
+        final int chunkSize = 400;
+        for (int offset = 0; offset < normalizedKeys.size(); offset += chunkSize) {
+            int end = Math.min(offset + chunkSize, normalizedKeys.size());
+            StringBuilder placeholders = new StringBuilder();
+            String[] args = new String[end - offset];
+            for (int i = offset; i < end; i++) {
+                if (i > offset) placeholders.append(',');
+                placeholders.append('?');
+                args[i - offset] = normalizedKeys.get(i);
+            }
+
+            Cursor cursor = null;
+            try {
+                cursor = db.rawQuery(
+                        "SELECT UPPER(device_key) FROM " + tableName +
+                                " WHERE UPPER(device_key) IN (" + placeholders + ")",
+                        args
+                );
+                while (cursor != null && cursor.moveToNext()) {
+                    String key = cursor.getString(0);
+                    if ("BLACKLIST".equals(status)) {
+                        statuses.put(key, status);
+                        continue;
+                    }
+                    if ("BLACKLIST".equals(statuses.get(key))) {
+                        continue;
+                    }
+                    if ("SAFE".equals(status) && "TARGET".equals(statuses.get(key))) {
+                        continue;
+                    }
+                    statuses.put(key, status);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error bulk loading statuses from " + tableName + ": " + e.getMessage());
+            } finally {
+                if (cursor != null) cursor.close();
+            }
+        }
+    }
+
     public String buildDeviceKeyFromRow(
             String bssid,
             Long cellId,
@@ -1914,5 +2993,17 @@ public class MainDatabaseHelper extends SQLiteOpenHelper {
         } catch (Exception e) {
             Log.e(TAG, "Error sending devices changed broadcast: " + e.getMessage(), e);
         }
+    }
+
+    private void notifyDevicesChangedThrottled(String tableName) {
+        long now = System.currentTimeMillis();
+        synchronized (LAST_DEVICES_CHANGED_BROADCAST) {
+            Long last = LAST_DEVICES_CHANGED_BROADCAST.get(tableName);
+            if (last != null && now - last < DEVICES_CHANGED_BROADCAST_INTERVAL_MS) {
+                return;
+            }
+            LAST_DEVICES_CHANGED_BROADCAST.put(tableName, now);
+        }
+        notifyDevicesChanged(tableName);
     }
 }

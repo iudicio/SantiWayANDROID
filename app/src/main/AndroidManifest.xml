@@ -19,6 +19,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
 
     <!-- Локация -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -33,8 +34,8 @@
     <!-- Уведомления (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- READ_PHONE_STATE - если используется для сотовых сетей -->
-    <!--<uses-permission android:name="android.permission.READ_PHONE_STATE" />-->
+    <!-- Сотовые сети -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
     <!-- Для карт -->
     <uses-feature
@@ -44,6 +45,7 @@
     <!-- Декларация использования Bluetooth для старых версий Android -->
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
 
     <!-- Декларация для локации -->
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
@@ -95,8 +97,34 @@
             android:exported="false" />
 
         <activity
+            android:name=".GrayDeviceSearchActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SantiWay" />
+        <activity
+            android:name=".GrayDeviceSearchListActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SantiWay" />
+        <activity
+            android:name=".GrayDeviceHistogramActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SantiWay" />
+
+        <activity
             android:name=".esp32.Esp32Activity"
             android:exported="false"
+            android:theme="@style/Theme.SantiWay" />
+
+        <activity
+            android:name=".esp32.Esp32MapActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SantiWay" />
+
+        <activity
+            android:name=".esp32.TriangulatedDevicesActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SantiWay" />
+
+        <activity android:name=".esp32.firmware.Esp32FirmwareActivity" android:exported="false"
             android:theme="@style/Theme.SantiWay" />
 
         <activity
@@ -104,6 +132,11 @@
             android:exported="false" />
 
         <activity android:name=".AppConfigViewActivity"
+            android:exported="false" />
+        <activity android:name=".OpenCellIdStatusActivity"
+            android:exported="false"
+            android:theme="@style/Theme.SantiWay" />
+        <activity android:name=".AppManualActivity"
             android:exported="false" />
 
         <activity

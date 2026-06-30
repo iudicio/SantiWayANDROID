@@ -7,6 +7,7 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.database.sqlite.SQLiteDatabase;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -19,6 +20,7 @@ import androidx.core.app.NotificationCompat;
 import com.example.santiway.FolderNameHelper;
 import com.example.santiway.LocaleHelper;
 import com.example.santiway.R;
+import com.example.santiway.opencellid.OpenCellIdSyncScheduler;
 import com.example.santiway.upload_data.MainDatabaseHelper;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
@@ -36,6 +38,7 @@ public class CellForegroundService extends Service {
     private Handler handler;
     private Runnable scanRunnable;
     private boolean isScanning = false;
+    private boolean scanInProgress = false;
     private final long scanInterval = 10000;
 
     private String currentTableName = FolderNameHelper.MAIN_FOLDER_INTERNAL;
@@ -55,6 +58,8 @@ public class CellForegroundService extends Service {
         handler = new Handler(Looper.getMainLooper());
         databaseHelper = new MainDatabaseHelper(this);
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+        OpenCellIdSyncScheduler.scheduleDaily(this);
+        OpenCellIdSyncScheduler.enqueueIfDue(this);
 
         createNotificationChannel();
     }
@@ -67,6 +72,10 @@ public class CellForegroundService extends Service {
                 if (intent.hasExtra("tableName")) {
                     currentTableName = intent.getStringExtra("tableName");
                 }
+                currentLatitude = intent.getDoubleExtra("latitude", currentLatitude);
+                currentLongitude = intent.getDoubleExtra("longitude", currentLongitude);
+                currentAltitude = intent.getDoubleExtra("altitude", currentAltitude);
+                currentAccuracy = intent.getFloatExtra("accuracy", currentAccuracy);
                 startForegroundService();
                 startScanning();
             } else if ("STOP_SCAN".equals(action)) {
@@ -96,28 +105,30 @@ public class CellForegroundService extends Service {
         scanRunnable = new Runnable() {
             @Override
             public void run() {
+                if (scanInProgress) {
+                    if (isScanning) {
+                        handler.postDelayed(this, scanInterval);
+                    }
+                    return;
+                }
+                scanInProgress = true;
                 // Получаем координаты перед сканированием
                 if (ActivityCompat.checkSelfPermission(CellForegroundService.this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
                         ActivityCompat.checkSelfPermission(CellForegroundService.this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                     Log.w(TAG, "Location permissions not granted. Cannot perform scan.");
+                    scanInProgress = false;
+                    if (isScanning) {
+                        handler.postDelayed(this, scanInterval);
+                    }
                     return;
                 }
 
-                fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
-                        .addOnSuccessListener(location -> {
-                            if (location != null) {
-                                currentLatitude = location.getLatitude();
-                                currentLongitude = location.getLongitude();
-                                currentAltitude = location.getAltitude();
-                                currentAccuracy = location.getAccuracy();
-                            }
-
-                            scanAndSave();
-                        })
-                        .addOnFailureListener(e -> {
-                            Log.e(TAG, "Failed to get location: " + e.getMessage());
-                            scanAndSave(); // Даже без координат пробуем сохранить
-                        });
+                try {
+                    scanAndSave();
+                    refreshLocationAsync();
+                } finally {
+                    scanInProgress = false;
+                }
 
                 if (isScanning) {
                     handler.postDelayed(this, scanInterval);
@@ -128,9 +139,31 @@ public class CellForegroundService extends Service {
         handler.post(scanRunnable);
     }
 
+    private void refreshLocationAsync() {
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, null)
+                .addOnSuccessListener(location -> {
+                    if (location != null) {
+                        currentLatitude = location.getLatitude();
+                        currentLongitude = location.getLongitude();
+                        currentAltitude = location.getAltitude();
+                        currentAccuracy = location.getAccuracy();
+                    }
+                })
+                .addOnFailureListener(e ->
+                        Log.w(TAG, "Failed to refresh cell scan location: " + e.getMessage()));
+    }
+
     private void scanAndSave() {
         List<CellTower> towers = cellScanner.getAllCellTowers();
         if (towers != null) {
+            SQLiteDatabase db = databaseHelper.getWritableDatabase();
+            boolean ownsTransaction = !db.inTransaction();
+            if (ownsTransaction) db.beginTransaction();
+            try {
             for (CellTower tower : towers) {
                 // Записываем координаты в объект перед сохранением
                 tower.setLatitude(currentLatitude);
@@ -139,6 +172,10 @@ public class CellForegroundService extends Service {
                 tower.setLocationAccuracy(currentAccuracy);
 
                 saveToDatabase(tower);
+            }
+            if (ownsTransaction) db.setTransactionSuccessful();
+            } finally {
+                if (ownsTransaction && db.inTransaction()) db.endTransaction();
             }
             Log.d(TAG, "Cell scan successful. Found " + towers.size() + " towers.");
         } else {
@@ -195,6 +232,7 @@ public class CellForegroundService extends Service {
         super.onDestroy();
         Log.d(TAG, "Service onDestroy");
         isScanning = false;
+        scanInProgress = false;
 
         if (handler != null && scanRunnable != null) {
             handler.removeCallbacks(scanRunnable);

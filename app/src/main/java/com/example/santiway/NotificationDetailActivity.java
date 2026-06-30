@@ -1,12 +1,15 @@
 package com.example.santiway;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -17,12 +20,16 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.core.content.FileProvider;
 
 import com.bumptech.glide.Glide;
+import com.example.santiway.activity_map.MapLayerManager;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.PolylineOptions;
+import com.google.android.gms.maps.model.TileOverlay;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -34,6 +41,9 @@ public class NotificationDetailActivity extends BaseLocalizedActivity implements
 
     private NotificationData notification;
     private SupportMapFragment mapFragment;
+    private GoogleMap googleMap;
+    private TileOverlay mapTileOverlay;
+    private Toolbar toolbar;
     private static final String TAG = "NotifDetailActivity";
 
     @Override
@@ -41,7 +51,7 @@ public class NotificationDetailActivity extends BaseLocalizedActivity implements
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_notification_detail);
 
-        Toolbar toolbar = findViewById(R.id.toolbar);
+        toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
@@ -108,8 +118,9 @@ public class NotificationDetailActivity extends BaseLocalizedActivity implements
                     // Кнопка для установки APK
                     Button installButton = new Button(this);
                     installButton.setText(getString(R.string.install_apk));
-                    installButton.setTextColor(getResources().getColor(android.R.color.white));
-                    installButton.setBackgroundColor(notification.getType().getColor());
+                    int buttonColor = notification.getType().getColor();
+                    installButton.setTextColor(readableTextColor(buttonColor));
+                    installButton.setBackgroundColor(buttonColor);
                     binaryContainer.addView(installButton);
 
                     // Исправленная лямбда-функция
@@ -175,10 +186,67 @@ public class NotificationDetailActivity extends BaseLocalizedActivity implements
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
+        this.googleMap = googleMap;
+        mapTileOverlay = MapLayerManager.applyGoogleLayer(this, googleMap, mapTileOverlay);
+        setupGoogleMapControls();
         if (notification.getLatitude() != null && notification.getLongitude() != null) {
             LatLng location = new LatLng(notification.getLatitude(), notification.getLongitude());
-            googleMap.addMarker(new MarkerOptions().position(location).title(notification.getTitle()));
-            googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(location, 15));
+            googleMap.addMarker(new MarkerOptions()
+                    .position(location)
+                    .title(notification.getTitle())
+                    .snippet(String.format(Locale.US, "%.6f, %.6f",
+                            notification.getLatitude(), notification.getLongitude()))
+                    .icon(MapLayerManager.googleMarkerDescriptor(this, notification.getType().getColor(), 1)));
+            if (notification.getReferenceLatitude() != null
+                    && notification.getReferenceLongitude() != null) {
+                LatLng reference = new LatLng(
+                        notification.getReferenceLatitude(),
+                        notification.getReferenceLongitude()
+                );
+                googleMap.addMarker(new MarkerOptions()
+                        .position(reference)
+                        .title(getString(R.string.opencellid_reference_location_title))
+                        .snippet(String.format(Locale.US, "%.6f, %.6f",
+                                notification.getReferenceLatitude(),
+                                notification.getReferenceLongitude()))
+                        .icon(MapLayerManager.googleMarkerDescriptor(this, Color.parseColor("#3DDC84"), 1)));
+                googleMap.addPolyline(new PolylineOptions()
+                        .add(reference, location)
+                        .color(Color.parseColor("#FF9800"))
+                        .width(6f)
+                        .geodesic(true));
+                LatLngBounds bounds = LatLngBounds.builder()
+                        .include(reference)
+                        .include(location)
+                        .build();
+                googleMap.moveCamera(CameraUpdateFactory.newLatLngBounds(bounds, 72));
+            } else {
+                googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(location, 15));
+            }
+        }
+    }
+
+    private void setupGoogleMapControls() {
+        if (googleMap == null) return;
+        View legacyControls = findViewById(R.id.notification_map_controls);
+        if (legacyControls != null) legacyControls.setVisibility(View.GONE);
+        View mapCard = findViewById(R.id.map_card);
+        if (mapCard instanceof ViewGroup) {
+            ((ViewGroup) mapCard).addView(MapLayerManager.createGoogleControls(
+                    this,
+                    googleMap,
+                    () -> mapTileOverlay = MapLayerManager.applyGoogleLayer(this, googleMap, mapTileOverlay),
+                    null,
+                    12,
+                    open -> {
+                        if (getSupportActionBar() != null) {
+                            getSupportActionBar().setTitle(open ? "" : getString(R.string.notification_details_title));
+                        } else if (toolbar != null) {
+                            toolbar.setTitle(open ? "" : getString(R.string.notification_details_title));
+                        }
+                    },
+                    legacyControls
+            ));
         }
     }
 
@@ -189,5 +257,25 @@ public class NotificationDetailActivity extends BaseLocalizedActivity implements
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private int readableTextColor(int backgroundColor) {
+        double luminance = relativeLuminance(backgroundColor);
+        double contrastWithBlack = (luminance + 0.05d) / 0.05d;
+        double contrastWithWhite = 1.05d / (luminance + 0.05d);
+        return contrastWithBlack >= contrastWithWhite ? Color.BLACK : Color.WHITE;
+    }
+
+    private double relativeLuminance(int color) {
+        double red = linearColor(Color.red(color) / 255d);
+        double green = linearColor(Color.green(color) / 255d);
+        double blue = linearColor(Color.blue(color) / 255d);
+        return 0.2126d * red + 0.7152d * green + 0.0722d * blue;
+    }
+
+    private double linearColor(double channel) {
+        return channel <= 0.03928d
+                ? channel / 12.92d
+                : Math.pow((channel + 0.055d) / 1.055d, 2.4d);
     }
 }

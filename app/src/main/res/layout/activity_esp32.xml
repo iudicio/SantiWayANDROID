@@ -1,63 +1,171 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0B1A2C"
-    android:orientation="vertical">
+    android:background="#0B1A2C">
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:background="#172A46"
+        android:layout_width="0dp"
+        android:layout_height="56dp"
+        android:background="#CC071427"
+        android:elevation="0dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="16dp"
+        app:contentInsetStartWithNavigation="0dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:navigationIcon="@drawable/ic_arrow_back"
         app:title="@string/esp32_management_title"
         app:titleTextColor="@android:color/white" />
 
-    <TextView
-        android:id="@+id/esp32_connection_status"
-        android:layout_width="match_parent"
+    <LinearLayout
+        android:id="@+id/esp32_status_panel"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:background="@drawable/bg_esp32_status_panel"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
         android:padding="16dp"
-        android:text="@string/esp32_status_disconnected"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/toolbar">
+
+        <View
+            android:id="@+id/esp32_status_indicator"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:background="@drawable/bg_status_dot" />
+
+        <TextView
+            android:id="@+id/esp32_connection_status"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
+            android:text="@string/esp32_status_disconnected"
+            android:textColor="@android:color/white"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/esp32_program_firmware"
+        android:layout_width="0dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp"
+        android:text="@string/esp32_program_action"
+        android:textAllCaps="false"
         android:textColor="@android:color/white"
-        android:textSize="16sp" />
+        app:backgroundTint="#172A46"
+        app:cornerRadius="8dp"
+        app:icon="@drawable/ic_setting"
+        app:iconTint="#F5A623"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/esp32_scan_button" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/esp32_map_button"
+        android:layout_width="0dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp"
+        android:text="@string/esp32_map_action"
+        android:textAllCaps="false"
+        android:textColor="@android:color/white"
+        app:backgroundTint="#172A46"
+        app:cornerRadius="8dp"
+        app:icon="@drawable/ic_map_pin"
+        app:iconTint="#3DDC84"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/esp32_program_firmware" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/esp32_scan_button"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_width="0dp"
+        android:layout_height="52dp"
         android:layout_marginStart="16dp"
+        android:layout_marginTop="12dp"
         android:layout_marginEnd="16dp"
         android:text="@string/esp32_find_and_connect"
-        android:textColor="@android:color/white"
-        app:backgroundTint="#172A46"
-        app:cornerRadius="12dp" />
+        android:textAllCaps="false"
+        android:textColor="@android:color/black"
+        android:textStyle="bold"
+        app:backgroundTint="#3DDC84"
+        app:cornerRadius="8dp"
+        app:icon="@drawable/ic_scan_arrows"
+        app:iconGravity="textStart"
+        app:iconTint="#071427"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/esp32_status_panel" />
 
     <TextView
-        android:layout_width="match_parent"
+        android:id="@+id/esp32_list_title"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:paddingStart="16dp"
-        android:paddingTop="16dp"
-        android:paddingEnd="16dp"
-        android:paddingBottom="8dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="20dp"
+        android:layout_marginEnd="16dp"
         android:text="@string/connected_devices_title"
         android:textColor="@android:color/white"
         android:textSize="18sp"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/esp32_map_button" />
 
-    <HorizontalScrollView
-        android:layout_width="match_parent"
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/esp32_connections_list"
+        android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:fillViewport="true">
-        <ScrollView android:layout_width="wrap_content" android:layout_height="match_parent">
-            <TableLayout
-                android:id="@+id/esp32_connections_table"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:padding="8dp"
-                android:stretchColumns="*" />
-        </ScrollView>
-    </HorizontalScrollView>
-</LinearLayout>
+        android:clipToPadding="false"
+        android:paddingTop="8dp"
+        android:paddingBottom="16dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/esp32_list_title" />
+
+    <LinearLayout
+        android:id="@+id/esp32_empty_state"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="32dp"
+        android:layout_marginEnd="32dp"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="24dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/esp32_connections_list"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@id/esp32_connections_list">
+
+        <ImageView
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_esp32_chip"
+            app:tint="#6F839C" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:text="@string/esp32_empty_devices"
+            android:textColor="@android:color/white"
+            android:textSize="15sp" />
+    </LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

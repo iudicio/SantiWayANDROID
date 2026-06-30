@@ -16,10 +16,12 @@ public class NotificationData implements Serializable {
     private List<String> binaryMimeTypes; // Типы контента (e.g., "image/jpeg", "application/vnd.android.package-archive")
     private Double latitude;
     private Double longitude;
+    private Double referenceLatitude;
+    private Double referenceLongitude;
     private String deviceId;
 
     public enum NotificationType {
-        ALARM, SYSTEM, INFO;
+        ALARM, SYSTEM, INFO, CELL_UNKNOWN;
 
         public int getColor() {
             switch (this) {
@@ -29,6 +31,8 @@ public class NotificationData implements Serializable {
                     return Color.parseColor("#3DDC84"); // Зеленый (как в вашем стиле)
                 case INFO:
                     return Color.parseColor("#808080"); // Серый
+                case CELL_UNKNOWN:
+                    return Color.parseColor("#FF9800");
                 default:
                     return Color.parseColor("#FFFFFF");
             }
@@ -38,6 +42,15 @@ public class NotificationData implements Serializable {
     public NotificationData(String id, String title, String text, Date timestamp, NotificationType type,
                             List<byte[]> binaryContents, List<String> binaryMimeTypes,
                             Double latitude, Double longitude, String deviceId) {
+        this(id, title, text, timestamp, type, binaryContents, binaryMimeTypes,
+                latitude, longitude, null, null, deviceId);
+    }
+
+    public NotificationData(String id, String title, String text, Date timestamp, NotificationType type,
+                            List<byte[]> binaryContents, List<String> binaryMimeTypes,
+                            Double latitude, Double longitude,
+                            Double referenceLatitude, Double referenceLongitude,
+                            String deviceId) {
         this.id = id;
         this.title = title;
         this.text = text;
@@ -47,6 +60,8 @@ public class NotificationData implements Serializable {
         this.binaryMimeTypes = binaryMimeTypes;
         this.latitude = latitude;
         this.longitude = longitude;
+        this.referenceLatitude = referenceLatitude;
+        this.referenceLongitude = referenceLongitude;
         this.deviceId = deviceId;
     }
 
@@ -60,6 +75,8 @@ public class NotificationData implements Serializable {
     public List<String> getBinaryMimeTypes() { return binaryMimeTypes; }
     public Double getLatitude() { return latitude; }
     public Double getLongitude() { return longitude; }
+    public Double getReferenceLatitude() { return referenceLatitude; }
+    public Double getReferenceLongitude() { return referenceLongitude; }
     public String getDeviceId() { return deviceId; }
 
     public boolean isDeletable() {

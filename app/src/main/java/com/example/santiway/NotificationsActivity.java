@@ -142,7 +142,7 @@ public class NotificationsActivity extends BaseLocalizedActivity implements Noti
         currentNotification = notification;
         String deviceId = notification.getDeviceId();
 
-        if (deviceId != null && !deviceId.isEmpty()) {
+        if (deviceId != null && !deviceId.isEmpty() && !deviceId.startsWith("opencellid_unknown:")) {
             openDeviceMap(deviceId);
         } else {
             // Если нет deviceId, открываем детали уведомления

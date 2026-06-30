@@ -31,7 +31,7 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:navigationIcon="?attr/homeAsUpIndicator"
+        app:navigationIcon="@drawable/ic_arrow_back"
         app:titleTextColor="@android:color/white" />
 
     <!-- Переключатель Target / Safe -->
@@ -59,7 +59,7 @@
             android:paddingEnd="12dp"
             android:text="@string/status_target_en"
             android:textAllCaps="false"
-            android:textColor="@android:color/white"
+            android:textColor="@android:color/black"
             android:textSize="12sp"
             android:textStyle="bold" />
 
@@ -75,44 +75,9 @@
             android:paddingEnd="12dp"
             android:text="@string/status_safe_en"
             android:textAllCaps="false"
-            android:textColor="@android:color/white"
+            android:textColor="@android:color/black"
             android:textSize="12sp"
             android:textStyle="bold" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/custom_zoom_container_map"
-        android:layout_width="48dp"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginEnd="16dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent">
-
-        <TextView
-            android:id="@+id/btn_zoom_in_map"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="@drawable/bg_map_zoom_button"
-            android:gravity="center"
-            android:text="@string/zoom_in"
-            android:textColor="@android:color/white"
-            android:textSize="28sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/btn_zoom_out_map"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/bg_map_zoom_button"
-            android:gravity="center"
-            android:text="@string/zoom_out"
-            android:textColor="@android:color/white"
-            android:textSize="30sp"
-            android:textStyle="bold" />
-
     </LinearLayout>
 
 <!--     Правая колонка круглых кнопок -->

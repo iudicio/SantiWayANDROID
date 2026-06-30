@@ -14,7 +14,7 @@ import java.util.List;
 public class NotificationDatabaseHelper extends SQLiteOpenHelper {
     private static final String TAG = "NotificationDBHelper";
     private static final String DATABASE_NAME = "notifications_history.db";
-    private static final int DATABASE_VERSION = 2; // Увеличиваем версию БД
+    private static final int DATABASE_VERSION = 3; // Увеличиваем версию БД
 
     // Константы имен колонок
     private static final String TABLE_NAME = "notifications";
@@ -26,6 +26,8 @@ public class NotificationDatabaseHelper extends SQLiteOpenHelper {
     private static final String COL_TYPE = "type";
     private static final String COL_LAT = "latitude";
     private static final String COL_LON = "longitude";
+    private static final String COL_REF_LAT = "reference_latitude";
+    private static final String COL_REF_LON = "reference_longitude";
     private static final String COL_DEVICE_IDENTIFIER = "device_identifier";
 
     public NotificationDatabaseHelper(Context context) {
@@ -43,6 +45,8 @@ public class NotificationDatabaseHelper extends SQLiteOpenHelper {
                 COL_TYPE + " TEXT, " +
                 COL_LAT + " DOUBLE, " +
                 COL_LON + " DOUBLE, " +
+                COL_REF_LAT + " DOUBLE, " +
+                COL_REF_LON + " DOUBLE, " +
                 COL_DEVICE_IDENTIFIER + " TEXT)";
         db.execSQL(createTableQuery);
         Log.d(TAG, "Database created with version " + DATABASE_VERSION);
@@ -61,6 +65,10 @@ public class NotificationDatabaseHelper extends SQLiteOpenHelper {
                 Log.e(TAG, "Error adding column: " + e.getMessage());
             }
         }
+        if (oldVersion < 3) {
+            addColumnIfMissing(db, COL_REF_LAT + " DOUBLE");
+            addColumnIfMissing(db, COL_REF_LON + " DOUBLE");
+        }
     }
 
     public void addNotification(NotificationData data, String deviceId) {
@@ -74,6 +82,8 @@ public class NotificationDatabaseHelper extends SQLiteOpenHelper {
         v.put(COL_TYPE, data.getType().name());
         v.put(COL_LAT, data.getLatitude());
         v.put(COL_LON, data.getLongitude());
+        v.put(COL_REF_LAT, data.getReferenceLatitude());
+        v.put(COL_REF_LON, data.getReferenceLongitude());
         v.put(COL_DEVICE_IDENTIFIER, data.getDeviceId() != null ? data.getDeviceId() : "");
 
         long result = db.insert(TABLE_NAME, null, v);
@@ -97,6 +107,8 @@ public class NotificationDatabaseHelper extends SQLiteOpenHelper {
                     int typeIdx = c.getColumnIndex(COL_TYPE);
                     int latIdx = c.getColumnIndex(COL_LAT);
                     int lonIdx = c.getColumnIndex(COL_LON);
+                    int refLatIdx = c.getColumnIndex(COL_REF_LAT);
+                    int refLonIdx = c.getColumnIndex(COL_REF_LON);
                     int deviceIdIdx = c.getColumnIndex(COL_DEVICE_IDENTIFIER);
 
                     if (idIdx == -1 || titleIdx == -1 || textIdx == -1 ||
@@ -110,6 +122,14 @@ public class NotificationDatabaseHelper extends SQLiteOpenHelper {
                         deviceId = c.getString(deviceIdIdx);
                         if (deviceId == null) deviceId = "";
                     }
+                    Double latitude = c.isNull(latIdx) ? null : c.getDouble(latIdx);
+                    Double longitude = c.isNull(lonIdx) ? null : c.getDouble(lonIdx);
+                    Double referenceLatitude = refLatIdx == -1 || c.isNull(refLatIdx)
+                            ? null
+                            : c.getDouble(refLatIdx);
+                    Double referenceLongitude = refLonIdx == -1 || c.isNull(refLonIdx)
+                            ? null
+                            : c.getDouble(refLonIdx);
 
                     NotificationData notification = new NotificationData(
                             c.getString(idIdx),
@@ -118,8 +138,10 @@ public class NotificationDatabaseHelper extends SQLiteOpenHelper {
                             new Date(c.getLong(timestampIdx)),
                             NotificationData.NotificationType.valueOf(c.getString(typeIdx)),
                             null, null,
-                            c.getDouble(latIdx),
-                            c.getDouble(lonIdx),
+                            latitude,
+                            longitude,
+                            referenceLatitude,
+                            referenceLongitude,
                             deviceId
                     );
                     list.add(notification);
@@ -157,6 +179,45 @@ public class NotificationDatabaseHelper extends SQLiteOpenHelper {
 
         if (c != null) c.close();
         return true;
+    }
+
+    public int countNotificationsByType(NotificationData.NotificationType type) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor c = null;
+        try {
+            c = db.rawQuery(
+                    "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE " + COL_TYPE + " = ?",
+                    new String[]{type.name()}
+            );
+            if (c != null && c.moveToFirst()) {
+                return c.getInt(0);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error counting notifications: " + e.getMessage());
+        } finally {
+            if (c != null) c.close();
+        }
+        return 0;
+    }
+
+    public int deleteOldNotifications(long maxAgeMillis) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        long cutoffTime = System.currentTimeMillis() - maxAgeMillis;
+        try {
+            return db.delete(TABLE_NAME, COL_TIMESTAMP + " < ?", new String[]{String.valueOf(cutoffTime)});
+        } catch (Exception e) {
+            Log.e(TAG, "Error deleting old notifications: " + e.getMessage());
+            return 0;
+        }
+    }
+
+    private void addColumnIfMissing(SQLiteDatabase db, String columnDefinition) {
+        try {
+            db.execSQL("ALTER TABLE " + TABLE_NAME + " ADD COLUMN " + columnDefinition);
+            Log.d(TAG, "Added column: " + columnDefinition);
+        } catch (Exception e) {
+            Log.e(TAG, "Error adding column " + columnDefinition + ": " + e.getMessage());
+        }
     }
 
     public void deleteNotification(String id) {

@@ -18,39 +18,6 @@
         android:src="@drawable/ic_map_pin"
         android:contentDescription="@string/content_desc_selected_point" />
 
-    <LinearLayout
-        android:id="@+id/custom_zoom_container"
-        android:layout_width="48dp"
-        android:layout_height="wrap_content"
-        android:layout_gravity="end|center_vertical"
-        android:layout_marginEnd="16dp"
-        android:orientation="vertical">
-
-        <TextView
-            android:id="@+id/btn_zoom_in"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="@drawable/bg_map_zoom_button"
-            android:gravity="center"
-            android:text="@string/zoom_in"
-            android:textColor="@android:color/white"
-            android:textSize="28sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/btn_zoom_out"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/bg_map_zoom_button"
-            android:gravity="center"
-            android:text="@string/zoom_out"
-            android:textColor="@android:color/white"
-            android:textSize="30sp"
-            android:textStyle="bold" />
-
-    </LinearLayout>
-
     <Button
         android:id="@+id/btn_select_static_location"
         android:layout_width="match_parent"

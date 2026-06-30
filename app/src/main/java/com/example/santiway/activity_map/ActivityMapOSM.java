@@ -14,6 +14,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.Manifest;
 import android.graphics.Path;
+import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -22,7 +23,6 @@ import androidx.fragment.app.Fragment;
 
 import org.osmdroid.api.IMapController;
 import org.osmdroid.config.Configuration;
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.Marker;
@@ -50,6 +50,13 @@ public class ActivityMapOSM extends Fragment {
     private String deviceMac;
     private String deviceName;
     private String deviceStatus = "scanned";
+    private View[] hideWhenDrawerOpen = new View[0];
+    private MapLayerManager.DrawerStateListener drawerStateListener;
+
+    public void setDrawerOverlayBehavior(MapLayerManager.DrawerStateListener listener, View... viewsToHide) {
+        drawerStateListener = listener;
+        hideWhenDrawerOpen = viewsToHide == null ? new View[0] : viewsToHide;
+    }
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -98,11 +105,21 @@ public class ActivityMapOSM extends Fragment {
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         // Создаем MapView
+        FrameLayout root = new FrameLayout(requireContext());
         mapView = new MapView(getContext());
         mapView.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
-        return mapView;
+        root.addView(mapView);
+        root.addView(MapLayerManager.createOsmControls(
+                requireContext(),
+                mapView,
+                112,
+                null,
+                drawerStateListener,
+                hideWhenDrawerOpen
+        ));
+        return root;
     }
 
     @Override
@@ -110,7 +127,7 @@ public class ActivityMapOSM extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         // Сначала настраиваем минимальную конфигурацию
-        mapView.setTileSource(TileSourceFactory.MAPNIK);
+        MapLayerManager.applySavedLayer(requireContext(), mapView);
         mapView.setMultiTouchControls(true);
         mapController = mapView.getController();
 
@@ -200,8 +217,7 @@ public class ActivityMapOSM extends Fragment {
                 try {
                     // Используем цвет в зависимости от статуса
                     int color = getStatusColor(deviceStatus);
-                    Bitmap customMarker = createCustomMarker(color);
-                    marker.setIcon(new BitmapDrawable(getResources(), customMarker));
+                    marker.setIcon(MapLayerManager.markerDrawable(requireContext(), color, 1));
                 } catch (Exception e) {
                     marker.setIcon(getResources().getDrawable(R.drawable.ic_mark));
                 }
@@ -212,13 +228,16 @@ public class ActivityMapOSM extends Fragment {
                     marker.setSnippet(getString(R.string.time_label_short) + " " + deviceHistoryTimestamps.get(i));
                 }
                 try {
-                    Bitmap smallMarker = createSmallMarker();
-                    marker.setIcon(new BitmapDrawable(getResources(), smallMarker));
+                    marker.setIcon(MapLayerManager.markerDrawable(
+                            requireContext(),
+                            Color.parseColor("#3DDC84"),
+                            1));
                 } catch (Exception e) {
                     // Используем стандартную иконку
                 }
             }
 
+            MapLayerManager.styleOsmMarkerInfoWindow(requireContext(), mapView, marker);
             mapView.getOverlays().add(marker);
             historyMarkers.add(marker);
         }
@@ -377,13 +396,13 @@ public class ActivityMapOSM extends Fragment {
 
     public void zoomIn() {
         if (mapView != null) {
-            mapView.getController().zoomIn();
+            mapView.getController().setZoom(mapView.getZoomLevelDouble() + 3.0);
         }
     }
 
     public void zoomOut() {
         if (mapView != null) {
-            mapView.getController().zoomOut();
+            mapView.getController().setZoom(mapView.getZoomLevelDouble() - 3.0);
         }
     }
 }

@@ -50,10 +50,10 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
     private TextView tvFirstDetected;
     private TextView tvLastDetected;
     private TextView tvDetectionCount;
-    private TextView btnZoomInMap;
-    private TextView btnZoomOutMap;
     private Button btnMakeTarget;
     private Button btnMakeSafe;
+    private Toolbar toolbarMap;
+    private CharSequence toolbarTitle;
 
     // Данные устройства
     private String deviceMac;
@@ -85,7 +85,7 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
         initViews();
 
         View root = findViewById(R.id.root_activity_map);
-        Toolbar toolbar = findViewById(R.id.toolbar_map);
+        toolbarMap = findViewById(R.id.toolbar_map);
         View actionsContainer = findViewById(R.id.status_actions_container);
         View infoCard = findViewById(R.id.device_info_card);
 
@@ -94,16 +94,16 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
 
             int toolbarHeight = bars.top + dpToPx(56);
 
-            if (toolbar != null) {
-                ViewGroup.LayoutParams toolbarLp = toolbar.getLayoutParams();
+            if (toolbarMap != null) {
+                ViewGroup.LayoutParams toolbarLp = toolbarMap.getLayoutParams();
                 toolbarLp.height = toolbarHeight;
-                toolbar.setLayoutParams(toolbarLp);
+                toolbarMap.setLayoutParams(toolbarLp);
 
-                toolbar.setPadding(
-                        toolbar.getPaddingLeft(),
+                toolbarMap.setPadding(
+                        toolbarMap.getPaddingLeft(),
                         bars.top,
-                        toolbar.getPaddingRight(),
-                        toolbar.getPaddingBottom()
+                        toolbarMap.getPaddingRight(),
+                        toolbarMap.getPaddingBottom()
                 );
             }
 
@@ -151,8 +151,6 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
         // Настройка кнопок
         setupButtons();
 
-        setupMapZoomButtons();
-
         // Отображение данных
         displayDeviceInfo();
 
@@ -171,8 +169,6 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
         btnMakeTarget = findViewById(R.id.btn_make_target);
         btnMakeSafe = findViewById(R.id.btn_make_safe);
 
-        btnZoomInMap = findViewById(R.id.btn_zoom_in_map);
-        btnZoomOutMap = findViewById(R.id.btn_zoom_out_map);
     }
 
     private int dpToPx(int dp) {
@@ -195,6 +191,31 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
 
     private void loadDeviceData() {
         MainDatabaseHelper dbHelper = new MainDatabaseHelper(this);
+        int summaryPointLimit = getSharedPreferences("AppSettings", MODE_PRIVATE)
+                .getInt("map_point_limit", 100);
+        MainDatabaseHelper.DeviceHistorySummary summary =
+                dbHelper.getDeviceHistorySummaryByKey(tableName, deviceMac, deviceType, summaryPointLimit);
+
+        if (!summary.isEmpty()) {
+            detectionCount = summary.detectionCount;
+            firstDetectionTime = summary.firstTimestamp;
+            lastDetectionTime = summary.lastTimestamp;
+
+            if (deviceType == null) {
+                deviceType = "Wi-Fi/Bluetooth";
+            }
+
+            if (currentStatus == null || "GREY".equalsIgnoreCase(currentStatus)) {
+                currentStatus = dbHelper.getStatusFromServiceTables(deviceMac);
+            }
+
+            for (MainDatabaseHelper.DeviceLocation loc : summary.points) {
+                deviceHistoryPoints.add(new GeoPoint(loc.latitude, loc.longitude));
+                deviceTimestamps.add(Long.parseLong(loc.timestamp));
+            }
+            dbHelper.close();
+            return;
+        }
 
         // Получаем историю устройства
         List<MainDatabaseHelper.DeviceLocation> history =
@@ -259,48 +280,36 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
                 deviceTimestamps.add(Long.parseLong(loc.timestamp));
             }
         }
+        dbHelper.close();
     }
 
     public String getDeviceStatus(String tableName, String mac) {
         MainDatabaseHelper dbHelper = new MainDatabaseHelper(this);
-        return dbHelper.getStatusFromServiceTables(mac);
+        try {
+            return dbHelper.getStatusFromServiceTables(mac);
+        } finally {
+            dbHelper.close();
+        }
     }
 
     private void setupToolbar() {
-        Toolbar toolbar = findViewById(R.id.toolbar_map);
-        setSupportActionBar(toolbar);
-        toolbar.getNavigationIcon().setTint(Color.WHITE);
+        toolbarMap = findViewById(R.id.toolbar_map);
+        setSupportActionBar(toolbarMap);
+        toolbarMap.getNavigationIcon().setTint(Color.WHITE);
         if (getSupportActionBar() != null) {
             String title = (deviceName != null && !deviceName.isEmpty())
                     ? deviceName
                     : (deviceMac != null ? deviceMac : getString(R.string.device_map_title));
-            getSupportActionBar().setTitle(title);
+            toolbarTitle = title;
+            getSupportActionBar().setTitle(toolbarTitle);
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
-        toolbar.setNavigationOnClickListener(v -> onBackPressed());
+        toolbarMap.setNavigationOnClickListener(v -> onBackPressed());
     }
 
     private void setupButtons() {
         updateStatusToggle();
-    }
-
-    private void setupMapZoomButtons() {
-        if (btnZoomInMap != null) {
-            btnZoomInMap.setOnClickListener(v -> {
-                if (mapFragment != null) {
-                    mapFragment.zoomIn();
-                }
-            });
-        }
-
-        if (btnZoomOutMap != null) {
-            btnZoomOutMap.setOnClickListener(v -> {
-                if (mapFragment != null) {
-                    mapFragment.zoomOut();
-                }
-            });
-        }
     }
 
     private void updateStatusToggle() {
@@ -327,9 +336,10 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
     }
 
     private void setupStatusButton(Button button, String text, String colorHex, String statusToSet) {
+        int backgroundColor = Color.parseColor(colorHex);
         button.setText(text);
         button.setAlpha(1f);
-        button.setTextColor(Color.WHITE);
+        button.setTextColor(readableTextColor(backgroundColor));
         button.setBackground(makeRoundedDrawable(colorHex, 18));
 
         button.setOnClickListener(v -> {
@@ -341,8 +351,45 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
 
     private void setInfoCardColor(String colorHex) {
         if (deviceInfoCard != null) {
+            int backgroundColor = Color.parseColor(colorHex);
             deviceInfoCard.setBackground(makeRoundedDrawable(colorHex, 16));
+            applyTextColorRecursive(deviceInfoCard, readableTextColor(backgroundColor));
+            if (tvDetectionCount != null) {
+                tvDetectionCount.setTextColor(Color.WHITE);
+            }
         }
+    }
+
+    private void applyTextColorRecursive(View view, int textColor) {
+        if (view instanceof TextView) {
+            ((TextView) view).setTextColor(textColor);
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                applyTextColorRecursive(group.getChildAt(i), textColor);
+            }
+        }
+    }
+
+    private int readableTextColor(int backgroundColor) {
+        double luminance = relativeLuminance(backgroundColor);
+        double contrastWithBlack = (luminance + 0.05d) / 0.05d;
+        double contrastWithWhite = 1.05d / (luminance + 0.05d);
+        return contrastWithBlack >= contrastWithWhite ? Color.BLACK : Color.WHITE;
+    }
+
+    private double relativeLuminance(int color) {
+        double red = linearColor(Color.red(color) / 255d);
+        double green = linearColor(Color.green(color) / 255d);
+        double blue = linearColor(Color.blue(color) / 255d);
+        return 0.2126d * red + 0.7152d * green + 0.0722d * blue;
+    }
+
+    private double linearColor(double channel) {
+        return channel <= 0.03928d
+                ? channel / 12.92d
+                : Math.pow((channel + 0.055d) / 1.055d, 2.4d);
     }
 
     private GradientDrawable makeRoundedDrawable(String colorHex, int radiusDp) {
@@ -449,6 +496,11 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
 
     private void showMapFragment() {
         mapFragment = new ActivityMapOSM();
+        mapFragment.setDrawerOverlayBehavior(
+                this::setDrawerChromeHidden,
+                findViewById(R.id.status_actions_container),
+                deviceInfoCard
+        );
 
         // Передаем данные во фрагмент
         Bundle args = new Bundle();
@@ -481,6 +533,14 @@ public class ActivityMapActivity extends BaseLocalizedActivity {
                 .beginTransaction()
                 .replace(R.id.map_container, mapFragment)
                 .commit();
+    }
+
+    private void setDrawerChromeHidden(boolean hidden) {
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setTitle(hidden ? "" : toolbarTitle);
+        } else if (toolbarMap != null) {
+            toolbarMap.setTitle(hidden ? "" : toolbarTitle);
+        }
     }
 
     @Override

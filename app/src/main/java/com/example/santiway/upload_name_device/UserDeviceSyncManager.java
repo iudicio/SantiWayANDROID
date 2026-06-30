@@ -2,6 +2,7 @@ package com.example.santiway.upload_name_device;
 import com.example.santiway.upload_data.ApiService;
 import com.example.santiway.upload_data.ApiConfig;
 import com.example.santiway.upload_data.ApiResponse;
+import com.example.santiway.upload_data.ServerUploadConfig;
 import com.example.santiway.host_database.AppSettingsRepository;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -40,6 +41,10 @@ public class UserDeviceSyncManager {
 
     // === ГЛАВНЫЙ МЕТОД ===
     public void syncOwnerDevice() {
+        if (!ServerUploadConfig.isEnabled(context)) {
+            Log.d(TAG, "Server upload disabled - skip owner device sync");
+            return;
+        }
         new Thread(() -> {
             try {
                 String apiKey = ApiConfig.getApiKey(context);
