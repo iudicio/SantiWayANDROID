@@ -485,10 +485,24 @@ public class Esp32DatabaseHelper extends SQLiteOpenHelper {
     }
 
     public Cursor getMapDevices() {
-        return getReadableDatabase().query("esp_devices",
-                new String[]{"mac_address", "name", "latitude", "longitude", "altitude",
-                        "coordinates_mode", "coordinates_updated_at", "is_connected"},
-                "latitude<>0 AND longitude<>0", null, null, null, "coordinates_updated_at DESC");
+        return getReadableDatabase().query(
+                "esp_devices",
+                new String[]{
+                        "mac_address",
+                        "name",
+                        "latitude",
+                        "longitude",
+                        "altitude",
+                        "coordinates_mode",
+                        "coordinates_updated_at",
+                        "is_connected"
+                },
+                null,
+                null,
+                null,
+                null,
+                "is_connected DESC, coordinates_updated_at DESC, name COLLATE NOCASE"
+        );
     }
 
     public static final class PhonePosition {

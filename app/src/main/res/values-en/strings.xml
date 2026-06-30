@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_config_title">Application Settings</string>
+    <string name="settings">Settings</string>
     <string name="general_settings_title">General Settings</string>
     <string name="server_ipv4_hint">Server IPv4 address</string>
     <string name="device_name_hint">Device name</string>

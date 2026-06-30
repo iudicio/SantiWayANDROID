@@ -1,8 +1,10 @@
 package com.example.santiway.esp32;
 
 import android.Manifest;
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -33,6 +35,8 @@ import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
+import android.location.Location;
+import com.example.santiway.gsm_protocol.LocationManager;
 import com.example.santiway.FolderNameHelper;
 import com.example.santiway.R;
 import com.example.santiway.upload_data.MainDatabaseHelper;
@@ -83,11 +87,33 @@ public class Esp32ConnectionService extends Service {
         adapter = manager != null ? manager.getAdapter() : null;
         phoneBeaconId = getOrCreatePhoneBeaconId();
         createChannel();
-        startForeground(3201, new NotificationCompat.Builder(this, CHANNEL_ID)
+        Intent notificationIntent = new Intent(this, Esp32Activity.class);
+        notificationIntent.setFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK |
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP |
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP
+        );
+
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                this,
+                3201,
+                notificationIntent,
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                        ? PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                        : PendingIntent.FLAG_UPDATE_CURRENT
+        );
+
+        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_device)
                 .setContentTitle(getString(R.string.esp32_service_title))
                 .setContentText(getString(R.string.esp32_service_text))
-                .setOngoing(true).setPriority(NotificationCompat.PRIORITY_LOW).build());
+                .setOngoing(true)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setOnlyAlertOnce(true)
+                .setContentIntent(pendingIntent)
+                .build();
+
+        startForeground(3201, notification);
         startPhoneBeacon();
         handler.post(scanCycle);
         handler.post(positionRefreshCycle);
@@ -230,7 +256,15 @@ public class Esp32ConnectionService extends Service {
         @Override public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 connecting.remove(mac);
-                database.upsertDevice(mac, "ESP32 " + mac.substring(Math.max(0, mac.length() - 5)), 0, 0, 0);
+                double[] coords = getFallbackAnchorCoordinates();
+
+                database.upsertDevice(
+                        mac,
+                        "ESP32 " + mac.substring(Math.max(0, mac.length() - 5)),
+                        coords[0],
+                        coords[1],
+                        coords[2]
+                );
                 database.setConnected(mac, true);
                 if (!gatt.requestMtu(247)) gatt.discoverServices();
                 broadcastChanged();
@@ -291,6 +325,33 @@ public class Esp32ConnectionService extends Service {
             }
             broadcastChanged();
         } catch (NumberFormatException ignored) { }
+    }
+
+    private double[] getFallbackAnchorCoordinates() {
+        SharedPreferences prefs = getSharedPreferences("AppSettings", MODE_PRIVATE);
+
+        if (prefs.getBoolean("static_location_enabled", false)) {
+            float lat = prefs.getFloat("static_latitude", 0f);
+            float lon = prefs.getFloat("static_longitude", 0f);
+
+            if (lat != 0f || lon != 0f) {
+                return new double[]{lat, lon, 0.0};
+            }
+        }
+
+        try {
+            Location location = LocationManager.getInstance(this).getBestEffortLocation();
+            if (location != null && (location.getLatitude() != 0.0 || location.getLongitude() != 0.0)) {
+                return new double[]{
+                        location.getLatitude(),
+                        location.getLongitude(),
+                        location.hasAltitude() ? location.getAltitude() : 0.0
+                };
+            }
+        } catch (Exception ignored) {
+        }
+
+        return new double[]{0.0, 0.0, 0.0};
     }
 
     private void processRelayedRecord(String proxyMac, String[] fields) {
