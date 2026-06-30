@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_config_title">应用设置</string>
+    <string name="settings">设置</string>
     <string name="general_settings_title">常规设置</string>
     <string name="server_ipv4_hint">服务器 IPv4 地址</string>
     <string name="device_name_hint">设备名称</string>

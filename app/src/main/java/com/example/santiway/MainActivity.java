@@ -893,7 +893,7 @@ public class MainActivity extends BaseLocalizedActivity implements NavigationVie
         int textRes = scanning ? R.string.scanning_status : R.string.stopped_status;
 
         playPauseButton.setImageResource(scanning
-                ? R.drawable.ic_stop_scan
+                ? R.drawable.ic_pause_scan
                 : R.drawable.ic_play_scan);
 
         if (scanArrowsIcon != null) {

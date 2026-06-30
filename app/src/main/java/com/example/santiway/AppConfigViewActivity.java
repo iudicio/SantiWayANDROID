@@ -435,6 +435,24 @@ public class AppConfigViewActivity extends BaseLocalizedActivity {
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         mapLayerSpinner.setAdapter(adapter);
         mapLayerSpinner.setSelection(MapLayerManager.savedLayerIndex(this));
+        mapLayerSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            private boolean firstCall = true;
+
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (firstCall) {
+                    firstCall = false;
+                    return;
+                }
+
+                MapLayerManager.saveLayerIndex(AppConfigViewActivity.this, position);
+                Toast.makeText(AppConfigViewActivity.this, "Слой карты сохранён", Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
     }
 
     private void setupAppSettingsUI() {

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_config_title">إعدادات التطبيق</string>
+    <string name="settings">الإعدادات</string>
     <string name="general_settings_title">الإعدادات العامة</string>
     <string name="server_ipv4_hint">عنوان IPv4 للخادم</string>
     <string name="device_name_hint">اسم الجهاز</string>
